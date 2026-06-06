@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  postgres_test:
+    image: postgres:16-alpine
+    container_name: bi_postgres_container
+    restart: always
+    environment:
+      POSTGRES_USER: dev_admin
+      POSTGRES_PASSWORD: SecretPassword123
+      POSTGRES_DB: bi_testing_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_bi_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev_admin -d bi_testing_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  cube:
+    image: cubejs/cube:v0.36
+    container_name: demo_cube
+    ports:
+      - "4000:4000"     # REST/GraphQL API
+      - "15432:15432"   # Virtual SQL API
+    environment:
+      CUBEJS_API_SECRET: my_super_secret_key_12345
+      CUBEJS_DEV_MODE: "true"
+      CUBEJS_WEB_SOCKETS: "true"
+    volumes:
+      # CHANGED target path from /cube/conf/schema to /cube/conf/model
+      - ./backend/cube/model:/cube/conf/model
+      - ./backend/cube/cube.py:/cube/conf/cube.py
+    depends_on:
+      postgres_test:
+        condition: service_healthy
+
+volumes:
+  pg_bi_data:
