@@ -1,4 +1,4 @@
 sqlite.db
 chester-bi.db
+.local/*
 
-./backend/cube/model/cubes/*.yml

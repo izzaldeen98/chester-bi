@@ -19,23 +19,5 @@ services:
       timeout: 5s
       retries: 5
 
-  cube:
-    image: cubejs/cube:v0.36
-    container_name: demo_cube
-    ports:
-      - "4000:4000"     # REST/GraphQL API
-      - "15432:15432"   # Virtual SQL API
-    environment:
-      CUBEJS_API_SECRET: my_super_secret_key_12345
-      CUBEJS_DEV_MODE: "true"
-      CUBEJS_WEB_SOCKETS: "true"
-    volumes:
-      # CHANGED target path from /cube/conf/schema to /cube/conf/model
-      - ./backend/cube/model:/cube/conf/model
-      - ./backend/cube/cube.py:/cube/conf/cube.py
-    depends_on:
-      postgres_test:
-        condition: service_healthy
-
 volumes:
   pg_bi_data:

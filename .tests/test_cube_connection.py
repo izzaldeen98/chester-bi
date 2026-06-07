@@ -1,38 +1,54 @@
+# backend/cube/test_query.py
+import os
+import time
 import jwt
 import requests
+from dotenv import load_dotenv
 
-# 1. Define your security credentials
-# The CUBE_SECRET must match the CUBEJS_API_SECRET in your docker-compose file
-CUBE_SECRET = "my_super_secret_key_12345"
-CUBE_URL = "http://localhost:4000/cubejs-api/v1/load"
+load_dotenv()
 
-# 2. Package the target database credentials dynamically into the payload
-target_database_payload = {
-    "db_type": "postgres",
-    "db_host": "postgres_test",        # Name of your DB service in docker-compose
-    "db_name": "bi_testing_db",
-    "db_user": "dev_admin",
-    "db_pass": "SecretPassword123",
-    "exp": 1811883800                  # Token expiration timestamp
+CUBE_SECRET = os.getenv("CUBE_SECRET")
+CUBE_HOST   = os.getenv("CUBE_HOST", "localhost")
+CUBE_PORT   = os.getenv("CUBE_PORT", "4000")
+CUBE_URL    = f"http://{CUBE_HOST}:{CUBE_PORT}/cubejs-api/v1/load"
+
+if not CUBE_SECRET:
+    raise EnvironmentError("CUBE_SECRET is not set in your .env file")
+
+now = int(time.time())
+
+token_payload = {
+        # <-- THIS wrapper is what was missing
+        "tenant_id": "customer_acme_corp_42",
+        "db_type":   "postgres",
+        "db_host":   "host.docker.internal",
+        "db_name":   "bi_testing_db",
+        "db_user":   "dev_admin",
+        "db_pass":   "SecretPassword123",
+        "db_port":   5432,
+
 }
 
-# 3. Encrypt the credentials into a JWT token
-# token = jwt.encode(target_database_payload, CUBE_SECRET, algorithm="HS256")
+token = jwt.encode(token_payload, CUBE_SECRET, algorithm="HS256")
 
-# 4. Build your semantic query (using the measures & dimensions in your model)
 query_payload = {
     "query": {
-        "measures": ["order_items.total_unit_price"],
-        "dimensions": ["stores.name"]
+        "dimensions": ["stores.name"],
     }
 }
 
-# 5. Establish the connection and query Cube through the API
-# headers = {"Authorization": token}
-response = requests.post(CUBE_URL, json=query_payload)
+headers = {
+    "Authorization": token,
+    "Content-Type":  "application/json",
+}
 
-print(response.text)
+print(f"[test] Hitting: {CUBE_URL}")
+response = requests.post(CUBE_URL, json=query_payload, headers=headers)
 
-# 6. View your results
-data = response.json().get("data")
-print(data)
+try:
+    response.raise_for_status()
+    print("[test] Success:", response.json())
+except requests.HTTPError:
+    print(f"[test] HTTP {response.status_code} error:", response.text)
+except Exception as e:
+    print("[test] Unexpected error:", e)

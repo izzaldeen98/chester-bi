@@ -8,7 +8,8 @@ class Connection(Base):
     __tablename__ = "connections"
     id = Column(Integer, primary_key=True, index=True)
     public_key = Column(UUID, nullable=False, unique=True, index=True, default=uuid.uuid4)
-    name = Column(String, nullable=False)
+    type = Column(String, nullable=False)
+    name = Column(String, nullable=False )
     description = Column(String, nullable=True)
     host = Column(String, nullable=False)
     port = Column(Integer, nullable=False)
@@ -23,7 +24,9 @@ class Connection(Base):
     updated_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_by_public_key = Column(UUID, nullable=False)
     updated_by_public_key = Column(UUID, nullable=False)
-    
+
+
+    is_active = Column(Boolean, default=True)
 
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
