@@ -1,0 +1,77 @@
+
+
+source: stores is test_db.table('public.stores') extend {
+    
+    primary_key: `Store ID`
+    dimension:
+        `Store ID` is id
+        `Store Name` is name
+        `Store Region` is region
+        `Store Manager` is manager
+    measure:
+        `Total Stores` is count()
+    view: store_summary is {
+        group_by: `Store Region`
+        aggregate:
+            `Total Stores`
+    }
+}
+
+source: orders is test_db.table('public.orders') extend {
+  join_one: stores on store_id = stores.id
+  primary_key: `Order ID`
+  // --- Dimensions ---
+  dimension:
+    `Order ID` is id
+    `Order Status` is status
+    `Order Number` is order_number
+    `Order Year` is created_at.year
+    `Order Month` is created_at.month
+    `Store ID` is store_id
+
+
+  // Existing table columns such as:
+  // order_number, customer_email, store_id, created_at
+  // are already available directly from public.orders.
+
+  // --- Measures ---
+  measure:
+    `Total Orders` is count()
+    `Unique Customers Count` is count(customer_email)
+    `Status Count` is count(status)
+
+  // --- Pre-defined Analytical View ---
+  view: order_summary is {
+    group_by: `Order Status`
+    aggregate:
+      `Total Orders`
+      `Unique Customers Count`
+      `Status Count`
+  }
+}
+
+source: order_items is test_db.table('public.order_items') extend {
+  join_one: orders on order_id = orders.id
+  primary_key: `Order Item ID`
+  // --- Dimensions ---
+  dimension:
+    `Order Item ID` is id
+    `Product Name` is product_name
+    `Category` is category
+    `Quantity` is quantity
+    `Price` is unit_price
+    `Total Price` is quantity * unit_price
+
+  // Existing table columns such as:
+  // order_id, product_id, quantity, price
+  // are already available directly from public.order_items.
+
+  // --- Measures ---
+  measure:
+    `Total Revenue` is sum(quantity * unit_price)
+    `Total Quantity` is sum(quantity)
+
+  
+
+}
+

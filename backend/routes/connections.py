@@ -74,3 +74,15 @@ async def update_connection(
 ):
     connection = db.query(Connection).filter(and_(Connection.account_id == current_user.account_id, Connection.is_active == True , User.id == current_user.id)).first()
     return connection
+
+@router.get("/test-connection")
+async def test_connection(
+    connection_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    connection = db.query(Connection).filter(and_(Connection.account_id == current_user.account_id, Connection.is_active == True , Connection.public_key == connection_id)).first()
+    if not connection:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found")
+    return connection
+    return connection

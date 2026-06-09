@@ -25,6 +25,8 @@ a `json` file that contains how metric is calculated.
 2. S3 Storage
 3. Apache Ozzie
 
+## Semantic Layer 
+- MetricFlow
 
 ---
 

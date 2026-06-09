@@ -79,7 +79,7 @@ with SessionLocal() as db:
     }
 
     # Generate 500 total orders over a rolling historical timeline (past 60 days)
-    for i in range(1, 501):
+    for i in range(1, 10000):
         random_days_ago = random.randint(0, 60)
         order_date = datetime.utcnow() - timedelta(days=random_days_ago)
         
