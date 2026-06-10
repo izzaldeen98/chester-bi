@@ -4,11 +4,12 @@ from sqlalchemy.sql import func
 from utils.init_database import Base
 import uuid
 
-class CubeModel(Base):
-    __tablename__ = "cube_models"
+class SemanticModel(Base):
+    __tablename__ = "semantic_models"
     id = Column(Integer, primary_key=True, index=True)
     public_key = Column(UUID, nullable=False, unique=True, index=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
     file_path = Column(String, nullable=False)
     connection_id = Column(Integer, ForeignKey("connections.id"), nullable=False)
     connection_public_key = Column(UUID, nullable=False)

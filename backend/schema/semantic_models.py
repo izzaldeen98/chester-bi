@@ -2,8 +2,9 @@ from pydantic import BaseModel, Field
 from uuid import UUID
 from datetime import datetime
 
-class CubeModelBase(BaseModel):
+class SemanticModelBase(BaseModel):
     name: str = Field(..., min_length=3)
+    description: str = Field(...)
     
     # 1. Fixed mutable default timestamp using default_factory
     created_at: datetime = Field(default_factory=datetime.now)
@@ -21,7 +22,7 @@ class CubeModelBase(BaseModel):
 
     
 
-class CubeModelPublicResponse(BaseModel):
+class SemanticModelPublicResponse(BaseModel):
     id: UUID = Field(..., validation_alias="public_key")
     file_path: str
     name: str

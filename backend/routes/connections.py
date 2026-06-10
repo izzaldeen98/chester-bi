@@ -8,6 +8,7 @@ from models.connections import Connection
 from typing import List
 from security import encrypt_password
 from sqlalchemy import and_
+from uuid import UUID
 
 
 

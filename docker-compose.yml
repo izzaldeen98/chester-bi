@@ -26,7 +26,7 @@ services:
       - "4040:4040"  # MCP endpoint for AI agents
     restart: unless-stopped
     volumes:
-      - ./malloy/publisher_data:/publisher/publisher_data
+      - ./.local/publisher_data:/publisher/publisher_data/
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/status"]
       interval: 30s
