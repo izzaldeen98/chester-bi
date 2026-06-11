@@ -9,7 +9,7 @@ class Account(Base):
     id = Column(Integer, primary_key=True, index=True)
     public_key = Column(UUID, nullable=False , unique=True , index=True , default=uuid.uuid4)
     name = Column(String, nullable=False)
-    description = Column(String, nullable=False)
+    description = Column(String, nullable=True)
     
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())

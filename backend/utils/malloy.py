@@ -429,6 +429,22 @@ class Malloy:
             if connection.name == name:
                 return connection
         return None
+    @classmethod
+    def test_connection(cls , type: str, host: str, port: int, databaseName: str, userName: str, password: str):
+        payload = {
+            "type": type,
+            "postgresConnection": {
+            "host": host,
+            "port": port,
+            "databaseName": databaseName,
+            "userName": userName,
+            "password": password,}
+        }
+
+        response = requests.post(f"{MALLOY_URL}/api/v0/connections/test", json=payload)
+        if response.status_code != 200:
+            raise Exception(f"Failed to test connection: {response.text}")
+        return True
 
     
     def __str__(self):

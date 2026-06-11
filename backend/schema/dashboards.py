@@ -26,9 +26,8 @@ class DashboardPublicResponse(BaseModel):
     description: str
     created_at: datetime
     updated_at: datetime
-    created_by_public_key: Optional[UUID] = Field(None , serialize_alias="created_by")
-    updated_by_public_key: Optional[UUID] = Field(None , serialize_alias="updated_by")
+    created_by : UUID
+    updated_by : UUID
 
-    class Config:
-        from_attributes = True
+
 

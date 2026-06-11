@@ -5,7 +5,7 @@ import jwt
 from pwdlib import PasswordHash
 from dotenv import load_dotenv
 from cryptography.fernet import Fernet
-
+from models.user import User
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -38,5 +38,8 @@ def create_access_token(data: dict , expires_delta: Optional[timedelta] = None) 
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+def check_permissions( user: User , *permissions) -> bool:
+    return any(permission in user.permissions for permission in permissions)
 
     

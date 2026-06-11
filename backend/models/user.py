@@ -38,8 +38,7 @@ class User(Base):
     updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     
     # These store the UUIDs for quick frontend API consumption, but don't need FK constraints
-    created_by_public_key = Column(UUID, nullable=True)
-    updated_by_public_key = Column(UUID, nullable=True)
+
 
     # 🔗 Clean Self-Referential Relationships
     # This allows you to do: user.creator.username or user.updater.email

@@ -29,15 +29,15 @@ class UserUpdate(BaseModel):
 
 
 class UserPublicResponse(UserBase):
-    public_key: UUID
+    id: UUID
     is_active: bool
     role: str
     email : str | None = None
     permissions: List[str]
     created_at: datetime
     updated_at: datetime
-    created_by_public_key: UUID | None = None
-    updated_by_public_key: UUID | None = None
+    created_by: UUID | None = None
+    updated_by: UUID | None = None
 
     class Config:
         from_attributes = True

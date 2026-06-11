@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, UUID
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, UUID, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from utils.init_database import Base
@@ -11,19 +11,12 @@ class Connection(Base):
     type = Column(String, nullable=False)
     name = Column(String, nullable=False )
     description = Column(String, nullable=True)
-    host = Column(String, nullable=False)
-    port = Column(Integer, nullable=False)
-    username = Column(String, nullable=False)
-    password = Column(String, nullable=False)
-    namespace = Column(String, nullable=True)
-    schema = Column(String, nullable=True)
-    database = Column(String, nullable=True)
 
+    connection_attributes = Column(JSON, nullable=False)
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     updated_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_by_public_key = Column(UUID, nullable=False)
-    updated_by_public_key = Column(UUID, nullable=False)
+
 
 
     is_active = Column(Boolean, default=True)

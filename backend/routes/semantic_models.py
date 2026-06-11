@@ -17,7 +17,8 @@ from fastapi import Query, Form, UploadFile
 from fastapi.responses import StreamingResponse
 from models.account import Account
 from utils.malloy import Malloy
-
+import hashlib
+from utils.redis_handler import cache_query, get_cached_query
 import json
 
 router = APIRouter(prefix="/api/v1/semantic_models")
@@ -134,11 +135,6 @@ async def create_cube_model(
         f"/publisher/publisher_data/{str(account.public_key)}/{connection.name}"
     )
 
-    # if new_semantic_model.file_path.startswith("file://"):
-    #     copy_to = "malloy/publisher_data/" + account.public_key + "/" + connection.public_key + "/"
-    #     await storage.copy_file(publisher_file, copy_to)
-    #     await storage.copy_file(new_semantic_model.file_path.replace("file://", ""), copy_to)
-
     malloy.create_package(
         name=name,
         description=description if description else "No description",
@@ -187,9 +183,10 @@ async def list_semantic_models(
     return semantic_models
 
 
-@router.get("/get-file")  # 1. Removed response_model to allow raw file download
+@router.get("/content/{name}")  # 1. Removed response_model to allow raw file download
 async def get_semantic_model_file(
     id: UUID = Form(...),
+    
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     # 2. Removed "min_length=3" because it is a UUID type, not a string
@@ -283,7 +280,13 @@ async def query_semantic_model(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Semantic model not found"
         )
+    
     account = db.query(Account).filter(Account.id == current_user.account_id).first()
+
+    query_hash = hashlib.sha256(query.encode()).hexdigest()
+    cached_query = get_cached_query(account.id, query_hash)
+    if cached_query:
+        return cached_query
     malloy = Malloy(envid=str(account.public_key))
     package = malloy.get_package_by_name(package)
     if not package:
@@ -296,6 +299,7 @@ async def query_semantic_model(
             status_code=status.HTTP_404_NOT_FOUND, detail="Model not found"
         )
     result = model.query(query)
+    cache_query(account.id, query_hash, result)
     return result
 
 

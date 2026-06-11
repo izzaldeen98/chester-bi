@@ -9,8 +9,8 @@ from security import (
     create_access_token,
 )
 from utils.init_database import get_db
-from schema.account import AccountWithSuperuserPayload
 from models.account import Account
+from schema.account import OwnerCreate
 
 router = APIRouter(prefix="/api/v1/auth")
 
@@ -26,6 +26,8 @@ async def login_for_access_token(
         )
         .first()
     )
+
+    print(user.company_name)
 
     if not user:
         raise HTTPException(
@@ -46,13 +48,13 @@ async def login_for_access_token(
             "email": user.email,
             "first_name": user.first_name,
             "last_name": user.last_name,
-            "company_name": user.account.name,
+            "account_name": user.account.name,
         },
     }
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-def register_user(payload: AccountWithSuperuserPayload, db: Session = Depends(get_db)):
+def register_user(payload: OwnerCreate, db: Session = Depends(get_db)):
 
     user = (
         db.query(User)
@@ -79,8 +81,6 @@ def register_user(payload: AccountWithSuperuserPayload, db: Session = Depends(ge
         is_active=True,
         account_id=new_account.id,
         is_superuser=True,
-        created_by_public_key=None,
-        updated_by_public_key=None,
         first_name=payload.first_name,
         last_name=payload.last_name,
         created_by = None,
@@ -91,10 +91,4 @@ def register_user(payload: AccountWithSuperuserPayload, db: Session = Depends(ge
     db.commit()
     db.refresh(superuser)
 
-    return {
-        "user_id": superuser.id,
-        "username": superuser.username,
-        "email": superuser.email,
-        "account_id" : new_account.public_key,
-        "account_name" : new_account.name
-    }
+    return {"message": "Account created successfully"}
