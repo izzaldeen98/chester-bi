@@ -160,7 +160,7 @@ def delete_user(
     db.commit()
     return {"message": "User deleted successfully"}
 
-@router.user("/update-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.put("/update-password", status_code=status.HTTP_204_NO_CONTENT)
 def update_user_password(
     user_id: UUID,
     password: str,
