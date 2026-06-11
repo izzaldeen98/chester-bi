@@ -10,8 +10,8 @@ class Dashboard(Base):
     id = Column(Integer, primary_key=True, index=True)
     public_key = Column(UUID, nullable=False, unique=True, index=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
-    description = Column(String, nullable=False)
-    config_file = Column(String, nullable=False) # Stores the path to your JSON layout file
+    description = Column(String, nullable=True)
+    config_file = Column(String, nullable=False , unique=True) # Stores the path to your JSON layout file
     is_active = Column(Boolean, default=True)
     
     # Timestamps

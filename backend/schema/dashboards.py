@@ -1,7 +1,8 @@
-from pydantic import BaseModel , Field
+from pydantic import BaseModel , Field , AliasPath
 from datetime import datetime
 from uuid import UUID
 from typing import Optional
+
 
 class DashboardBase(BaseModel):
     name: str = Field(..., min_length=3, max_length=127)
@@ -18,16 +19,19 @@ class DashboardUpdate(DashboardBase):
     name: Optional[str] = Field(None, min_length=3, max_length=127)
     description: Optional[str] = Field(None, min_length=3, max_length=127)
     config_file: Optional[str] = Field(None, min_length=3, max_length=127)
-    is_active: Optional[bool] = Field(None)
 
 class DashboardPublicResponse(BaseModel):
-    public_key: UUID
+    id: UUID = Field(validation_alias="public_key")
     name: str
     description: str
     created_at: datetime
     updated_at: datetime
-    created_by : UUID
-    updated_by : UUID
+    created_by : UUID = Field( validation_alias=AliasPath("creator", "public_key"))
+    updated_by : UUID = Field( validation_alias=AliasPath("updater", "public_key"))
+    config_file: str
+
+    class Config:
+        from_attributes = True
 
 
 
