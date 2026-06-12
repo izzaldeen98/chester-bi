@@ -1,8 +1,9 @@
 import uuid
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON, ForeignKey, UUID
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship , validates
 from sqlalchemy.sql import func
 from utils.init_database import Base
+
 
 class User(Base):
     __tablename__ = "users"
@@ -11,18 +12,21 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     # Passed uuid.uuid4 as a callable default (no parenthesis)
     public_key = Column(UUID, nullable=False, unique=True, index=True, default=uuid.uuid4)
+
+    auth_method = Column(String, nullable=False, default="username")
     
     # 👤 Profile Information
     email = Column(String, unique=True, index=True, nullable=True)
-    username = Column(String, nullable=False, unique=True, index=True)
+    username = Column(String, nullable=False, unique=False, index=True)
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     company_name = Column(String, nullable=True)
-    hashed_password = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=True)
     
     # 🛡️ Access Control & RBAC
     is_superuser = Column(Boolean, default=False)
-    is_active = Column(Boolean, default=True)
+    is_active = Column[bool](Boolean, default=True)
+    is_password_set = Column[bool](Boolean, default=False)
     role = Column(String, nullable=False, default="user")
     permissions = Column(JSON, nullable=False, default=[])
     
@@ -61,3 +65,9 @@ class User(Base):
         foreign_keys=[account_id], 
         backref="account_users"
     )
+
+    @validates('hashed_password')
+    def validate_password(self , key , value):
+        if self.auth_method == "email":
+            raise ValueError("Password is not allowed for email authentication")
+        return value

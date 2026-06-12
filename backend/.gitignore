@@ -16,3 +16,5 @@ __pycache__/
 
 cube/model/cubes/*.yml
 cube/model/views/*.yml
+
+.local/*

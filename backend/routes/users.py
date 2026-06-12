@@ -51,7 +51,9 @@ async def register_user(
         first_name=user.first_name,
         last_name=user.last_name,
         account_id=current_user.account_id,
-        hashed_password=hash_password(user.password),
+        auth_method="username",
+        is_password_set=user.password is not None,
+        hashed_password=hash_password(user.password) if user.password else None,
         role="user",
         permissions=user.permissions,
         created_by=current_user.id,
@@ -122,7 +124,11 @@ def update_user(
     # Extract permissions from the dict so it isn't assigned via setattr
     requested_permissions = update_data.pop("permissions", None)
 
-    # Dynamically update normal profile attributes (names, email, etc.)
+    # Apply normal profile attributes (names, email, role, is_active, etc.)
+    for key, value in update_data.items():
+        setattr(db_user, key, value)
+
+    # Validate and apply permissions separately
     if requested_permissions is not None:
         valid_system_permissions = {permission.value for permission in UserPermissions}
         for perm in requested_permissions:
@@ -159,22 +165,3 @@ def delete_user(
     db.delete(db_user)
     db.commit()
     return {"message": "User deleted successfully"}
-
-@router.put("/update-password", status_code=status.HTTP_204_NO_CONTENT)
-def update_user_password(
-    user_id: UUID,
-    password: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    permissions = ["*", "users:*", "users:edit"]
-    if not check_permissions(current_user, *permissions):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized : Insufficient permissions")
-    db_user = db.query(User).filter(and_(User.public_key == user_id, User.account_id == current_user.account_id)).first()
-    if not db_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    db_user.hashed_password = hash_password(password)
-    db_user.updated_by = current_user.id
-    db.commit()
-    db.refresh(db_user)
-    return {"message": "User password updated successfully"}

@@ -1,307 +1,187 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from schema.semantic_models import SemanticModelBase, SemanticModelPublicResponse
-from models.semantic_models import SemanticModel
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query, Form
+from schema.semantic_models import SemanticModelBase
 from utils.init_database import get_db
 from security import get_current_user
 from sqlalchemy.orm import Session
-from models.user import User
-from models.connections import Connection
-from typing import List
 from sqlalchemy import and_
-from utils.config_files import storage, S3Storage, LocalStorage
-from security import decrypt_password
-from io import BytesIO
-from fastapi import File
+from models.user import User
+from models.packages import Package
+from models.semantic_models import SemanticModel
+from security import check_permissions
 from uuid import UUID
-from fastapi import Query, Form, UploadFile
-from fastapi.responses import StreamingResponse
-from models.account import Account
-from utils.malloy import Malloy
-import hashlib
-from utils.redis_handler import cache_query, get_cached_query
-import json
-
-router = APIRouter(prefix="/api/v1/semantic_models")
+from utils.config_files import storage
+from io import BytesIO
 
 
-@router.post("/create", status_code=status.HTTP_201_CREATED)
-async def create_cube_model(
-    # 1. Use Form fields to accept data along with the file in a multipart request
+
+router = APIRouter(prefix="/api/v1/semantic-models", tags=["semantic-models"])
+# router = APIRouter()
+
+@router.post("/add", status_code=status.HTTP_201_CREATED)
+async def add_semantic_model(
+    # 1. FIX: Expanded the Pydantic model into explicit Form fields to support file uploading
     name: str = Form(...),
-    description: str | None = Form(None),
-    connection_id: UUID = Form(...),
+    package_id: UUID = Form(...),  # Adjust type (e.g., str/int) based on your DB schema
+    description: str = Form(None),
+    file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    # 2. Use UploadFile instead of BytesIO
-    file_payload: UploadFile = File(...),
 ):
-    # Check for duplicate record first before handling any file streams
-    existing_semantic_model = (
-        db.query(SemanticModel)
-        .filter(
-            and_(
-                SemanticModel.name == name,
-                SemanticModel.connection_public_key == connection_id,
-                Connection.account_id == current_user.account_id,
-                Account.id == current_user.account_id,
-            )
-        )
-        .first()
-    )
-
-    if existing_semantic_model:
+    # 2. Enforce Permissions
+    permissions = ["*", "semantic-models:*", "semantic-models:edit"]
+    if not check_permissions(current_user, *permissions):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Semantic model with {name} already exists",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized: Insufficient permissions",
         )
-    account = db.query(Account).filter(Account.id == current_user.account_id).first()
-    connection = (
-        db.query(Connection)
-        .filter(
-            and_(
-                Connection.public_key == connection_id,
-                Connection.account_id == current_user.account_id,
-            )
+    
+    # 3. MAXIMUM SECURITY: Look up the package and ensure it belongs to this logged-in tenant account
+    target_package = db.query(Package).filter(
+        and_(
+            Package.public_key == package_id,
+            Package.account_id == current_user.account_id
         )
-        .first()
-    )
+    ).first()
 
-    malloy = Malloy()
-    malloy.create_environment(
-        name=str(account.public_key), description=account.description
-    )
-
-    try:
-        malloy.create_connection(
-            name=connection.name,
-            type=connection.type,
-            host=connection.host,
-            port=connection.port,
-            databaseName=connection.database,
-            userName=connection.username,
-            password=decrypt_password(connection.password),
-        )
-    except Exception as e:
-        print(e)
-
-    try:
-        # Read incoming YAML bytes
-        content = await file_payload.read()
-
-        # Parse YAML text into a native Python dictionary
-        file_payload_bytes = BytesIO(content)
-    except Exception as e:
+    if not target_package:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid YAML file structure: {str(e)}",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target package not found or access denied for this tenant account."
         )
 
-    # 3. Upload the file FIRST to generate the file_path
+            
+    # Extract structural values cleanly out of the verified database records
+    account_public_key = str(current_user.account.public_key)
+    package_name = str(target_package.name)
+    
+    # Secure storage target path generation
+    file_path = f"publisher_data/{account_public_key}/{package_name}"
+    
+    # 5. File Upload Execution
     try:
-        publisher_data = {
-            "name": name,
-            "version": "1.0.0",
-            "description": description if description else "No description",
-        }
-        publisher_file = await storage.upload_file(
-            file=BytesIO(json.dumps(publisher_data).encode("utf-8")),
-            file_name="publisher.json",
-            path="publisher_data/" + str(account.public_key) + "/" + connection.name,
-        )
-        malloy_file = await storage.upload_file(
-            file=file_payload_bytes,
-            file_name=f"{name}.malloy",
-            path="publisher_data/" + str(account.public_key) + "/" + connection.name,
-        )
+        file_bytes = await file.read()
+
+        # Pass file.file directly along with the safe generated paths
+        await storage.upload_file(BytesIO(file_bytes), file_path, f"{name}.malloy")
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload cube model storage: {str(e)}",
+            detail=f"Failed to upload file: {str(e)}",
         )
-
-    # 4. Instantiate model AFTER file_path is successfully generated
-    new_semantic_model = SemanticModel(
-        name=name,
-        file_path=malloy_file,
-        connection_id=connection.id,
-        created_by=current_user.id,
-        updated_by=current_user.id,
-        created_by_public_key=current_user.public_key,
-        updated_by_public_key=current_user.public_key,
-        connection_public_key=connection.public_key,
-    )
-
-    model_folder = (
-        f"/publisher/publisher_data/{str(account.public_key)}/{connection.name}"
-    )
-
-    malloy.create_package(
-        name=name,
-        description=description if description else "No description",
-        location=model_folder,
-    )
-
+        
+    # 6. Database Persistance (Using distinct variable name 'new_model' to avoid collision)
     try:
-        db.add(new_semantic_model)
+        new_model = SemanticModel(
+            name=name,
+            description=description,
+            file_name=f"{name}.malloy",
+            file_path=file_path,
+            package_id=target_package.id,
+            created_by=current_user.id,
+            updated_by=current_user.id,
+        )
+        db.add(new_model)
         db.commit()
-        db.refresh(new_semantic_model)
-    except Exception as e:
-        # Cleanup storage file if Database fails
-        await storage.delete_file(
-            path="publisher_data/" + str(account.public_key) + "/" + connection.name,
-            file_name=f"{name}.malloy",
-        )
-        await storage.delete_file(
-            path="publisher_data/" + str(account.public_key) + "/" + connection.name,
-            file_name="publisher.json",
-        )
-
-        malloy.delete_environment()
+        db.refresh(new_model)
+    except Exception as db_err:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save record to database: {str(e)}",
+            detail="Storage upload complete, but tracking record failed to save to database."
         )
+        
+    return new_model
 
-    return {"message": "Semantic model created successfully"}
 
-
-@router.get("/list", response_model=List[SemanticModelPublicResponse])
-async def list_semantic_models(
+@router.put("/save", status_code=status.HTTP_200_OK)
+async def save_semantic_model(
+    model_id: UUID = Form(...),
+    file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    connection_id: UUID = Form(...),
 ):
-    semantic_models = (
-        db.query(SemanticModel)
-        .filter(and_(SemanticModel.connection_public_key == connection_id))
-        .all()
-    )
-    if not semantic_models:
+    permissions = ["*", "semantic-models:*", "semantic-models:edit"]
+    if not check_permissions(current_user, *permissions):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="No semantic models found"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized: Insufficient permissions",
         )
-    return semantic_models
 
-
-@router.get("/content/{name}")  # 1. Removed response_model to allow raw file download
-async def get_semantic_model_file(
-    id: UUID = Form(...),
-    
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    # 2. Removed "min_length=3" because it is a UUID type, not a string
-    connection_id: UUID = Form(...),
-):
-    # Fetch record from database
-    semantic_model = (
+    # Look up the model and verify it belongs to this tenant via the package relationship
+    target_model = (
         db.query(SemanticModel)
+        .join(Package, SemanticModel.package_id == Package.id)
         .filter(
-            and_(
-                SemanticModel.public_key == id,
-                SemanticModel.connection_public_key == connection_id,
-                Connection.account_id == current_user.account_id,
-                Account.id == current_user.account_id,
-            )
+            SemanticModel.public_key == model_id,
+            Package.account_id == current_user.account_id,
         )
         .first()
     )
 
-    if not semantic_model:
+    if not target_model:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Semantic model not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Semantic model not found or access denied.",
         )
 
+    # Overwrite the file in storage at the same path
     try:
-        # 3. Fetch the file stream from your storage layer
-        file_stream = await storage.get_file(
-            current_user.account_id,
-            f"{connection_id}/cube_models",
-            f"{semantic_model.name}.yaml",
-        )
-
-        # 4. Wrap the stream in a StreamingResponse with explicit file headers
-        return StreamingResponse(
-            file_stream,
-            media_type="application/yaml",
-            headers={
-                "Content-Disposition": f'attachment; filename="{semantic_model.name}.yaml"'
-            },
-        )
-
+        file_bytes = await file.read()
+        await storage.upload_file(BytesIO(file_bytes), target_model.file_path, target_model.file_name)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve file from storage: {str(e)}",
+            detail=f"Failed to save file: {str(e)}",
         )
 
+    # Update the DB record timestamps
+    try:
+        target_model.updated_by = current_user.id
+        db.commit()
+        db.refresh(target_model)
+    except Exception:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="File saved to storage but failed to update the database record.",
+        )
 
-@router.delete("/delete/{public_key}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_semantic_model(
-    public_key: UUID,
+    return {"message": "Model saved successfully"}
+
+
+@router.get("/file-content")
+async def get_file_content(
+    model_id: UUID = Query(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    connection_public_key: UUID = Query(..., min_length=3),
 ):
-    semantic_model = (
+    permissions = ["*", "semantic-models:*", "semantic-models:list"]
+    if not check_permissions(current_user, *permissions):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized: Insufficient permissions",
+        )
+
+    target_model = (
         db.query(SemanticModel)
+        .join(Package, SemanticModel.package_id == Package.id)
         .filter(
-            and_(
-                SemanticModel.public_key == public_key,
-                SemanticModel.connection_public_key == connection_public_key,
-                Account.id == current_user.account_id,
-            )
+            SemanticModel.public_key == model_id,
+            Package.account_id == current_user.account_id,
         )
         .first()
     )
-    if not semantic_model:
+    if not target_model:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Semantic model not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Semantic model not found or access denied.",
         )
-    await storage.delete_file(
-        current_user.account_id,
-        f"{connection_public_key}/cube_models",
-        f"{semantic_model.name}.yaml",
-    )
-    db.delete(semantic_model)
-    db.commit()
-    return {"message": "Semantic model deleted successfully"}
 
-@router.get("/query")
-async def query_semantic_model(
-    semantic_model_id : UUID = Form(...),
-    query: str = Form(...),
-    package: str = Form(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    semantic_model = db.query(SemanticModel).filter(and_(SemanticModel.public_key == semantic_model_id, Account.id == current_user.account_id)).first()
-
-    if not semantic_model:
+    file_bytes = await storage.get_file(target_model.file_path, target_model.file_name)
+    if not file_bytes:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Semantic model not found"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="File not found in storage.",
         )
-    
-    account = db.query(Account).filter(Account.id == current_user.account_id).first()
 
-    query_hash = hashlib.sha256(query.encode()).hexdigest()
-    cached_query = get_cached_query(account.id, query_hash)
-    if cached_query:
-        return cached_query
-    malloy = Malloy(envid=str(account.public_key))
-    package = malloy.get_package_by_name(package)
-    if not package:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Package not found"
-        )
-    model = package.get_model_by_name(semantic_model.name)
-    if not model:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Model not found"
-        )
-    result = model.query(query)
-    cache_query(account.id, query_hash, result)
-    return result
-
-
-
-
+    return {"content": file_bytes.read().decode("utf-8")}

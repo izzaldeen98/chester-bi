@@ -10,7 +10,7 @@ class Package(Base):
     public_key = Column(UUID, nullable=False, unique=True, index=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
     location = Column(String, nullable=False)
-    description = Column(String, nullable=False)
+    description = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

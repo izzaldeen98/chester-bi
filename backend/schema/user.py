@@ -44,7 +44,7 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: str = Field(..., min_length=8)
+    password: Optional[str] = Field(None, min_length=6)
     permissions: Optional[List[UserPermissions]] = Field(None)
 
 
@@ -56,6 +56,7 @@ class UserUpdate(BaseModel):
     role: Optional[str] = Field(None)
     permissions: Optional[List[UserPermissions]] = Field(None)
     is_active: Optional[bool] = Field(None)
+    is_password_set: Optional[bool] = Field(None)
 
 
 class UserPublicResponse(UserBase):
@@ -63,7 +64,7 @@ class UserPublicResponse(UserBase):
     is_active: bool
     role: str
     email : str | None = None
-    permissions: List[UserPermissions]
+    permissions: List[str] | None = None
     created_at: datetime
     updated_at: datetime
     created_by: Optional[UUID] = Field(default=None, validation_alias=AliasPath("creator", "public_key"))

@@ -26,7 +26,7 @@ async def create_connection(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    print(current_user.permissions)
+
     permissions = ["*", "connections:*", "connections:create"]
     if not check_permissions(current_user, *permissions):
         raise HTTPException(
@@ -49,6 +49,34 @@ async def create_connection(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Connection with this name already exists",
+        )
+    
+    malloy_client = Malloy()
+    try:
+        malloy_client.create_environment(
+            name=str(current_user.account.public_key),
+            description=current_user.account.description,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create environment: {str(e)}",
+        )
+    try:
+        malloy_client.create_connection(
+            name=connection.name,
+            type=connection.type,
+            host=connection.connection_attributes.get("host"),
+            port=connection.connection_attributes.get("port"),
+            databaseName=connection.connection_attributes.get("databaseName"),
+            userName=connection.connection_attributes.get("userName"),
+            password=connection.connection_attributes.get("password"),
+        )
+    except Exception as e:
+        malloy_client.delete_environment()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create connection: {str(e)}",
         )
     raw_password = connection.connection_attributes.get("password")
     encrypted_password = encrypt_password(raw_password)
@@ -163,7 +191,6 @@ async def delete_connection(
         .filter(
             and_(
                 Connection.account_id == current_user.account_id,
-                Connection.is_active == True,
                 Connection.public_key == connection_id,
             )
         )

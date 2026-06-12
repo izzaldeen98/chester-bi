@@ -5,7 +5,12 @@ from botocore.exceptions import ClientError
 import aiofiles
 from io import BytesIO
 from fastapi import HTTPException
-import shutil
+from dotenv import load_dotenv
+load_dotenv()
+
+
+LOCAL_DIR = os.getenv("LOCAL_DIR", "./.local/")
+
 # Abstract Base Class enforcing an identical code interface for both storage types
 class BaseStorage(ABC):
     @abstractmethod
@@ -90,7 +95,7 @@ class S3Storage(BaseStorage):
 # 💻 STRATEGY B: Local Machine Storage Provider
 class LocalStorage(BaseStorage):
     def __init__(self):
-        self.base_dir = os.getenv("LOCAL_DIR", ".local/")
+        self.base_dir = LOCAL_DIR
         if not os.path.exists(self.base_dir):
             os.makedirs(self.base_dir)
 
