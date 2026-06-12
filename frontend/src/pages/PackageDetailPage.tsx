@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, Package, FileJson, File as FileLucide, AlertCircle,
-  Search, CheckCircle2, CircleOff, Copy, Check, Plus, X, Save,
+  Search, CheckCircle2, CircleOff, Copy, Check, Plus, X, Save, Play, Trash2,
 } from 'lucide-react'
 import { packagesApi, semanticModelsApi } from '../lib/api'
 import type { PackageResponse, PackageFile } from '../lib/api'
@@ -112,6 +112,14 @@ export default function PackageDetailPage() {
   const [saveError, setSaveError]           = useState('')
   // Content loading state per file
   const [loadingContent, setLoadingContent] = useState(false)
+  // Load package state
+  const [loadingPackage, setLoadingPackage] = useState(false)
+  const [loadPackageStatus, setLoadPackageStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [loadPackageMsg, setLoadPackageMsg]       = useState('')
+  // Delete confirmation — holds the file pending deletion
+  const [deleteTarget, setDeleteTarget] = useState<PackageFile | null>(null)
+  const [deleting, setDeleting]         = useState(false)
+  const [deleteError, setDeleteError]   = useState('')
 
   // Add semantic model modal
   const [showAddModal, setShowAddModal] = useState(false)
@@ -263,6 +271,41 @@ export default function PackageDetailPage() {
     setShowAddModal(true)
   }
 
+  async function handleDelete() {
+    if (!deleteTarget?.model_id) return
+    setDeleting(true); setDeleteError('')
+    try {
+      await semanticModelsApi.delete(deleteTarget.model_id)
+      // Clean up local state for the deleted file
+      setFileContents(prev => { const n = { ...prev }; delete n[deleteTarget.file]; return n })
+      setUnsavedFiles(prev => { const n = { ...prev }; delete n[deleteTarget.file]; return n })
+      if (selectedFile?.file === deleteTarget.file) setSelectedFile(null)
+      const updated = await packagesApi.listFiles(packageId!)
+      setFiles(updated)
+      setDeleteTarget(null)
+    } catch (err: unknown) {
+      setDeleteError(err instanceof Error ? err.message : 'Failed to delete')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  async function handleLoadPackage() {
+    if (!packageId) return
+    setLoadingPackage(true); setLoadPackageStatus('idle'); setLoadPackageMsg('')
+    try {
+      const res = await packagesApi.loadPackage(packageId)
+      setLoadPackageStatus('success')
+      setLoadPackageMsg(res.message ?? 'Package loaded successfully')
+    } catch (err: unknown) {
+      setLoadPackageStatus('error')
+      setLoadPackageMsg(err instanceof Error ? err.message : 'Failed to load package')
+    } finally {
+      setLoadingPackage(false)
+      setTimeout(() => setLoadPackageStatus('idle'), 4000)
+    }
+  }
+
   const filteredFiles = files.filter((f) =>
     f.file.toLowerCase().includes(fileSearch.toLowerCase()),
   )
@@ -379,26 +422,71 @@ export default function PackageDetailPage() {
               <p className="text-center text-xs text-gray-400 dark:text-white/25 py-6 italic px-3">No files found</p>
             ) : (
               filteredFiles.map((f) => (
-                <button
+                <div
                   key={f.file}
-                  onClick={() => handleFileSelect(f)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${
+                  className={`group flex items-center gap-2 px-3 py-2 text-xs transition-colors border-l-2 ${
                     selectedFile?.file === f.file
-                      ? 'bg-yellow-400/10 text-yellow-600 dark:text-yellow-400 border-l-2 border-yellow-400'
-                      : 'text-gray-600 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 border-l-2 border-transparent'
+                      ? 'bg-yellow-400/10 text-yellow-600 dark:text-yellow-400 border-yellow-400'
+                      : 'text-gray-600 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 border-transparent'
                   }`}
                 >
-                  <FileIcon filename={f.file} active={selectedFile?.file === f.file} />
-                  <span className="flex-1 truncate font-medium">{f.file}</span>
+                  <button
+                    onClick={() => handleFileSelect(f)}
+                    className="flex items-center gap-2 flex-1 min-w-0 text-left"
+                  >
+                    <FileIcon filename={f.file} active={selectedFile?.file === f.file} />
+                    <span className="flex-1 truncate font-medium">{f.file}</span>
+                  </button>
                   {unsavedFiles[f.file] && (
                     <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 flex-shrink-0" title="Unsaved changes" />
                   )}
-                </button>
+                  {/* Delete button — only for .malloy files, revealed on row hover */}
+                  {f.model_id && (
+                    <button
+                      onClick={e => { e.stopPropagation(); setDeleteTarget(f); setDeleteError('') }}
+                      title="Delete file"
+                      className="opacity-0 group-hover:opacity-100 flex-shrink-0 w-5 h-5 flex items-center justify-center rounded text-gray-400 dark:text-white/20 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               ))
             )}
           </div>
 
-          <div className="px-3 py-2 border-t border-gray-200 dark:border-white/10">
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-white/10 space-y-2">
+            {/* Load Package button */}
+            <button
+              onClick={handleLoadPackage}
+              disabled={loadingPackage}
+              className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-50 ${
+                loadPackageStatus === 'success'
+                  ? 'bg-green-400/15 border border-green-400/30 text-green-500 dark:text-green-400'
+                  : loadPackageStatus === 'error'
+                  ? 'bg-red-400/10 border border-red-400/20 text-red-500 dark:text-red-400'
+                  : 'bg-yellow-400 text-black hover:bg-yellow-300 border border-transparent'
+              }`}
+            >
+              {loadingPackage ? (
+                <div className="w-3 h-3 rounded-full border-2 border-black/20 border-t-black animate-spin" />
+              ) : loadPackageStatus === 'success' ? (
+                <CheckCircle2 className="w-3.5 h-3.5" />
+              ) : loadPackageStatus === 'error' ? (
+                <AlertCircle className="w-3.5 h-3.5" />
+              ) : (
+                <Play className="w-3.5 h-3.5" />
+              )}
+              {loadingPackage ? 'Loading…' : loadPackageStatus === 'success' ? 'Loaded!' : loadPackageStatus === 'error' ? 'Failed' : 'Load Package'}
+            </button>
+            {/* Status message */}
+            {loadPackageMsg && loadPackageStatus !== 'idle' && (
+              <p className={`text-[10px] text-center leading-tight ${
+                loadPackageStatus === 'error' ? 'text-red-400' : 'text-gray-400 dark:text-white/30'
+              }`}>
+                {loadPackageMsg}
+              </p>
+            )}
             <p className="text-[10px] text-gray-400 dark:text-white/25">{files.length} file{files.length !== 1 ? 's' : ''}</p>
           </div>
         </aside>
@@ -514,6 +602,70 @@ export default function PackageDetailPage() {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* ── Delete Confirmation ── */}
+      <AnimatePresence>
+        {deleteTarget && (
+          <>
+            <motion.div
+              key="del-backdrop"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="fixed inset-0 z-40 bg-black/60"
+              onClick={() => !deleting && setDeleteTarget(null)}
+            />
+            <motion.div
+              key="del-modal"
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              transition={{ duration: 0.16, type: 'spring', stiffness: 400, damping: 30 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+            >
+              <div className="w-full max-w-sm bg-white dark:bg-[#111111] rounded-2xl border border-gray-200 dark:border-white/10 shadow-2xl pointer-events-auto overflow-hidden">
+                <div className="px-6 py-5">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="w-9 h-9 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 flex items-center justify-center flex-shrink-0">
+                      <Trash2 className="w-4 h-4 text-red-500 dark:text-red-400" />
+                    </div>
+                    <div>
+                      <p className="text-gray-900 dark:text-white font-bold text-sm">Delete file?</p>
+                      <p className="text-gray-500 dark:text-white/40 text-xs mt-0.5">
+                        <span className="font-mono text-gray-700 dark:text-white/60">{deleteTarget.file}</span> will be permanently removed from storage. This cannot be undone.
+                      </p>
+                    </div>
+                  </div>
+                  {deleteError && (
+                    <div className="flex items-center gap-2 mb-3 p-2.5 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-xs">
+                      <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />{deleteError}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setDeleteTarget(null)}
+                      disabled={deleting}
+                      className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold text-gray-600 dark:text-white/40 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 transition-all disabled:opacity-40"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="flex-1 px-3 py-2 rounded-xl text-xs font-semibold bg-red-500 hover:bg-red-600 text-white transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      {deleting
+                        ? <div className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                        : <Trash2 className="w-3 h-3" />
+                      }
+                      {deleting ? 'Deleting…' : 'Delete'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* ── Unsaved Changes — Switch Confirmation ── */}
       <AnimatePresence>

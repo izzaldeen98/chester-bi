@@ -36,7 +36,7 @@ const modalClasses = {
 }
 
 const blankForm = (): ConnectionCreate => ({
-  name: '', description: '', type: 'postgresql',
+  name: '', description: '', type: 'postgres',
   connection_attributes: { host: '', port: '5432', database: '', username: '', password: '' },
 })
 

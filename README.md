@@ -41,3 +41,11 @@ a `json` file that contains how metric is calculated.
 # Workspace 
 
 1. user `React-Grid-Layout
+
+
+
+
+---
+# Bugs
+
+1. when connection or package is deleted files are deleted from malloy side but not for database which leads to lose models 

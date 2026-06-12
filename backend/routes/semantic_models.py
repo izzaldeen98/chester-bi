@@ -185,3 +185,27 @@ async def get_file_content(
         )
 
     return {"content": file_bytes.read().decode("utf-8")}
+
+
+@router.delete("/delete", status_code=status.HTTP_200_OK)
+async def delete_semantic_model(
+    model_id: UUID = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    permissions = ["*", "semantic-models:*", "semantic-models:edit"]
+    if not check_permissions(current_user, *permissions):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized: Insufficient permissions",
+        )
+    target_model = db.query(SemanticModel).filter(SemanticModel.public_key == model_id).first()
+    if not target_model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Semantic model not found",
+        )
+    await storage.delete_file(target_model.file_path, target_model.file_name)
+    db.delete(target_model)
+    db.commit()
+    return {"message": "Semantic model deleted successfully"}

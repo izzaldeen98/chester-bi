@@ -186,12 +186,14 @@ async def load_package(
         )
 
     malloy = Malloy(envid=current_user.account.public_key)
-
-    malloy_package = malloy.get_package_by_name(package.name)
-    if not malloy_package:
+    try:
+        malloy.create_package(name=package.name, description=package.description, location=f"/publisher/publisher_data/{current_user.account.public_key}/{package.name}")
+    except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Package not found in Malloy",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load package: {str(e)}",
         )
-    malloy_package.models[0].load()
+
+    
+    return {"message": "Package loaded successfully"}
     

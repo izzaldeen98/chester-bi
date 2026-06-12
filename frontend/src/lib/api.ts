@@ -231,10 +231,11 @@ async function formRequest<T>(path: string, body: FormData, method: 'POST' | 'PU
 }
 
 export const packagesApi = {
-  list:      ()                                         => request<PackageResponse[]>('GET', '/packages/list'),
-  get:       (id: string)                               => request<PackageResponse>('GET', `/packages/get?package_id=${id}`),
-  listFiles: (id: string)                               => request<PackageFile[]>('GET', `/packages/list-files?package_id=${id}`),
-  create:    (name: string, description?: string)       => {
+  list:        ()                                   => request<PackageResponse[]>('GET', '/packages/list'),
+  get:         (id: string)                         => request<PackageResponse>('GET', `/packages/get?package_id=${id}`),
+  listFiles:   (id: string)                         => request<PackageFile[]>('GET', `/packages/list-files?package_id=${id}`),
+  loadPackage: (id: string)                         => request<{ message: string }>('POST', `/packages/load-package?package_id=${id}`),
+  create:      (name: string, description?: string) => {
     const body = new FormData()
     body.append('name', name)
     if (description) body.append('description', description)
@@ -261,4 +262,6 @@ export const semanticModelsApi = {
   },
   getContent: (modelId: string) =>
     request<{ content: string }>('GET', `/semantic-models/file-content?model_id=${modelId}`),
+  delete: (modelId: string) =>
+    request<{ message: string }>('DELETE', `/semantic-models/delete?model_id=${modelId}`),
 }

@@ -68,8 +68,8 @@ async def create_connection(
             type=connection.type,
             host=connection.connection_attributes.get("host"),
             port=connection.connection_attributes.get("port"),
-            databaseName=connection.connection_attributes.get("databaseName"),
-            userName=connection.connection_attributes.get("userName"),
+            databaseName=connection.connection_attributes.get("database"),
+            userName=connection.connection_attributes.get("username"),
             password=connection.connection_attributes.get("password"),
         )
     except Exception as e:
@@ -200,6 +200,8 @@ async def delete_connection(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found"
         )
+    malloy = Malloy(envid=current_user.account.public_key)
+    malloy.get_connection_by_name(db_connection.name).delete()
     db_connection.is_active = False
     db_connection.updated_by = current_user.id
     db.commit()
