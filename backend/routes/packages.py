@@ -12,6 +12,7 @@ import json
 from typing import List
 from uuid import UUID
 from models.semantic_models import SemanticModel
+from utils.malloy import Malloy
 
 
 router = APIRouter(prefix="/api/v1/packages")
@@ -138,32 +139,6 @@ def get_package(
         )
     return package
 
-# @router.put("/update", status_code=status.HTTP_204_NO_CONTENT)
-# def update_package(
-#     package_id: UUID,
-#     package: PackageUpdate,
-#     db: Session = Depends(get_db),
-#     current_user: User = Depends(get_current_user),
-# ):
-#     permissions = ["*", "packages:*", "packages:update"]
-#     if not check_permissions(current_user, *permissions):
-#         raise HTTPException(
-#             status_code=status.HTTP_403_FORBIDDEN,
-#             detail="Unauthorized : Insufficient permissions",
-#         )
-#     package = db.query(Package).filter(Package.public_key == package_id, Package.account_id == current_user.account_id).first()
-#     if not package:
-#         raise HTTPException(
-#             status_code=status.HTTP_404_NOT_FOUND,
-#             detail="Package not found",
-#         )
-#     package.name = package.name
-#     package.description = package.description
-#     package.updated_by = current_user.id
-#     db.commit()
-#     db.refresh(package)
-#     return {"message": "Package updated successfully"}
-
 
 @router.get("/list-files")
 def list_files(
@@ -190,3 +165,33 @@ def list_files(
         })
 
     return output
+
+@router.post("/load-package")
+async def load_package(
+    package_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    permissions = ["*", "packages:*", "packages:edit"]
+    if not check_permissions(current_user, *permissions):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized : Insufficient permissions",
+        )
+    package = db.query(Package).filter(Package.public_key == package_id, Package.account_id == current_user.account_id).first()
+    if not package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found",
+        )
+
+    malloy = Malloy(envid=current_user.account.public_key)
+
+    malloy_package = malloy.get_package_by_name(package.name)
+    if not malloy_package:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Package not found in Malloy",
+        )
+    malloy_package.models[0].load()
+    
