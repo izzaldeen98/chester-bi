@@ -1,113 +1,22 @@
 import { useEffect, useState } from 'react'
-import {
-  Button,
-  Card, CardBody,
-  Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,
-  useDisclosure, Chip,
-} from '@heroui/react'
+import { Card, CardBody, Chip, useDisclosure } from '@heroui/react'
 import { AppInput, AppTextarea } from '../components/ui/AppInput'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AppButton } from '../components/ui/AppButton'
+import { AppModal } from '../components/ui/AppModal'
+import { PageHeader } from '../components/ui/PageHeader'
+import { StatsGrid } from '../components/ui/StatCard'
+import { ErrorBanner } from '../components/ui/ErrorBanner'
+import { EmptyState } from '../components/ui/EmptyState'
+import { SlidePanel } from '../components/ui/SlidePanel'
+import { DetailRow } from '../components/ui/DetailRow'
+import { StatusBadge } from '../components/ui/Badge'
+import { motion } from 'framer-motion'
 import {
-  LayoutDashboard, CalendarDays, CheckCircle2, Plus, AlertCircle,
-  X, FileText, User, Clock,
+  LayoutDashboard, CalendarDays, CheckCircle2, Plus,
+  FileText, User, Clock,
 } from 'lucide-react'
 import { dashboardsApi } from '../lib/api'
 import type { DashboardPublicResponse, DashboardCreate } from '../lib/api'
-
-// ── Detail panel ─────────────────────────────────────────────────────────────
-
-function DashboardDetailPanel({
-  dashboard,
-  onClose,
-}: {
-  dashboard: DashboardPublicResponse | null
-  onClose: () => void
-}) {
-  return (
-    <AnimatePresence>
-      {dashboard && (
-        <>
-          <motion.div
-            key="bd"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-40 bg-black/50"
-            onClick={onClose}
-          />
-          <motion.aside
-            key="panel"
-            initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-            transition={{ type: 'spring', stiffness: 300, damping: 32 }}
-            className="fixed top-0 right-0 z-50 h-screen w-full max-w-sm bg-[#111111] border-l border-white/10 flex flex-col overflow-hidden"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-white/5">
-              <p className="text-white font-bold">Dashboard Details</p>
-              <button
-                onClick={onClose}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-white hover:bg-white/5 transition-all"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
-              {/* Icon + name */}
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center text-yellow-400 flex-shrink-0">
-                  <LayoutDashboard className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-white text-lg font-bold leading-tight">{dashboard.name}</p>
-                  <span className="text-xs px-2.5 py-1 rounded-full border font-medium text-green-400 bg-green-400/10 border-green-400/20">
-                    Active
-                  </span>
-                </div>
-              </div>
-
-              {/* Description */}
-              {dashboard.description && (
-                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/8">
-                  <p className="text-white/60 text-sm leading-relaxed">{dashboard.description}</p>
-                </div>
-              )}
-
-              <div className="h-px bg-white/5" />
-
-              {/* Fields */}
-              <div className="space-y-4">
-                <DetailRow icon={<CalendarDays className="w-4 h-4" />} label="Created"
-                  value={new Date(dashboard.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} />
-                <DetailRow icon={<Clock className="w-4 h-4" />} label="Last updated"
-                  value={new Date(dashboard.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} />
-                <DetailRow icon={<User className="w-4 h-4" />} label="Created by" value={dashboard.created_by} />
-                <DetailRow icon={<User className="w-4 h-4" />} label="Last updated by" value={dashboard.updated_by} />
-                {dashboard.config_file && (
-                  <DetailRow icon={<FileText className="w-4 h-4" />} label="Config file" value={dashboard.config_file} />
-                )}
-              </div>
-            </div>
-          </motion.aside>
-        </>
-      )}
-    </AnimatePresence>
-  )
-}
-
-function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="flex items-start gap-3">
-      <span className="text-white/25 mt-0.5 flex-shrink-0">{icon}</span>
-      <div className="min-w-0">
-        <p className="text-white/40 text-xs mb-0.5">{label}</p>
-        <p className="text-white text-sm break-all">{value}</p>
-      </div>
-    </div>
-  )
-}
-
-// ── Main component ────────────────────────────────────────────────────────────
 
 export default function DashboardsPage() {
   const [dashboards, setDashboards] = useState<DashboardPublicResponse[]>([])
@@ -139,43 +48,26 @@ export default function DashboardsPage() {
   }
 
   const statCards = [
-    { label: 'Total',      value: dashboards.length,                                                                                       icon: <LayoutDashboard className="w-4 h-4" /> },
-    { label: 'This Month', value: dashboards.filter(d => new Date(d.created_at) > new Date(Date.now() - 30 * 86400000)).length,            icon: <CalendarDays className="w-4 h-4" /> },
-    { label: 'Active',     value: dashboards.length,                                                                                       icon: <CheckCircle2 className="w-4 h-4" /> },
+    { label: 'Total',      value: dashboards.length,                                                                            icon: <LayoutDashboard className="w-4 h-4" /> },
+    { label: 'This Month', value: dashboards.filter(d => new Date(d.created_at) > new Date(Date.now() - 30 * 86400000)).length, icon: <CalendarDays className="w-4 h-4" /> },
+    { label: 'Active',     value: dashboards.length,                                                                            icon: <CheckCircle2 className="w-4 h-4" /> },
   ]
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-black text-white mb-1">Dashboards</h1>
-          <p className="text-white/40 text-sm">Manage and explore your analytics dashboards</p>
-        </div>
-        <Button
-          className="bg-yellow-400 text-black font-semibold hover:bg-yellow-300"
-          onPress={onOpen}
-          startContent={<Plus className="w-4 h-4" />}
-        >
-          New Dashboard
-        </Button>
-      </div>
+      <PageHeader
+        title="Dashboards"
+        description="Manage and explore your analytics dashboards"
+        action={
+          <AppButton icon={<Plus className="w-4 h-4" />} onClick={onOpen}>
+            New Dashboard
+          </AppButton>
+        }
+      />
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        {statCards.map((s) => (
-          <div key={s.label} className="bg-white/[0.03] border border-white/10 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-1 text-white/40">{s.icon}<p className="text-xs">{s.label}</p></div>
-            <p className="text-white text-2xl font-bold">{s.value}</p>
-          </div>
-        ))}
-      </div>
+      <StatsGrid stats={statCards} />
 
-      {error && (
-        <div className="flex items-center gap-2 mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />{error}
-        </div>
-      )}
+      <ErrorBanner message={error} onDismiss={() => setError('')} className="mb-4" />
 
       {/* Grid */}
       {loading ? (
@@ -183,16 +75,12 @@ export default function DashboardsPage() {
           {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-40 rounded-2xl bg-white/5 animate-pulse" />)}
         </div>
       ) : dashboards.length === 0 ? (
-        <div className="text-center py-24">
-          <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-4">
-            <LayoutDashboard className="w-7 h-7 text-white/20" />
-          </div>
-          <h3 className="text-white/60 text-lg font-semibold mb-2">No dashboards yet</h3>
-          <p className="text-white/30 text-sm mb-6">Create your first dashboard to get started</p>
-          <Button className="bg-yellow-400 text-black font-semibold hover:bg-yellow-300" onPress={onOpen}>
-            Create Dashboard
-          </Button>
-        </div>
+        <EmptyState
+          icon={<LayoutDashboard className="w-7 h-7" />}
+          title="No dashboards yet"
+          description="Create your first dashboard to get started"
+          action={<AppButton icon={<Plus className="w-4 h-4" />} onClick={onOpen}>Create Dashboard</AppButton>}
+        />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {dashboards.map((d, i) => (
@@ -224,29 +112,70 @@ export default function DashboardsPage() {
       )}
 
       {/* Detail panel */}
-      <DashboardDetailPanel dashboard={detail} onClose={() => setDetail(null)} />
+      <SlidePanel
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title="Dashboard Details"
+        footer={
+          <AppButton fullWidth icon={<LayoutDashboard className="w-4 h-4" />} onClick={() => setDetail(null)}>
+            Open Dashboard
+          </AppButton>
+        }
+      >
+        {detail && (
+          <>
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center text-yellow-400 flex-shrink-0">
+                <LayoutDashboard className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-white text-lg font-bold leading-tight">{detail.name}</p>
+                <StatusBadge active />
+              </div>
+            </div>
+
+            {detail.description && (
+              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/8">
+                <p className="text-white/60 text-sm leading-relaxed">{detail.description}</p>
+              </div>
+            )}
+
+            <div className="h-px bg-white/5" />
+
+            <div className="space-y-4">
+              <DetailRow icon={<CalendarDays className="w-4 h-4" />} label="Created"
+                value={new Date(detail.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} />
+              <DetailRow icon={<Clock className="w-4 h-4" />} label="Last updated"
+                value={new Date(detail.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} />
+              <DetailRow icon={<User className="w-4 h-4" />} label="Created by" value={detail.created_by} />
+              <DetailRow icon={<User className="w-4 h-4" />} label="Last updated by" value={detail.updated_by} />
+              {detail.config_file && (
+                <DetailRow icon={<FileText className="w-4 h-4" />} label="Config file" value={detail.config_file} />
+              )}
+            </div>
+          </>
+        )}
+      </SlidePanel>
 
       {/* Create Modal */}
-      <Modal isOpen={isOpen} onClose={onClose} placement="center" scrollBehavior="inside" backdrop="blur"
-        classNames={{ base: 'bg-[#131313] border border-white/10 rounded-2xl', backdrop: 'bg-black/60 backdrop-blur-sm', header: 'text-white border-b border-white/5 font-bold', body: 'py-5', footer: 'border-t border-white/5' }}>
-        <ModalContent>
-          <ModalHeader>New Dashboard</ModalHeader>
-          <ModalBody>
-            <div className="space-y-4">
-              <AppInput label="Name" placeholder="My Dashboard" isRequired
-                value={form.name} onValueChange={(v) => setForm((p) => ({ ...p, name: v }))} />
-              <AppTextarea label="Description" placeholder="Describe what this dashboard shows…" isRequired
-                value={form.description} onValueChange={(v) => setForm((p) => ({ ...p, description: v }))} />
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" className="text-white/50" onPress={onClose}>Cancel</Button>
-            <Button className="bg-yellow-400 text-black font-semibold hover:bg-yellow-300" isLoading={creating} onPress={handleCreate}>
-              Create
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+      <AppModal
+        isOpen={isOpen}
+        onClose={onClose}
+        title="New Dashboard"
+        footer={
+          <>
+            <AppButton variant="ghost" onClick={onClose}>Cancel</AppButton>
+            <AppButton loading={creating} onClick={handleCreate}>Create</AppButton>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <AppInput label="Name" placeholder="My Dashboard" isRequired
+            value={form.name} onValueChange={(v) => setForm((p) => ({ ...p, name: v }))} />
+          <AppTextarea label="Description" placeholder="Describe what this dashboard shows…" isRequired
+            value={form.description} onValueChange={(v) => setForm((p) => ({ ...p, description: v }))} />
+        </div>
+      </AppModal>
     </div>
   )
 }

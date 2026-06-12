@@ -49,3 +49,7 @@ a `json` file that contains how metric is calculated.
 # Bugs
 
 1. when connection or package is deleted files are deleted from malloy side but not for database which leads to lose models 
+
+2. connections should be hard deleted 
+
+3. db name should be validated to match malloy modeling 

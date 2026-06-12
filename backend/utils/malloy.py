@@ -293,7 +293,7 @@ class Malloy:
                 self.packages.append(
                     MalloyPackage(
                         name=package["name"],
-                        description=package["description"],
+                        description=package.get("description", None),
                         resource=package.get(
                             "resource", f"{self.resource}/packages/{package['name']}"
                         ),
