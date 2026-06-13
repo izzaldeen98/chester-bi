@@ -23,6 +23,8 @@ from io import BytesIO
 from utils.malloy import Malloy
 from schema.semantic_models import SemanticModelSchema
 import time
+from utils.redis_handler import cache_query, get_cached_query
+import hashlib
 
 
 router = APIRouter(prefix="/api/v1/semantic-models", tags=["semantic-models"])
@@ -225,12 +227,21 @@ async def query_semantic_model(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Semantic model not found",
         )
+    start_time = time.time()
+    redis_key = f"{current_user.account.public_key}:{model_id}:{hashlib.sha256(query.encode()).hexdigest()}"
+    redis_result = get_cached_query(redis_key)
+    if redis_result:
+        end_time = time.time()
+        return {**redis_result  , "time": end_time - start_time}
+
+
     malloy = Malloy(envid=current_user.account.public_key)
     package = malloy.get_package_by_name(target_model.package.name)
     model = package.get_model_by_path(target_model.file_name)
-    start_time = time.time()
+    
     result = model.query(query)
     end_time = time.time()
+    cache_query(redis_key, result)
     return {**result, "time": end_time - start_time}
 
 
