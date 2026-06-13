@@ -17,7 +17,7 @@ from uuid import UUID
 from utils.malloy import Malloy
 
 
-router = APIRouter(prefix="/api/v1/connections")
+router = APIRouter(prefix="/api/v1/connections" , tags=["connections"])
 
 
 @router.post("/create", status_code=status.HTTP_201_CREATED)

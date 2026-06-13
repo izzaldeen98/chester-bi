@@ -14,7 +14,7 @@ from sqlalchemy import and_
 from typing import List
 from security import check_permissions
 
-router = APIRouter(prefix="/api/v1/dashboards")
+router = APIRouter(prefix="/api/v1/dashboards" , tags=["dashboards"])
 
 @router.post("/create", status_code=status.HTTP_201_CREATED)
 async def create_dashboard(

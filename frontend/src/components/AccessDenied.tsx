@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ShieldOff, Mail } from 'lucide-react'
+import { ShieldOff, Mail } from '../lib/icons'
 
 interface AccessDeniedProps {
   permission?: string
@@ -19,24 +19,24 @@ export default function AccessDenied({ permission }: AccessDeniedProps) {
       </div>
 
       {/* Heading */}
-      <h2 className="text-2xl font-black text-white mb-2">Access Denied</h2>
-      <p className="text-white/40 text-sm max-w-sm leading-relaxed mb-2">
+      <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-2">Access Denied</h2>
+      <p className="text-gray-500 dark:text-white/40 text-sm max-w-sm leading-relaxed mb-2">
         You don&apos;t have permission to view this page.
       </p>
       {permission && (
-        <p className="text-white/25 text-xs font-mono mb-6">
+        <p className="text-gray-400 dark:text-white/25 text-xs font-mono mb-6">
           Required permission: <span className="text-yellow-400/60">{permission}</span>
         </p>
       )}
 
       {/* Contact card */}
-      <div className="mt-4 flex items-start gap-3 px-5 py-4 rounded-2xl bg-white/[0.03] border border-white/10 max-w-sm text-left">
+      <div className="mt-4 flex items-start gap-3 px-5 py-4 rounded-2xl bg-gray-100 dark:bg-white/[0.03] border border-gray-200 dark:border-white/10 max-w-sm text-left">
         <div className="w-8 h-8 rounded-xl bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center text-yellow-400 flex-shrink-0 mt-0.5">
           <Mail className="w-4 h-4" />
         </div>
         <div>
-          <p className="text-white text-sm font-semibold mb-0.5">Contact your administrator</p>
-          <p className="text-white/40 text-xs leading-relaxed">
+          <p className="text-gray-900 dark:text-white text-sm font-semibold mb-0.5">Contact your administrator</p>
+          <p className="text-gray-500 dark:text-white/40 text-xs leading-relaxed">
             Ask your account administrator to grant you the required permissions to access this section.
           </p>
         </div>

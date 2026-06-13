@@ -11,7 +11,7 @@ from security import check_permissions
 from uuid import UUID
 
 
-router = APIRouter(prefix="/api/v1/users")
+router = APIRouter(prefix="/api/v1/users" , tags=["users"])
 
 
 @router.post("/create", status_code=status.HTTP_201_CREATED)

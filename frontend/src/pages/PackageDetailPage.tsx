@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Package, CheckCircle2, CircleOff, AlertCircle, Trash2, Save } from 'lucide-react'
+import { ArrowLeft, Package, CheckCircle2, CircleOff, AlertCircle, Trash2, Save } from '../lib/icons'
 import { packagesApi, semanticModelsApi } from '../lib/api'
 import type { PackageResponse, PackageFile } from '../lib/api'
 

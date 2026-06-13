@@ -15,7 +15,7 @@ import {
   Users, CheckCircle2, ShieldCheck, UserRound,
   Search, Plus, Pencil,
   CalendarDays, Mail, Tag, Shield, CircleOff, KeyRound,
-} from 'lucide-react'
+} from '../lib/icons'
 import { usersApi } from '../lib/api'
 import type { UserPublicResponse, UserUpdate } from '../lib/api'
 
@@ -35,7 +35,7 @@ function parsePermissions(raw: string): string[] {
 const roleBadgeCls = (role: string) => {
   if (role === 'owner') return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20'
   if (role === 'admin')  return 'text-blue-400   bg-blue-400/10   border-blue-400/20'
-  return 'text-white/40 bg-white/5 border-white/10'
+  return 'text-gray-500 dark:text-white/40 bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10'
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
@@ -142,9 +142,9 @@ export default function UsersPage() {
   )
 
   const permHint = (
-    <p className="text-[11px] text-white/25 mt-1 leading-relaxed">
+    <p className="text-[11px] text-gray-400 dark:text-white/25 mt-1 leading-relaxed">
       Separate with <span className="text-yellow-400/60">;</span> — Available:&nbsp;
-      <span className="text-white/35">{ALL_PERMISSIONS.join(' ; ')}</span>
+      <span className="text-gray-400 dark:text-white/35">{ALL_PERMISSIONS.join(' ; ')}</span>
     </p>
   )
 
@@ -168,22 +168,22 @@ export default function UsersPage() {
 
       <div className="mb-6">
         <AppInput placeholder="Search users…" value={search} onValueChange={setSearch}
-          startContent={<Search className="w-4 h-4 text-white/30" />}
+          startContent={<Search className="w-4 h-4 text-gray-400 dark:text-white/30" />}
         />
       </div>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} className="mb-4" />
 
       {/* Table */}
-      <div className="rounded-2xl border border-white/10 overflow-hidden">
-        <div className="grid grid-cols-[1fr_120px_110px_80px_40px] gap-4 px-5 py-3 bg-white/[0.02] border-b border-white/5 text-xs font-semibold text-white/30 uppercase tracking-wider">
+      <div className="rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
+        <div className="grid grid-cols-[1fr_120px_110px_80px_40px] gap-4 px-5 py-3 bg-gray-50 dark:bg-white/[0.02] border-b border-gray-100 dark:border-white/5 text-xs font-semibold text-gray-400 dark:text-white/30 uppercase tracking-wider">
           <span>User</span><span>Role</span><span>Joined</span>
           <span className="text-center">Status</span><span />
         </div>
 
         {loading ? (
           <div className="space-y-px">
-            {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 bg-white/[0.02] animate-pulse" />)}
+            {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-16 bg-gray-50 dark:bg-white/[0.02] animate-pulse" />)}
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState compact icon={<UserRound className="w-5 h-5" />} title="No users found" />
@@ -196,17 +196,17 @@ export default function UsersPage() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: i * 0.03 }}
                 onClick={() => setDetailUser(user)}
-                className="grid grid-cols-[1fr_120px_110px_80px_40px] gap-4 items-center px-5 py-4 border-b border-white/5 last:border-0 hover:bg-white/[0.03] cursor-pointer transition-colors group"
+                className="grid grid-cols-[1fr_120px_110px_80px_40px] gap-4 items-center px-5 py-4 border-b border-gray-100 dark:border-white/5 last:border-0 hover:bg-gray-50 dark:hover:bg-white/[0.03] cursor-pointer transition-colors group"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-8 h-8 rounded-full bg-yellow-400/15 border border-yellow-400/20 flex items-center justify-center text-yellow-400 text-sm font-bold flex-shrink-0">
                     {user.first_name.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-white text-sm font-medium truncate group-hover:text-yellow-400 transition-colors">
+                    <p className="text-gray-900 dark:text-white text-sm font-medium truncate group-hover:text-yellow-400 transition-colors">
                       {user.first_name} {user.last_name}
                     </p>
-                    <p className="text-white/30 text-xs truncate">@{user.username}</p>
+                    <p className="text-gray-400 dark:text-white/30 text-xs truncate">@{user.username}</p>
                   </div>
                 </div>
 
@@ -214,7 +214,7 @@ export default function UsersPage() {
                   <ColorBadge label={user.role} colorCls={roleBadgeCls(user.role)} />
                 </div>
 
-                <p className="text-white/30 text-xs">{new Date(user.created_at).toLocaleDateString()}</p>
+                <p className="text-gray-400 dark:text-white/30 text-xs">{new Date(user.created_at).toLocaleDateString()}</p>
 
                 <div className="flex items-center justify-center">
                   <StatusBadge active={user.is_active} />
@@ -222,7 +222,7 @@ export default function UsersPage() {
 
                 <button
                   onClick={(e) => { e.stopPropagation(); openEdit(user) }}
-                  className="flex items-center justify-center w-7 h-7 rounded-lg text-white/20 hover:text-yellow-400 hover:bg-yellow-400/10 transition-all"
+                  className="flex items-center justify-center w-7 h-7 rounded-lg text-gray-300 dark:text-white/20 hover:text-yellow-400 hover:bg-yellow-400/10 transition-all"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
@@ -254,10 +254,10 @@ export default function UsersPage() {
                 {detailUser.first_name.charAt(0).toUpperCase()}{detailUser.last_name.charAt(0).toUpperCase()}
               </div>
               <div>
-                <p className="text-white text-lg font-bold leading-tight">
+                <p className="text-gray-900 dark:text-white text-lg font-bold leading-tight">
                   {detailUser.first_name} {detailUser.last_name}
                 </p>
-                <p className="text-white/40 text-sm">@{detailUser.username}</p>
+                <p className="text-gray-500 dark:text-white/40 text-sm">@{detailUser.username}</p>
               </div>
             </div>
 
@@ -266,7 +266,7 @@ export default function UsersPage() {
               <StatusBadge active={detailUser.is_active} />
             </div>
 
-            <div className="h-px bg-white/5" />
+            <div className="h-px bg-gray-100 dark:bg-white/5" />
 
             <div className="space-y-4">
               {detailUser.email && (
@@ -279,23 +279,23 @@ export default function UsersPage() {
                 value={new Date(detailUser.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} />
             </div>
 
-            <div className="h-px bg-white/5" />
+            <div className="h-px bg-gray-100 dark:bg-white/5" />
 
             <div>
-              <div className="flex items-center gap-2 mb-3 text-white/40">
+              <div className="flex items-center gap-2 mb-3 text-gray-500 dark:text-white/40">
                 <Tag className="w-4 h-4" />
                 <p className="text-xs font-semibold uppercase tracking-widest">Permissions</p>
               </div>
               {detailUser.permissions && detailUser.permissions.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {detailUser.permissions.map((p) => (
-                    <span key={p} className="text-xs px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/50 font-mono">
+                    <span key={p} className="text-xs px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-600 dark:text-white/50 font-mono">
                       {p}
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="text-white/25 text-sm italic">No permissions assigned</p>
+                <p className="text-gray-400 dark:text-white/25 text-sm italic">No permissions assigned</p>
               )}
             </div>
           </>
@@ -368,19 +368,19 @@ export default function UsersPage() {
             onValueChange={(v) => setEditForm((p) => ({ ...p, email: v }))} />
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-white/50 uppercase tracking-widest">Role</label>
+              <label className="text-xs font-semibold text-gray-600 dark:text-white/50 uppercase tracking-widest">Role</label>
               <select value={editForm.role ?? ''} onChange={(e) => setEditForm((p) => ({ ...p, role: e.target.value }))}
-                className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/[0.05] border border-white/10 outline-none transition-all hover:border-white/25 focus:border-yellow-400 focus:shadow-[0_0_0_3px_rgba(250,204,21,0.12)]">
-                <option value="user"  className="bg-[#131313]">user</option>
-                <option value="admin" className="bg-[#131313]">admin</option>
+                className="w-full rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-white/[0.05] border border-gray-200 dark:border-white/10 outline-none transition-all hover:border-gray-300 dark:hover:border-white/25 focus:border-yellow-400 focus:shadow-[0_0_0_3px_rgba(250,204,21,0.12)]">
+                <option value="user"  className="bg-white dark:bg-[#131313]">user</option>
+                <option value="admin" className="bg-white dark:bg-[#131313]">admin</option>
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-white/50 uppercase tracking-widest">Status</label>
+              <label className="text-xs font-semibold text-gray-600 dark:text-white/50 uppercase tracking-widest">Status</label>
               <select value={editForm.is_active ? 'active' : 'inactive'} onChange={(e) => setEditForm((p) => ({ ...p, is_active: e.target.value === 'active' }))}
-                className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/[0.05] border border-white/10 outline-none transition-all hover:border-white/25 focus:border-yellow-400 focus:shadow-[0_0_0_3px_rgba(250,204,21,0.12)]">
-                <option value="active"   className="bg-[#131313]">Active</option>
-                <option value="inactive" className="bg-[#131313]">Inactive</option>
+                className="w-full rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-white/[0.05] border border-gray-200 dark:border-white/10 outline-none transition-all hover:border-gray-300 dark:hover:border-white/25 focus:border-yellow-400 focus:shadow-[0_0_0_3px_rgba(250,204,21,0.12)]">
+                <option value="active"   className="bg-white dark:bg-[#131313]">Active</option>
+                <option value="inactive" className="bg-white dark:bg-[#131313]">Inactive</option>
               </select>
             </div>
           </div>

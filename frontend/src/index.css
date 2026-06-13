@@ -1,3 +1,98 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ── React-Grid-Layout overrides ────────────────────────────────────────────── */
+
+/* Drop placeholder */
+.react-grid-placeholder {
+  background: rgba(250, 204, 21, 0.07) !important;
+  border: 1.5px dashed rgba(250, 204, 21, 0.3) !important;
+  border-radius: 12px !important;
+  opacity: 1 !important;
+}
+
+/* Ensure the grid item itself never clips the resize handle spans */
+.react-grid-item {
+  overflow: visible !important;
+}
+
+/* SE resize handle (bottom-right corner) — keep original placement,
+   just style the ::after indicator */
+.react-resizable-handle-se {
+  cursor: se-resize;
+}
+.react-resizable-handle-se::after {
+  content: '';
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid rgba(0,0,0,0.2);
+  border-bottom: 2px solid rgba(0,0,0,0.2);
+  border-radius: 1px;
+  transition: border-color 0.15s;
+}
+
+/* South edge handle */
+.react-resizable-handle-s {
+  cursor: s-resize;
+  height: 10px !important;
+  bottom: 0 !important;
+  left: 10px !important;
+  right: 10px !important;
+  width: auto !important;
+}
+.react-resizable-handle-s::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.15);
+  transition: background 0.15s;
+}
+
+/* East edge handle */
+.react-resizable-handle-e {
+  cursor: e-resize;
+  width: 10px !important;
+  right: 0 !important;
+  top: 10px !important;
+  bottom: 10px !important;
+  height: auto !important;
+}
+.react-resizable-handle-e::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 28px;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.15);
+  transition: background 0.15s;
+}
+
+.react-grid-item:hover .react-resizable-handle-se::after {
+  border-color: rgba(250,204,21,0.55);
+}
+.react-grid-item:hover .react-resizable-handle-s::after,
+.react-grid-item:hover .react-resizable-handle-e::after {
+  background: rgba(250,204,21,0.45);
+}
+
+/* Dark mode overrides */
+.dark .react-resizable-handle-se::after {
+  border-right-color: rgba(255,255,255,0.2);
+  border-bottom-color: rgba(255,255,255,0.2);
+}
+.dark .react-resizable-handle-s::after,
+.dark .react-resizable-handle-e::after {
+  background: rgba(255,255,255,0.15);
+}

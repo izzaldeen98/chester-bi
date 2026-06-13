@@ -5,7 +5,7 @@ import {
   Database, Plus, Pencil, Trash2, FlaskConical,
   CheckCircle2, CircleOff, Activity,
   CalendarDays, User, Clock, Tag,
-} from 'lucide-react'
+} from '../lib/icons'
 import { AppInput } from '../components/ui/AppInput'
 import { AppButton } from '../components/ui/AppButton'
 import { AppModal } from '../components/ui/AppModal'
@@ -156,7 +156,7 @@ export default function ConnectionsPage() {
 
       {loading ? (
         <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-20 rounded-2xl bg-white/5 animate-pulse" />)}
+          {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-20 rounded-2xl bg-gray-100 dark:bg-white/5 animate-pulse" />)}
         </div>
       ) : connections.length === 0 ? (
         <EmptyState
@@ -176,19 +176,19 @@ export default function ConnectionsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
                 onClick={() => setDetail(c)}
-                className="flex items-center justify-between p-5 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 hover:bg-white/[0.05] transition-all group cursor-pointer"
+                className="flex items-center justify-between p-5 rounded-2xl bg-gray-100 dark:bg-white/[0.03] border border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20 hover:bg-gray-100 dark:hover:bg-white/[0.05] transition-all group cursor-pointer"
               >
                 <div className="flex items-center gap-4 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 flex-shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center text-gray-500 dark:text-white/40 flex-shrink-0">
                     <Database className="w-5 h-5" />
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-white font-semibold text-sm truncate group-hover:text-yellow-400 transition-colors">{c.name}</p>
-                      <ColorBadge label={c.type} colorCls={typeColor[c.type] ?? 'text-white/40 bg-white/5 border-white/10'} />
+                      <p className="text-gray-900 dark:text-white font-semibold text-sm truncate group-hover:text-yellow-400 transition-colors">{c.name}</p>
+                      <ColorBadge label={c.type} colorCls={typeColor[c.type] ?? 'text-gray-500 dark:text-white/40 bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10'} />
                     </div>
-                    {c.description && <p className="text-white/30 text-xs truncate">{c.description}</p>}
-                    <p className="text-white/20 text-xs mt-0.5">{new Date(c.created_at).toLocaleDateString()}</p>
+                    {c.description && <p className="text-gray-400 dark:text-white/30 text-xs truncate">{c.description}</p>}
+                    <p className="text-gray-300 dark:text-white/20 text-xs mt-0.5">{new Date(c.created_at).toLocaleDateString()}</p>
                   </div>
                 </div>
 
@@ -207,7 +207,7 @@ export default function ConnectionsPage() {
                     onClick={() => handleTest(c.id)}
                     disabled={testingId === c.id}
                     title="Test connection"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-white/40 hover:text-yellow-400 hover:bg-yellow-400/10 border border-white/10 hover:border-yellow-400/30 transition-all disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-gray-500 dark:text-white/40 hover:text-yellow-400 hover:bg-yellow-400/10 border border-gray-200 dark:border-white/10 hover:border-yellow-400/30 transition-all disabled:opacity-50"
                   >
                     {testingId === c.id
                       ? <Spinner size="xs" className="border-yellow-400/30 border-t-yellow-400" />
@@ -216,11 +216,11 @@ export default function ConnectionsPage() {
                     Test
                   </button>
                   <button onClick={() => openEdit(c)} title="Edit"
-                    className="w-8 h-8 flex items-center justify-center rounded-lg text-white/20 hover:text-yellow-400 hover:bg-yellow-400/10 transition-all">
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-300 dark:text-white/20 hover:text-yellow-400 hover:bg-yellow-400/10 transition-all">
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button onClick={() => handleDelete(c.id)} disabled={deletingId === c.id} title="Delete"
-                    className="w-8 h-8 flex items-center justify-center rounded-lg text-white/20 hover:text-red-400 hover:bg-red-400/10 transition-all disabled:opacity-50">
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-300 dark:text-white/20 hover:text-red-400 hover:bg-red-400/10 transition-all disabled:opacity-50">
                     {deletingId === c.id
                       ? <Spinner size="xs" className="border-red-400/30 border-t-red-400" />
                       : <Trash2 className="w-3.5 h-3.5" />
@@ -264,13 +264,13 @@ export default function ConnectionsPage() {
         {detail && (
           <>
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 flex-shrink-0">
+              <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center text-gray-500 dark:text-white/40 flex-shrink-0">
                 <Database className="w-6 h-6" />
               </div>
               <div className="min-w-0">
-                <p className="text-white text-lg font-bold leading-tight truncate">{detail.name}</p>
+                <p className="text-gray-900 dark:text-white text-lg font-bold leading-tight truncate">{detail.name}</p>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  <ColorBadge label={detail.type} colorCls={typeColor[detail.type] ?? 'text-white/40 bg-white/5 border-white/10'} />
+                  <ColorBadge label={detail.type} colorCls={typeColor[detail.type] ?? 'text-gray-500 dark:text-white/40 bg-gray-100 dark:bg-white/5 border-gray-200 dark:border-white/10'} />
                   <StatusBadge active={detail.is_active} />
                 </div>
               </div>
@@ -288,12 +288,12 @@ export default function ConnectionsPage() {
             )}
 
             {detail.description && (
-              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/8">
-                <p className="text-white/60 text-sm leading-relaxed">{detail.description}</p>
+              <div className="p-4 rounded-xl bg-gray-100 dark:bg-white/[0.03] border border-gray-200 dark:border-white/8">
+                <p className="text-gray-700 dark:text-white/60 text-sm leading-relaxed">{detail.description}</p>
               </div>
             )}
 
-            <div className="h-px bg-white/5" />
+            <div className="h-px bg-gray-100 dark:bg-white/5" />
 
             <div className="space-y-4">
               <DetailRow icon={<Tag className="w-4 h-4" />}           label="Type"            value={detail.type} />
@@ -323,18 +323,18 @@ export default function ConnectionsPage() {
             <AppInput label="Name" placeholder="Production DB" isRequired
               value={form.name} onValueChange={(v) => setForm((p) => ({ ...p, name: v }))} />
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-white/50 uppercase tracking-widest">
+              <label className="text-xs font-semibold text-gray-600 dark:text-white/50 uppercase tracking-widest">
                 Type <span className="text-yellow-400">*</span>
               </label>
               <select value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}
-                className="w-full rounded-xl px-4 py-3 text-sm text-white bg-white/[0.05] border border-white/10 outline-none transition-all hover:border-white/25 focus:border-yellow-400 focus:shadow-[0_0_0_3px_rgba(250,204,21,0.12)]">
-                {DB_TYPES.map((t) => <option key={t} value={t} className="bg-[#131313]">{t}</option>)}
+                className="w-full rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-white/[0.05] border border-gray-200 dark:border-white/10 outline-none transition-all hover:border-gray-300 dark:hover:border-white/25 focus:border-yellow-400 focus:shadow-[0_0_0_3px_rgba(250,204,21,0.12)]">
+                {DB_TYPES.map((t) => <option key={t} value={t} className="bg-white dark:bg-[#131313]">{t}</option>)}
               </select>
             </div>
           </div>
           <AppInput label="Description" placeholder="Optional description"
             value={form.description ?? ''} onValueChange={(v) => setForm((p) => ({ ...p, description: v }))} />
-          <div className="h-px bg-white/5" />
+          <div className="h-px bg-gray-100 dark:bg-white/5" />
           <p className="text-xs font-semibold text-yellow-400/80 uppercase tracking-widest">Connection Details</p>
           <AttrFields attrs={form.connection_attributes} onChange={setAttr} />
         </div>
@@ -355,10 +355,10 @@ export default function ConnectionsPage() {
         <div className="space-y-4">
           <AppInput label="Name" isRequired value={editForm.name} onValueChange={(v) => setEditForm((p) => ({ ...p, name: v }))} />
           <AppInput label="Description" value={editForm.description ?? ''} onValueChange={(v) => setEditForm((p) => ({ ...p, description: v }))} />
-          <div className="h-px bg-white/5" />
+          <div className="h-px bg-gray-100 dark:bg-white/5" />
           <p className="text-xs font-semibold text-yellow-400/80 uppercase tracking-widest">
             Update Connection Details
-            <span className="text-white/25 font-normal normal-case ml-2">(leave blank to keep existing)</span>
+            <span className="text-gray-400 dark:text-white/25 font-normal normal-case ml-2">(leave blank to keep existing)</span>
           </p>
           <AttrFields attrs={editForm.connection_attributes} onChange={setEditAttr} />
         </div>

@@ -12,7 +12,7 @@ from utils.init_database import get_db
 from models.account import Account
 from schema.account import OwnerCreate
 
-router = APIRouter(prefix="/api/v1/auth")
+router = APIRouter(prefix="/api/v1/auth" , tags=["auth"])
 
 
 @router.post("/login")

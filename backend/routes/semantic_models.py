@@ -1,4 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Query, Form
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+    File,
+    UploadFile,
+    Query,
+    Form,
+)
 from schema.semantic_models import SemanticModelBase
 from utils.init_database import get_db
 from security import get_current_user
@@ -11,11 +20,14 @@ from security import check_permissions
 from uuid import UUID
 from utils.config_files import storage
 from io import BytesIO
-
+from utils.malloy import Malloy
+from schema.semantic_models import SemanticModelSchema
+import time
 
 
 router = APIRouter(prefix="/api/v1/semantic-models", tags=["semantic-models"])
 # router = APIRouter()
+
 
 @router.post("/add", status_code=status.HTTP_201_CREATED)
 async def add_semantic_model(
@@ -34,29 +46,32 @@ async def add_semantic_model(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Unauthorized: Insufficient permissions",
         )
-    
+
     # 3. MAXIMUM SECURITY: Look up the package and ensure it belongs to this logged-in tenant account
-    target_package = db.query(Package).filter(
-        and_(
-            Package.public_key == package_id,
-            Package.account_id == current_user.account_id
+    target_package = (
+        db.query(Package)
+        .filter(
+            and_(
+                Package.public_key == package_id,
+                Package.account_id == current_user.account_id,
+            )
         )
-    ).first()
+        .first()
+    )
 
     if not target_package:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Target package not found or access denied for this tenant account."
+            detail="Target package not found or access denied for this tenant account.",
         )
 
-            
     # Extract structural values cleanly out of the verified database records
     account_public_key = str(current_user.account.public_key)
     package_name = str(target_package.name)
-    
+
     # Secure storage target path generation
     file_path = f"publisher_data/{account_public_key}/{package_name}"
-    
+
     # 5. File Upload Execution
     try:
         file_bytes = await file.read()
@@ -68,7 +83,7 @@ async def add_semantic_model(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to upload file: {str(e)}",
         )
-        
+
     # 6. Database Persistance (Using distinct variable name 'new_model' to avoid collision)
     try:
         new_model = SemanticModel(
@@ -87,9 +102,9 @@ async def add_semantic_model(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Storage upload complete, but tracking record failed to save to database."
+            detail="Storage upload complete, but tracking record failed to save to database.",
         )
-        
+
     return new_model
 
 
@@ -127,7 +142,9 @@ async def save_semantic_model(
     # Overwrite the file in storage at the same path
     try:
         file_bytes = await file.read()
-        await storage.upload_file(BytesIO(file_bytes), target_model.file_path, target_model.file_name)
+        await storage.upload_file(
+            BytesIO(file_bytes), target_model.file_path, target_model.file_name
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -187,6 +204,63 @@ async def get_file_content(
     return {"content": file_bytes.read().decode("utf-8")}
 
 
+@router.get("/query")
+async def query_semantic_model(
+    model_id: UUID = Query(...),
+    query: str = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    permissions = ["*", "semantic-models:*", "semantic-models:list"]
+    if not check_permissions(current_user, *permissions):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized: Insufficient permissions",
+        )
+    target_model = (
+        db.query(SemanticModel).filter(SemanticModel.public_key == model_id).first()
+    )
+    if not target_model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Semantic model not found",
+        )
+    malloy = Malloy(envid=current_user.account.public_key)
+    package = malloy.get_package_by_name(target_model.package.name)
+    model = package.get_model_by_path(target_model.file_name)
+    start_time = time.time()
+    result = model.query(query)
+    end_time = time.time()
+    return {**result, "time": end_time - start_time}
+
+
+@router.get("/get-compiled-model" , response_model=SemanticModelSchema)
+async def get_compiled_model(
+    model_id: UUID = Query(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    permissions = ["*", "semantic-models:*", "semantic-models:list"]
+    if not check_permissions(current_user, *permissions):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized: Insufficient permissions",
+        )
+    target_model = (
+        db.query(SemanticModel).filter(SemanticModel.public_key == model_id , Package.account_id == current_user.account_id).first()
+    )
+    if not target_model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Semantic model not found",
+        )
+    malloy = Malloy(envid=current_user.account.public_key)
+    package = malloy.get_package_by_name(target_model.package.name)
+    model = package.get_model_by_path(target_model.file_name)
+    compiled_model = model.get_compiled_model()
+    return compiled_model
+
+
 @router.delete("/delete", status_code=status.HTTP_200_OK)
 async def delete_semantic_model(
     model_id: UUID = Query(...),
@@ -199,7 +273,9 @@ async def delete_semantic_model(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Unauthorized: Insufficient permissions",
         )
-    target_model = db.query(SemanticModel).filter(SemanticModel.public_key == model_id).first()
+    target_model = (
+        db.query(SemanticModel).filter(SemanticModel.public_key == model_id).first()
+    )
     if not target_model:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -209,3 +285,5 @@ async def delete_semantic_model(
     db.delete(target_model)
     db.commit()
     return {"message": "Semantic model deleted successfully"}
+
+

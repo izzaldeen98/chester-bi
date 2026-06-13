@@ -1,4 +1,4 @@
-import { AlertCircle, X } from 'lucide-react'
+import { AlertCircle, X } from '../../lib/icons'
 
 interface ErrorBannerProps {
   message: string

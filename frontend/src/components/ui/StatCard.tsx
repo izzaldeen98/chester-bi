@@ -6,12 +6,12 @@ interface StatCardProps {
 
 export function StatCard({ label, value, icon }: StatCardProps) {
   return (
-    <div className="bg-white/[0.03] border border-white/10 rounded-xl p-4">
-      <div className="flex items-center gap-2 mb-1 text-white/40">
+    <div className="bg-gray-100 dark:bg-white/[0.03] border border-gray-200 dark:border-white/10 rounded-xl p-4">
+      <div className="flex items-center gap-2 mb-1 text-gray-500 dark:text-white/40">
         {icon}
         <p className="text-xs">{label}</p>
       </div>
-      <p className="text-white text-2xl font-bold">{value}</p>
+      <p className="text-gray-900 dark:text-white text-2xl font-bold">{value}</p>
     </div>
   )
 }

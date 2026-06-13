@@ -8,10 +8,12 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import HomePage from './pages/HomePage'
 import DashboardsPage from './pages/DashboardsPage'
+import DashboardWorkspacePage from './pages/DashboardWorkspacePage'
 import ConnectionsPage from './pages/ConnectionsPage'
 import UsersPage from './pages/UsersPage'
 import PackagesPage from './pages/PackagesPage'
 import PackageDetailPage from './pages/PackageDetailPage'
+import QueryPage from './pages/QueryPage'
 
 export default function App() {
   return (
@@ -24,6 +26,20 @@ export default function App() {
 
         {/* Protected */}
         <Route element={<ProtectedRoute />}>
+
+          {/* Full-screen workspace routes (no AppLayout wrapper) */}
+          <Route path="/home/dashboards/:dashboardId" element={
+            <RequirePermission permissions={['dashboards:view', 'dashboards:edit', 'dashboards:*']}>
+              <DashboardWorkspacePage />
+            </RequirePermission>
+          } />
+
+          <Route path="/home/query" element={
+            <RequirePermission permissions={['packages:list', 'packages:*']}>
+              <QueryPage />
+            </RequirePermission>
+          } />
+
           <Route element={<AppLayout />}>
             <Route path="/home" element={<HomePage />} />
 

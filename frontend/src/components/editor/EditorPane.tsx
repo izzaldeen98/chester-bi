@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { Copy, Check, Save, AlertCircle, X, File as FileLucide } from 'lucide-react'
+import { Copy, Check, Save, AlertCircle, X, File as FileLucide } from '../../lib/icons'
 import { Spinner } from '../ui/Spinner'
 import { FileIcon, fileLang } from './FileIcon'
 import { JsonHighlight } from './JsonHighlight'

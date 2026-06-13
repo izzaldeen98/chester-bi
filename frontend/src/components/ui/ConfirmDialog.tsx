@@ -1,4 +1,4 @@
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle } from '../../lib/icons'
 
 interface ConfirmDialogProps {
   /** Icon element rendered inside the badge */

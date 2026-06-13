@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, Package, Users, LogOut, X, Database, Sun, Moon } from 'lucide-react'
+import { LayoutDashboard, Package, Users, LogOut, X, Database, Sun, Moon, Table2 } from '../lib/icons'
+import { GiJesterHat } from 'react-icons/gi'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 
@@ -13,6 +14,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Dashboards',  icon: <LayoutDashboard className="w-4 h-4" />, path: '/home/dashboards', permissions: ['dashboards:list', 'dashboards:*'] },
+  { label: 'Query',       icon: <Table2 className="w-4 h-4" />,          path: '/home/query',      permissions: ['packages:list', 'packages:*'] },
   { label: 'Packages',    icon: <Package className="w-4 h-4" />,         path: '/home/packages',   permissions: ['packages:list', 'packages:*'] },
   { label: 'Connections', icon: <Database className="w-4 h-4" />,        path: '/home/connections', permissions: ['connections:list', 'connections:*'] },
   { label: 'Users',       icon: <Users className="w-4 h-4" />,           path: '/home/users',       permissions: ['users:list', 'users:*'] },
@@ -38,8 +40,9 @@ function SidebarContent({ onClose, mobile = false }: { onClose: () => void; mobi
       {/* Logo */}
       <div className="flex items-center justify-between px-5 py-5 border-b border-gray-200 dark:border-white/5">
         <div className="flex items-center gap-1">
+          <GiJesterHat className="text-yellow-500 dark:text-yellow-400 text-2xl flex-shrink-0" />
           <span className="text-yellow-500 dark:text-yellow-400 text-xl font-black">chester</span>
-          <span className="text-gray-900 dark:text-white text-xl font-black">-bi</span>
+          <span className="text-gray-900 dark:text-white text-xl font-black"> BI</span>
         </div>
         {mobile && (
           <button onClick={onClose} className="text-gray-400 dark:text-white/30 hover:text-gray-700 dark:hover:text-white transition-colors">

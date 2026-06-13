@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import {
   BrainCircuit, CheckCircle2, Table2, Plus, ChevronRight,
   CalendarDays, Tag, BarChart3,
-} from 'lucide-react'
+} from '../lib/icons'
 import { AppButton } from '../components/ui/AppButton'
 import { PageHeader } from '../components/ui/PageHeader'
 import { StatsGrid } from '../components/ui/StatCard'
@@ -68,23 +68,23 @@ export default function ModelsPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.06 }}
             onClick={() => setDetail(model)}
-            className="group flex items-center justify-between p-5 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-yellow-400/30 hover:bg-yellow-400/[0.03] transition-all cursor-pointer"
+            className="group flex items-center justify-between p-5 rounded-2xl bg-gray-100 dark:bg-white/[0.03] border border-gray-200 dark:border-white/10 hover:border-yellow-400/30 hover:bg-yellow-400/[0.03] transition-all cursor-pointer"
           >
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/30">
+              <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center text-gray-400 dark:text-white/30">
                 <BrainCircuit className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-white font-semibold group-hover:text-yellow-400 transition-colors">{model.name}</h3>
-                <p className="text-white/30 text-xs mt-0.5">Updated {model.updated}</p>
+                <h3 className="text-gray-900 dark:text-white font-semibold group-hover:text-yellow-400 transition-colors">{model.name}</h3>
+                <p className="text-gray-400 dark:text-white/30 text-xs mt-0.5">Updated {model.updated}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-4">
               <ColorBadge label={model.type} colorCls={typeColors[model.type]} />
-              <span className="text-white/40 text-sm">{model.tables} tables</span>
+              <span className="text-gray-500 dark:text-white/40 text-sm">{model.tables} tables</span>
               <StatusBadge active={model.status === 'Active'} activeLabel="Active" inactiveLabel="Draft" />
-              <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-yellow-400 transition-colors" />
+              <ChevronRight className="w-4 h-4 text-gray-300 dark:text-white/20 group-hover:text-yellow-400 transition-colors" />
             </div>
           </motion.div>
         ))}
@@ -104,11 +104,11 @@ export default function ModelsPage() {
         {detail && (
           <>
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/40 flex-shrink-0">
+              <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 flex items-center justify-center text-gray-500 dark:text-white/40 flex-shrink-0">
                 <BrainCircuit className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-white text-lg font-bold leading-tight">{detail.name}</p>
+                <p className="text-gray-900 dark:text-white text-lg font-bold leading-tight">{detail.name}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <ColorBadge label={detail.type} colorCls={typeColors[detail.type]} />
                   <StatusBadge active={detail.status === 'Active'} activeLabel="Active" inactiveLabel="Draft" />
@@ -117,12 +117,12 @@ export default function ModelsPage() {
             </div>
 
             {detail.description && (
-              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/8">
-                <p className="text-white/60 text-sm leading-relaxed">{detail.description}</p>
+              <div className="p-4 rounded-xl bg-gray-100 dark:bg-white/[0.03] border border-gray-200 dark:border-white/8">
+                <p className="text-gray-700 dark:text-white/60 text-sm leading-relaxed">{detail.description}</p>
               </div>
             )}
 
-            <div className="h-px bg-white/5" />
+            <div className="h-px bg-gray-100 dark:bg-white/5" />
 
             <div className="space-y-4">
               <DetailRow icon={<Tag className="w-4 h-4" />}          label="Category"     value={detail.type} />
@@ -131,13 +131,13 @@ export default function ModelsPage() {
               <DetailRow icon={<CalendarDays className="w-4 h-4" />} label="Last updated" value={detail.updated} />
             </div>
 
-            <div className="h-px bg-white/5" />
+            <div className="h-px bg-gray-100 dark:bg-white/5" />
 
             <div>
-              <p className="text-xs font-semibold text-white/30 uppercase tracking-widest mb-3">Included tables</p>
+              <p className="text-xs font-semibold text-gray-400 dark:text-white/30 uppercase tracking-widest mb-3">Included tables</p>
               <div className="flex flex-wrap gap-2">
                 {Array.from({ length: detail.tables }).map((_, i) => (
-                  <span key={i} className="text-xs px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-white/40 font-mono">
+                  <span key={i} className="text-xs px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/40 font-mono">
                     table_{i + 1}
                   </span>
                 ))}

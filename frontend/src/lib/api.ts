@@ -264,4 +264,57 @@ export const semanticModelsApi = {
     request<{ content: string }>('GET', `/semantic-models/file-content?model_id=${modelId}`),
   delete: (modelId: string) =>
     request<{ message: string }>('DELETE', `/semantic-models/delete?model_id=${modelId}`),
+  getCompiledModel: (modelId: string) =>
+    request<CompiledModel>('GET', `/semantic-models/get-compiled-model?model_id=${modelId}`),
+  query: (modelId: string, query: string) =>
+    request<QueryResult>('GET', `/semantic-models/query?model_id=${modelId}&query=${encodeURIComponent(query)}`),
+}
+
+export interface QueryResult {
+  /** Malloy returns rows under the "result" key */
+  result?: unknown
+  rows?: Record<string, unknown>[]
+  data?: Record<string, unknown>[]
+  /** Column metadata when compact JSON is used */
+  columns?: Array<{ name: string } | string>
+  time?: number
+  resource?: string
+  query?: string
+  [key: string]: unknown
+}
+
+// ── Models / Packages tree ─────────────────────────────────────────────────────
+
+export interface ModelItem {
+  model_id: string
+  model_name: string
+}
+
+export interface PackageModels {
+  package_id: string
+  package_name: string
+  models: ModelItem[]
+}
+
+export interface CompiledField {
+  name: string
+  type: string
+  datatype: string
+}
+
+export interface CompiledSource {
+  name: string
+  fields: CompiledField[]
+}
+
+export interface CompiledModel {
+  type: string
+  package_name: string
+  model_path: string
+  malloy_version: string
+  schema: CompiledSource[]
+}
+
+export const modelsApi = {
+  listModels: () => request<PackageModels[]>('GET', '/packages/list-models'),
 }

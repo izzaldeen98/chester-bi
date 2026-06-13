@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status , Form
 from schema.packages import PackageCreate, PackageResponse , PackageUpdate
 from utils.init_database import get_db
 from security import get_current_user
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from models.user import User
 from models.packages import Package
 from security import check_permissions
@@ -15,7 +15,7 @@ from models.semantic_models import SemanticModel
 from utils.malloy import Malloy
 
 
-router = APIRouter(prefix="/api/v1/packages")
+router = APIRouter(prefix="/api/v1/packages" , tags=["packages"])
 
 
 
@@ -118,6 +118,44 @@ def list_packages(
         )
     packages = db.query(Package).filter(Package.account_id == current_user.account_id).all()
     return packages
+
+@router.get("/list-models")
+def list_models(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    permissions = ["*", "packages:*", "packages:list"]
+    if not check_permissions(current_user, *permissions):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized: Insufficient permissions",
+        )
+    
+    # 1. Fetch packages and eagerly load their models in ONE query
+    packages = (
+        db.query(Package)
+        .options(joinedload(Package.semantic_models))  # Assumes a relationship named 'semantic_models' on Package
+        .filter(Package.account_id == current_user.account_id)
+        .all()
+    )
+    
+    # 2. Build the tree structure
+    output = []
+    for package in packages:
+        output.append({
+            "package_id": str(package.public_key),
+            "package_name": package.name,
+            "models": [
+                {
+                    "model_id": str(model.public_key),
+                    "model_name": model.name,
+                }
+                for model in package.semantic_models
+            ]
+        })
+        
+    return output
+
 
 @router.get("/get", response_model=PackageResponse)
 def get_package(

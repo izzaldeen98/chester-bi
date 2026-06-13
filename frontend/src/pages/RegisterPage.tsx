@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Button, Link } from '@heroui/react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { AlertCircle, ArrowLeft, PartyPopper } from 'lucide-react'
+import { AlertCircle, ArrowLeft, PartyPopper } from '../lib/icons'
+import { GiJesterHat } from 'react-icons/gi'
 import { useAuth } from '../contexts/AuthContext'
 import { AppInput } from '../components/ui/AppInput'
 
@@ -43,7 +44,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] flex">
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-2/5 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 via-yellow-600/10 to-transparent" />
@@ -57,8 +58,9 @@ export default function RegisterPage() {
         />
         <div className="absolute inset-0 flex flex-col items-start justify-center p-16">
           <div className="flex items-center gap-1 mb-8">
+            <GiJesterHat className="text-yellow-400 text-4xl flex-shrink-0" />
             <span className="text-yellow-400 text-3xl font-black">chester</span>
-            <span className="text-white text-3xl font-black">-bi</span>
+            <span className="text-white text-3xl font-black">BI</span>
           </div>
           <h2 className="text-3xl font-black text-white leading-tight mb-4">
             Start your<br />
@@ -91,13 +93,14 @@ export default function RegisterPage() {
         >
           {/* Mobile logo */}
           <div className="flex items-center gap-1 mb-8 lg:hidden">
+            <GiJesterHat className="text-yellow-400 text-3xl flex-shrink-0" />
             <span className="text-yellow-400 text-2xl font-black">chester</span>
-            <span className="text-white text-2xl font-black">-bi</span>
+            <span className="text-gray-900 dark:text-white text-2xl font-black">BI</span>
           </div>
 
           <div className="mb-8">
-            <h1 className="text-3xl font-black text-white mb-2">Create your account</h1>
-            <p className="text-white/40">Set up your organization on chester-bi</p>
+            <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-2">Create your account</h1>
+            <p className="text-gray-500 dark:text-white/40">Set up your organization on chesterBI</p>
           </div>
 
           {success ? (
@@ -109,8 +112,8 @@ export default function RegisterPage() {
               <div className="w-16 h-16 rounded-2xl bg-yellow-400/10 border border-yellow-400/20 flex items-center justify-center mx-auto mb-4">
                 <PartyPopper className="w-7 h-7 text-yellow-400" />
               </div>
-              <h3 className="text-2xl font-bold text-white mb-2">Account created!</h3>
-              <p className="text-white/40">Redirecting you to sign in…</p>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Account created!</h3>
+              <p className="text-gray-500 dark:text-white/40">Redirecting you to sign in…</p>
             </motion.div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -136,7 +139,7 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <div className="h-px bg-white/5" />
+              <div className="h-px bg-gray-100 dark:bg-white/5" />
 
               <div>
                 <p className="text-xs font-semibold text-yellow-400/80 uppercase tracking-widest mb-3">
@@ -160,7 +163,7 @@ export default function RegisterPage() {
                 </div>
               </div>
 
-              <div className="h-px bg-white/5" />
+              <div className="h-px bg-gray-100 dark:bg-white/5" />
 
               <div>
                 <p className="text-xs font-semibold text-yellow-400/80 uppercase tracking-widest mb-3">
@@ -214,7 +217,7 @@ export default function RegisterPage() {
             </form>
           )}
 
-          <p className="text-center text-white/40 mt-6 text-sm">
+          <p className="text-center text-gray-500 dark:text-white/40 mt-6 text-sm">
             Already have an account?{' '}
             <Link
               className="text-yellow-400 hover:text-yellow-300 cursor-pointer font-medium"
@@ -226,7 +229,7 @@ export default function RegisterPage() {
 
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 mt-6 text-white/30 hover:text-white/60 transition-colors text-sm"
+            className="flex items-center gap-2 mt-6 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition-colors text-sm"
           >
             <ArrowLeft className="w-4 h-4" /> Back to home
           </button>

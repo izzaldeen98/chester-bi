@@ -13,11 +13,53 @@ MALLOY_PORT = os.getenv("MALLOY_PORT")
 MALLOY_URL = f"http://{MALLOY_HOST}:{MALLOY_PORT}"
 
 
-def _get_from_list(list: list, key: str, value: Any):
-    for item in list:
-        if item[key] == value:
-            return item
-    return None
+
+
+def parse_source_infos(source_infos: list) -> list:
+    # Initialize the list inside the function
+    output_data = []
+
+    for source_info in source_infos:
+        # Safely load the stringified JSON
+        s = json.loads(source_info)
+
+        if s.get("kind") != "source":
+            continue
+
+        source_name = s.get("name")
+        fields = s.get("schema", {}).get("fields", [])
+
+        # Use a list to collect data for all fields within this source
+        fields_list = []
+        for field in fields:
+            field_type = field.get("kind")
+            if field_type not in ["dimension", "measure"]:
+                continue
+
+            field_name = field.get("name")
+
+            # Safely fetch the nested datatype dictionary
+            field_type_obj = field.get("type")
+            field_datatype = (
+                field_type_obj.get("kind")
+                if isinstance(field_type_obj, dict)
+                else None
+            )
+
+            # Constructing a clean object for each field
+            fields_list.append(
+                {
+                    "name": field_name,
+                    "type": field_type,
+                    "datatype": field_datatype,
+                }
+            )
+
+        # Append the source and its collected fields to the final list
+        output_data.append({"name": source_name, "fields": fields_list})
+
+    # Return the data back to your main script
+    return output_data
 
 
 class MalloyConnection:
@@ -127,7 +169,12 @@ class MalloyPackage:
         for model in self.models:
             if model.name == name:
                 return model
-        return None
+        raise Exception(f"Model {name} not found in package {self.name}")
+    def get_model_by_path(self, path: str):
+        for model in self.models:
+            if model.path == path:
+                return model
+        raise Exception(f"Model {path} not found in package {self.name}")
 
     def __str__(self):
         return f"MalloyPackage(name={self.name}, description={self.description}, resource={self.resource} , models={self.models})"
@@ -166,17 +213,14 @@ class MalloyModel:
             raise Exception(f"Failed to get compiled model: {response.text}")
         data = response.json()
 
-        source_infos = data["sourceInfos"]
-        source_infos_return = []
-        for source_info in source_infos:
-            source_infos_return.append(json.loads(source_info))
-        # return data
+        
+        
         return {
             "type": data["type"],
-            "packageName": data["packageName"],
-            "modelPath": data["modelPath"],
-            "malloyVersion": data["malloyVersion"],
-            "sourceInfos" : source_infos_return,
+            "package_name": data["packageName"],
+            "model_path": data.get("path", None),
+            "malloy_version": data["malloyVersion"],
+            "schema": parse_source_infos(data["sourceInfos"]),
         }
 
     def compile(self, includeSql: bool = True, sourceName: str = None):
@@ -455,27 +499,9 @@ class Malloy:
 
 
 if __name__ == "__main__":
-    malloy = Malloy(envid="izzaldeen_radaideh")
+    malloy = Malloy(envid="55cc0b65-59de-4dc9-97c5-07191d353f2b")
+    package = malloy.get_package_by_name("public_data")
+    print(package.get)
 
-    # malloy.create_environment(name="", description="test environment")
-
-    # malloy.create_connection(name="test_db", type="postgres", host="host.docker.internal", port=5432, databaseName="bi_testing_db", userName="dev_admin", password="SecretPassword123")
-    # malloy.packages[0].delete()
-    # malloy.create_package(name="pos", description="Order analytics semantic models", location="/publisher/publisher_data/test/model_a")
-    query = """
-    run: order_items -> {group_by: Category aggregate: `Total Revenue`}
-
-
-"""
-    package = malloy.get_package_by_name("pos")
-    # print(package)
-    model = package.get_model_by_name("pos")
-    # print(model)
-
-    # print(model.query(query))
-    with open("C:/dev/chester-bi/.tests/model.json", "w" , encoding="utf-8") as f:
-        f.write(json.dumps(model.get_compiled_model(), indent=4 , ensure_ascii=False))
-    
-    
 
     

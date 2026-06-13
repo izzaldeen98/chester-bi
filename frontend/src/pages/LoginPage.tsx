@@ -3,7 +3,8 @@ import { Button, Link } from '@heroui/react'
 import { AppInput } from '../components/ui/AppInput'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { AlertCircle, ArrowLeft, CheckCircle2, KeyRound, LogIn } from 'lucide-react'
+import { AlertCircle, ArrowLeft, CheckCircle2, KeyRound, LogIn } from '../lib/icons'
+import { GiJesterHat } from 'react-icons/gi'
 import { useAuth } from '../contexts/AuthContext'
 import { setPassword } from '../lib/api'
 
@@ -65,7 +66,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] flex">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0a0a0a] flex">
       {/* Left decorative panel */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 via-yellow-600/10 to-transparent" />
@@ -80,8 +81,9 @@ export default function LoginPage() {
         <div className="absolute inset-0 flex flex-col items-start justify-end p-16">
           <div className="mb-8">
             <div className="flex items-center gap-1 mb-6">
+              <GiJesterHat className="text-yellow-400 text-4xl flex-shrink-0" />
               <span className="text-yellow-400 text-3xl font-black">chester</span>
-              <span className="text-white text-3xl font-black">-bi</span>
+              <span className="text-white text-3xl font-black">BI</span>
             </div>
             <h2 className="text-4xl font-black text-white leading-tight mb-4">
               Turn data into<br />
@@ -111,12 +113,13 @@ export default function LoginPage() {
         >
           {/* Mobile logo */}
           <div className="flex items-center gap-1 mb-10 lg:hidden">
+            <GiJesterHat className="text-yellow-400 text-3xl flex-shrink-0" />
             <span className="text-yellow-400 text-2xl font-black">chester</span>
-            <span className="text-white text-2xl font-black">-bi</span>
+            <span className="text-gray-900 dark:text-white text-2xl font-black">BI</span>
           </div>
 
           {/* Tab switcher */}
-          <div className="flex gap-1 p-1 rounded-xl bg-white/[0.04] border border-white/8 mb-8">
+          <div className="flex gap-1 p-1 rounded-xl bg-gray-100 dark:bg-white/[0.04] border border-gray-200 dark:border-white/8 mb-8">
             {([
               { id: 'login',        label: 'Sign In',      icon: <LogIn className="w-3.5 h-3.5" /> },
               { id: 'set-password', label: 'Set Password', icon: <KeyRound className="w-3.5 h-3.5" /> },
@@ -127,7 +130,7 @@ export default function LoginPage() {
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all ${
                   tab === t.id
                     ? 'bg-yellow-400 text-black shadow-sm'
-                    : 'text-white/40 hover:text-white/70'
+                    : 'text-gray-500 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/70'
                 }`}
               >
                 {t.icon}
@@ -147,8 +150,8 @@ export default function LoginPage() {
                 transition={{ duration: 0.2 }}
               >
                 <div className="mb-8">
-                  <h1 className="text-3xl font-black text-white mb-2">Welcome back</h1>
-                  <p className="text-white/40">Sign in to your chester-bi account</p>
+                  <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-2">Welcome back</h1>
+                  <p className="text-gray-500 dark:text-white/40">Sign in to your chesterBI account</p>
                 </div>
 
                 <form onSubmit={handleLogin} className="space-y-5">
@@ -175,14 +178,14 @@ export default function LoginPage() {
                   </Button>
                 </form>
 
-                <p className="text-center text-white/40 mt-6 text-sm">
+                <p className="text-center text-gray-500 dark:text-white/40 mt-6 text-sm">
                   Don&apos;t have an account?{' '}
                   <Link className="text-yellow-400 hover:text-yellow-300 cursor-pointer font-medium" onPress={() => navigate('/register')}>
                     Create one
                   </Link>
                 </p>
 
-                <p className="text-center text-white/30 mt-3 text-sm">
+                <p className="text-center text-gray-400 dark:text-white/30 mt-3 text-sm">
                   First time login?{' '}
                   <button onClick={() => switchTab('set-password')} className="text-yellow-400/70 hover:text-yellow-400 transition-colors font-medium">
                     Set your password
@@ -201,8 +204,8 @@ export default function LoginPage() {
                 transition={{ duration: 0.2 }}
               >
                 <div className="mb-8">
-                  <h1 className="text-3xl font-black text-white mb-2">Set Password</h1>
-                  <p className="text-white/40">Create a password for your account</p>
+                  <h1 className="text-3xl font-black text-gray-900 dark:text-white mb-2">Set Password</h1>
+                  <p className="text-gray-500 dark:text-white/40">Create a password for your account</p>
                 </div>
 
                 {spSuccess ? (
@@ -215,8 +218,8 @@ export default function LoginPage() {
                       <CheckCircle2 className="w-7 h-7 text-green-400" />
                     </div>
                     <div>
-                      <p className="text-white font-bold text-lg">Password set!</p>
-                      <p className="text-white/40 text-sm mt-1">You can now sign in with your new password.</p>
+                      <p className="text-gray-900 dark:text-white font-bold text-lg">Password set!</p>
+                      <p className="text-gray-500 dark:text-white/40 text-sm mt-1">You can now sign in with your new password.</p>
                     </div>
                     <Button
                       className="bg-yellow-400 text-black font-bold hover:bg-yellow-300"
@@ -260,7 +263,7 @@ export default function LoginPage() {
 
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2 mt-8 text-white/30 hover:text-white/60 transition-colors text-sm"
+            className="flex items-center gap-2 mt-8 text-gray-400 dark:text-white/30 hover:text-gray-600 dark:hover:text-white/60 transition-colors text-sm"
           >
             <ArrowLeft className="w-4 h-4" /> Back to home
           </button>

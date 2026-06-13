@@ -20,8 +20,8 @@ interface AppButtonProps {
 
 const variantCls: Record<Variant, string> = {
   primary:      'bg-yellow-400 text-black hover:bg-yellow-300 disabled:opacity-40',
-  ghost:        'bg-transparent text-white/50 hover:text-white hover:bg-white/5 disabled:opacity-40',
-  secondary:    'bg-white/5 text-white/60 hover:bg-white/10 border border-white/10 disabled:opacity-40',
+  ghost:        'bg-transparent text-gray-600 dark:text-white/50 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 disabled:opacity-40',
+  secondary:    'bg-gray-100 dark:bg-white/5 text-gray-700 dark:text-white/60 hover:bg-gray-200 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 disabled:opacity-40',
   danger:       'bg-red-500 text-white hover:bg-red-600 disabled:opacity-50',
   'danger-ghost': 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 disabled:opacity-50',
 }
@@ -34,8 +34,8 @@ const sizeCls: Record<Size, string> = {
 
 const spinnerCls: Record<Variant, string> = {
   primary:        'border-black/20 border-t-black',
-  ghost:          'border-white/20 border-t-white/60',
-  secondary:      'border-white/20 border-t-white/60',
+  ghost:          'border-gray-300 dark:border-white/20 border-t-gray-600 dark:border-t-white/60',
+  secondary:      'border-gray-300 dark:border-white/20 border-t-gray-600 dark:border-t-white/60',
   danger:         'border-white/30 border-t-white',
   'danger-ghost': 'border-red-400/30 border-t-red-400',
 }

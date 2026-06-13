@@ -23,4 +23,20 @@ class SemanticModelPublicResponse(BaseModel):
     updated_at: datetime
     created_by: UUID = Field(validation_alias=AliasPath("creator", "public_key"))
     updated_by: UUID = Field(validation_alias=AliasPath("updater", "public_key"))
+
+class SemanticModelField(BaseModel):    
+    name: str
+    type: str
+    datatype: str
+
+class SemanticModelSource(BaseModel):
+    name: str
+    fields: list[SemanticModelField]
+
+class SemanticModelSchema(BaseModel):
+    type: str
+    package_name: str
+    model_path: str | None = None
+    malloy_version: str
+    schema : list[SemanticModelSource]
     

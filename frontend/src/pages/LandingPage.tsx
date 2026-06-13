@@ -1,7 +1,8 @@
 import { Button } from '@heroui/react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { BarChart2, BrainCircuit, Link2, Users } from 'lucide-react'
+import { BarChart2, BrainCircuit, Link2, Users } from '../lib/icons'
+import { GiJesterHat } from 'react-icons/gi'
 
 const features = [
   {
@@ -34,8 +35,9 @@ export default function LandingPage() {
       {/* Navbar */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-4 bg-black/60 backdrop-blur-md border-b border-white/5">
         <div className="flex items-center gap-1">
+          <GiJesterHat className="text-yellow-400 text-3xl flex-shrink-0" />
           <span className="text-yellow-400 text-2xl font-black tracking-tight">chester</span>
-          <span className="text-white text-2xl font-black tracking-tight">-bi</span>
+          <span className="text-white text-2xl font-black tracking-tight">BI</span>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="ghost" className="text-white/80 hover:text-white" onPress={() => navigate('/login')}>
@@ -75,7 +77,7 @@ export default function LandingPage() {
             </h1>
 
             <p className="text-xl text-white/50 max-w-2xl mx-auto mb-10 leading-relaxed">
-              chester-bi gives your team a unified platform to explore, visualize, and share data —
+              chesterBI gives your team a unified platform to explore, visualize, and share data —
               fast, flexible, and beautifully designed.
             </p>
 
@@ -110,7 +112,7 @@ export default function LandingPage() {
                 <span className="w-3 h-3 rounded-full bg-red-500/70" />
                 <span className="w-3 h-3 rounded-full bg-yellow-400/70" />
                 <span className="w-3 h-3 rounded-full bg-green-500/70" />
-                <span className="ml-4 text-white/30 text-xs font-mono">chester-bi — Dashboard</span>
+                <span className="ml-4 text-white/30 text-xs font-mono">chesterBI — Dashboard</span>
               </div>
               <div className="p-6 grid grid-cols-3 gap-4">
                 {[
@@ -191,7 +193,7 @@ export default function LandingPage() {
         >
           <h2 className="text-4xl font-black mb-4">Ready to get started?</h2>
           <p className="text-white/50 mb-8 text-lg">
-            Join thousands of data teams already using chester-bi.
+            Join thousands of data teams already using chesterBI.
           </p>
           <Button
             size="lg"
@@ -207,10 +209,11 @@ export default function LandingPage() {
       <footer className="border-t border-white/5 py-8 px-8">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-1">
+            <GiJesterHat className="text-yellow-400 text-xl flex-shrink-0" />
             <span className="text-yellow-400 font-black">chester</span>
-            <span className="font-black">-bi</span>
+            <span className="font-black">BI</span>
           </div>
-          <p className="text-white/30 text-sm">© 2026 chester-bi. Open-source BI platform.</p>
+          <p className="text-white/30 text-sm">© 2026 chesterBI. Open-source BI platform.</p>
         </div>
       </footer>
     </div>

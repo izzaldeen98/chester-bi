@@ -17,7 +17,7 @@ class Package(Base):
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     updated_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    account = relationship("Account", foreign_keys=[account_id])
-    creator = relationship("User", foreign_keys=[created_by])
-    updater = relationship("User", foreign_keys=[updated_by])
+    account = relationship("Account", foreign_keys=[account_id] , backref="packages")
+    creator = relationship("User", foreign_keys=[created_by] , backref="created_packages")
+    updater = relationship("User", foreign_keys=[updated_by] , backref="updated_packages")
 

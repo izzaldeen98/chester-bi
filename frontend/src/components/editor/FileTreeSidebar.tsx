@@ -1,4 +1,4 @@
-import { Search, Plus, Trash2, AlertCircle, CheckCircle2, Play } from 'lucide-react'
+import { Search, Plus, Trash2, AlertCircle, CheckCircle2, Play } from '../../lib/icons'
 import { Spinner } from '../ui/Spinner'
 import { FileIcon } from './FileIcon'
 import type { PackageFile } from '../../lib/api'

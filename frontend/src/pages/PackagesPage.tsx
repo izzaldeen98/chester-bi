@@ -15,7 +15,7 @@ import { motion } from 'framer-motion'
 import {
   Package, Search, Plus, ChevronRight,
   CalendarDays, ToggleRight, MapPin, User, Pencil,
-} from 'lucide-react'
+} from '../lib/icons'
 import { packagesApi } from '../lib/api'
 import type { PackageResponse } from '../lib/api'
 
@@ -80,15 +80,15 @@ export default function PackagesPage() {
           placeholder="Search packages…"
           value={search}
           onValueChange={setSearch}
-          startContent={<Search className="w-4 h-4 text-white/30" />}
+          startContent={<Search className="w-4 h-4 text-gray-400 dark:text-white/30" />}
         />
       </div>
 
       <ErrorBanner message={error} onDismiss={() => setError('')} className="mb-4" />
 
       {/* Table */}
-      <div className="rounded-2xl border border-white/10 overflow-hidden">
-        <div className="grid grid-cols-[1fr_180px_110px_80px_32px] gap-4 px-5 py-3 bg-white/[0.02] border-b border-white/5 text-xs font-semibold text-white/30 uppercase tracking-wider">
+      <div className="rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
+        <div className="grid grid-cols-[1fr_180px_110px_80px_32px] gap-4 px-5 py-3 bg-gray-50 dark:bg-white/[0.02] border-b border-gray-100 dark:border-white/5 text-xs font-semibold text-gray-400 dark:text-white/30 uppercase tracking-wider">
           <span>Package</span><span>Location</span><span>Created</span>
           <span className="text-center">Status</span><span />
         </div>
@@ -96,7 +96,7 @@ export default function PackagesPage() {
         {loading ? (
           <div className="space-y-px">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-16 bg-white/[0.02] animate-pulse" />
+              <div key={i} className="h-16 bg-gray-50 dark:bg-white/[0.02] animate-pulse" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -111,23 +111,23 @@ export default function PackagesPage() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: i * 0.03 }}
                 onClick={() => setDetailPkg(pkg)}
-                className="grid grid-cols-[1fr_180px_110px_80px_32px] gap-4 items-center px-5 py-4 border-b border-white/5 last:border-0 hover:bg-white/[0.03] cursor-pointer transition-colors group"
+                className="grid grid-cols-[1fr_180px_110px_80px_32px] gap-4 items-center px-5 py-4 border-b border-gray-100 dark:border-white/5 last:border-0 hover:bg-gray-50 dark:hover:bg-white/[0.03] cursor-pointer transition-colors group"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-8 h-8 rounded-lg bg-yellow-400/15 border border-yellow-400/20 flex items-center justify-center text-yellow-400 flex-shrink-0">
                     <Package className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-white text-sm font-medium truncate group-hover:text-yellow-400 transition-colors">
+                    <p className="text-gray-900 dark:text-white text-sm font-medium truncate group-hover:text-yellow-400 transition-colors">
                       {pkg.name}
                     </p>
-                    <p className="text-white/30 text-xs truncate font-mono">{pkg.id}</p>
+                    <p className="text-gray-400 dark:text-white/30 text-xs truncate font-mono">{pkg.id}</p>
                   </div>
                 </div>
 
-                <p className="text-white/30 text-xs truncate font-mono">{pkg.location}</p>
+                <p className="text-gray-400 dark:text-white/30 text-xs truncate font-mono">{pkg.location}</p>
 
-                <div className="flex items-center gap-1.5 text-white/30 text-xs">
+                <div className="flex items-center gap-1.5 text-gray-400 dark:text-white/30 text-xs">
                   <CalendarDays className="w-3 h-3 flex-shrink-0" />
                   {new Date(pkg.created_at).toLocaleDateString()}
                 </div>
@@ -136,7 +136,7 @@ export default function PackagesPage() {
                   <StatusBadge active={pkg.is_active} />
                 </div>
 
-                <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-yellow-400 transition-colors" />
+                <ChevronRight className="w-4 h-4 text-gray-300 dark:text-white/20 group-hover:text-yellow-400 transition-colors" />
               </motion.div>
             ))}
           </div>
@@ -165,14 +165,14 @@ export default function PackagesPage() {
                 <Package className="w-7 h-7" />
               </div>
               <div>
-                <p className="text-white text-lg font-bold leading-tight">{detailPkg.name}</p>
-                <p className="text-white/40 text-xs font-mono mt-0.5 break-all">{detailPkg.id}</p>
+                <p className="text-gray-900 dark:text-white text-lg font-bold leading-tight">{detailPkg.name}</p>
+                <p className="text-gray-500 dark:text-white/40 text-xs font-mono mt-0.5 break-all">{detailPkg.id}</p>
               </div>
             </div>
 
             <StatusBadge active={detailPkg.is_active} />
 
-            <div className="h-px bg-white/5" />
+            <div className="h-px bg-gray-100 dark:bg-white/5" />
 
             <div className="space-y-4">
               <DetailRow icon={<MapPin className="w-4 h-4" />}     label="Location"     value={detailPkg.location} mono />

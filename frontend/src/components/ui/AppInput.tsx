@@ -1,6 +1,6 @@
 import { useState, forwardRef } from 'react'
 import type { InputHTMLAttributes, TextareaHTMLAttributes } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff } from '../../lib/icons'
 import { cn } from '../../lib/utils'
 
 // ── Base field shell ──────────────────────────────────────────────────────────
@@ -17,7 +17,7 @@ function FieldShell({ label, error, required, children, className }: FieldShellP
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
       {label && (
-        <label className="text-xs font-semibold text-white/50 uppercase tracking-widest">
+        <label className="text-xs font-semibold text-gray-500 dark:text-white/50 uppercase tracking-widest">
           {label}
           {required && <span className="text-yellow-400 ml-0.5">*</span>}
         </label>
@@ -29,12 +29,12 @@ function FieldShell({ label, error, required, children, className }: FieldShellP
 }
 
 const inputBase = [
-  'w-full rounded-xl px-4 py-3 text-sm text-white',
-  'bg-white/[0.05] border border-white/10',
-  'placeholder:text-white/25',
+  'w-full rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-white',
+  'bg-white dark:bg-white/[0.05] border border-gray-200 dark:border-white/10',
+  'placeholder:text-gray-400 dark:placeholder:text-white/25',
   'outline-none transition-all duration-200',
-  'hover:border-white/25',
-  'focus:border-yellow-400 focus:bg-white/[0.07] focus:shadow-[0_0_0_3px_rgba(250,204,21,0.12)]',
+  'hover:border-gray-300 dark:hover:border-white/25',
+  'focus:border-yellow-400 focus:bg-gray-50 dark:focus:bg-white/[0.07] focus:shadow-[0_0_0_3px_rgba(250,204,21,0.12)]',
 ].join(' ')
 
 // ── AppInput ──────────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ export const AppInput = forwardRef<HTMLInputElement, AppInputProps>(
       <FieldShell label={label} error={error} required={isRequired} className={wrapperClassName}>
         <div className="relative flex items-center">
           {hasLeft && (
-            <span className="absolute left-3.5 flex items-center pointer-events-none text-white/30">
+            <span className="absolute left-3.5 flex items-center pointer-events-none text-gray-400 dark:text-white/30">
               {startContent}
             </span>
           )}
@@ -89,12 +89,12 @@ export const AppInput = forwardRef<HTMLInputElement, AppInputProps>(
                   type="button"
                   tabIndex={-1}
                   onClick={() => setShow((v) => !v)}
-                  className="text-white/30 hover:text-yellow-400 transition-colors"
+                  className="text-gray-400 dark:text-white/30 hover:text-yellow-400 transition-colors"
                 >
                   {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               ) : (
-                <span className="text-white/30">{endContent}</span>
+                <span className="text-gray-400 dark:text-white/30">{endContent}</span>
               )}
             </span>
           )}

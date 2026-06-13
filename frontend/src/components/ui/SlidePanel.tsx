@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { X } from 'lucide-react'
+import { X } from '../../lib/icons'
 
 interface SlidePanelProps {
   open: boolean
@@ -37,14 +37,14 @@ export function SlidePanel({
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', stiffness: 300, damping: 32 }}
-            className={`fixed top-0 right-0 z-50 h-screen w-full ${width} bg-[#111111] border-l border-white/10 flex flex-col overflow-hidden`}
+            className={`fixed top-0 right-0 z-50 h-screen w-full ${width} bg-white dark:bg-[#111111] border-l border-gray-200 dark:border-white/10 flex flex-col overflow-hidden`}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-white/5">
-              <p className="text-white font-bold">{title}</p>
+            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-white/5">
+              <p className="text-gray-900 dark:text-white font-bold">{title}</p>
               <button
                 onClick={onClose}
-                className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-white hover:bg-white/5 transition-all"
+                className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 dark:text-white/30 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/5 transition-all"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -57,7 +57,7 @@ export function SlidePanel({
 
             {/* Optional footer */}
             {footer && (
-              <div className="px-6 py-4 border-t border-white/5">
+              <div className="px-6 py-4 border-t border-gray-100 dark:border-white/5">
                 {footer}
               </div>
             )}

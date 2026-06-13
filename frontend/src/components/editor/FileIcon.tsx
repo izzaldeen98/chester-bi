@@ -1,4 +1,4 @@
-import { FileJson, File as FileLucide } from 'lucide-react'
+import { FileJson, File as FileLucide } from '../../lib/icons'
 
 interface FileIconProps {
   filename: string

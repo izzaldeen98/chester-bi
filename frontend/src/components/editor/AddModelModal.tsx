@@ -1,4 +1,4 @@
-import { Plus, X, AlertCircle } from 'lucide-react'
+import { Plus, X, AlertCircle } from '../../lib/icons'
 import { Modal } from '../ui/Modal'
 import { Spinner } from '../ui/Spinner'
 
