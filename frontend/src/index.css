@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+/* ── Dark mode: toggled by .dark class on <html> ──────────── */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Light tokens ─────────────────────────────────────────── */
+:root {
+  --text:           #57534e;   /* stone-600  */
+  --text-h:         #1c1917;   /* stone-900  */
+  --bg:             #ffffff;
+  --bg-subtle:      #fafaf9;   /* stone-50   */
+  --border:         #e7e5e4;   /* stone-200  */
+  --accent:         #eab308;   /* yellow-500 */
+  --accent-fg:      #000000;
+  --accent-subtle:  #fef9c3;   /* yellow-100 */
+  --accent-muted:   rgba(234,179,8,0.12);
+  --accent-ring:    rgba(234,179,8,0.45);
+  --shadow-sm:      0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md:      0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+
+  --sans:    system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono:    ui-monospace, Consolas, monospace;
+
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Dark tokens ──────────────────────────────────────────── */
+.dark {
+  --text:           #a8a29e;   /* stone-400  */
+  --text-h:         #fafaf9;   /* stone-50   */
+  --bg:             #1c1917;   /* stone-900  */
+  --bg-subtle:      #292524;   /* stone-800  */
+  --border:         #3f3b38;   /* stone-700  */
+  --accent:         #facc15;   /* yellow-400 */
+  --accent-fg:      #000000;
+  --accent-subtle:  #422006;   /* yellow-950 */
+  --accent-muted:   rgba(250,204,21,0.12);
+  --accent-ring:    rgba(250,204,21,0.45);
+  --shadow-sm:      0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-md:      0 4px 12px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* ── Base resets ──────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+body  { margin: 0; background: var(--bg); color: var(--text); }
+#root { min-height: 100svh; display: flex; flex-direction: column; }

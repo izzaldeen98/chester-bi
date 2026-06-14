@@ -502,6 +502,28 @@ No request body.
 
 ---
 
+### `GET /api/v1/packages/list-models`
+
+**Summary:** List Models
+
+**Operation ID:** `list_models_api_v1_packages_list_models_get`
+
+#### Parameters
+
+No parameters.
+
+#### Request Body
+
+No request body.
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `200` | Successful Response | `N/A` |
+
+---
+
 ### `GET /api/v1/packages/get`
 
 **Summary:** Get Package
@@ -552,6 +574,31 @@ No request body.
 
 ---
 
+### `POST /api/v1/packages/load-package`
+
+**Summary:** Load Package
+
+**Operation ID:** `load_package_api_v1_packages_load_package_post`
+
+#### Parameters
+
+| Name | In | Type | Required | Description |
+|---|---|---|---|---|
+| `package_id` | `query` | `string` | Yes |  |
+
+#### Request Body
+
+No request body.
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `200` | Successful Response | `N/A` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+---
+
 ### `POST /api/v1/semantic-models/add`
 
 **Summary:** Add Semantic Model
@@ -572,6 +619,131 @@ No parameters.
 | Status | Description | Schema |
 |---|---|---|
 | `201` | Successful Response | `N/A` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+---
+
+### `PUT /api/v1/semantic-models/save`
+
+**Summary:** Save Semantic Model
+
+**Operation ID:** `save_semantic_model_api_v1_semantic_models_save_put`
+
+#### Parameters
+
+No parameters.
+
+#### Request Body
+
+- Content-Type: `multipart/form-data`
+- Schema: `Body_save_semantic_model_api_v1_semantic_models_save_put`
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `200` | Successful Response | `N/A` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+---
+
+### `GET /api/v1/semantic-models/file-content`
+
+**Summary:** Get File Content
+
+**Operation ID:** `get_file_content_api_v1_semantic_models_file_content_get`
+
+#### Parameters
+
+| Name | In | Type | Required | Description |
+|---|---|---|---|---|
+| `model_id` | `query` | `string` | Yes |  |
+
+#### Request Body
+
+No request body.
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `200` | Successful Response | `N/A` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+---
+
+### `GET /api/v1/semantic-models/query`
+
+**Summary:** Query Semantic Model
+
+**Operation ID:** `query_semantic_model_api_v1_semantic_models_query_get`
+
+#### Parameters
+
+| Name | In | Type | Required | Description |
+|---|---|---|---|---|
+| `model_id` | `query` | `string` | Yes |  |
+| `query` | `query` | `string` | Yes |  |
+
+#### Request Body
+
+No request body.
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `200` | Successful Response | `N/A` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+---
+
+### `GET /api/v1/semantic-models/get-compiled-model`
+
+**Summary:** Get Compiled Model
+
+**Operation ID:** `get_compiled_model_api_v1_semantic_models_get_compiled_model_get`
+
+#### Parameters
+
+| Name | In | Type | Required | Description |
+|---|---|---|---|---|
+| `model_id` | `query` | `string` | Yes |  |
+
+#### Request Body
+
+No request body.
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `200` | Successful Response | `SemanticModelSchema` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+---
+
+### `DELETE /api/v1/semantic-models/delete`
+
+**Summary:** Delete Semantic Model
+
+**Operation ID:** `delete_semantic_model_api_v1_semantic_models_delete_delete`
+
+#### Parameters
+
+| Name | In | Type | Required | Description |
+|---|---|---|---|---|
+| `model_id` | `query` | `string` | Yes |  |
+
+#### Request Body
+
+No request body.
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `200` | Successful Response | `N/A` |
 | `422` | Validation Error | `HTTPValidationError` |
 
 ---
@@ -604,6 +776,13 @@ No parameters.
 | `scope` | `string` | No |  |
 | `client_id` | `object` | No |  |
 | `client_secret` | `object` | No |  |
+
+### `Body_save_semantic_model_api_v1_semantic_models_save_put`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `model_id` | `string` | Yes |  |
+| `file` | `string` | Yes |  |
 
 ### `ConnectionCreate`
 
@@ -694,6 +873,31 @@ No parameters.
 | `created_by` | `string` | Yes |  |
 | `updated_by` | `string` | Yes |  |
 | `is_active` | `boolean` | Yes |  |
+
+### `SemanticModelField`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | Yes |  |
+| `type` | `string` | Yes |  |
+| `datatype` | `string` | Yes |  |
+
+### `SemanticModelSchema`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `type` | `string` | Yes |  |
+| `package_name` | `string` | Yes |  |
+| `model_path` | `object` | No |  |
+| `malloy_version` | `string` | Yes |  |
+| `schema` | `array[SemanticModelSource]` | Yes |  |
+
+### `SemanticModelSource`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | Yes |  |
+| `fields` | `array[SemanticModelField]` | Yes |  |
 
 ### `UserCreate`
 
