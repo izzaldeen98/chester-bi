@@ -43,7 +43,11 @@ a `json` file that contains how metric is calculated.
 1. user `React-Grid-Layout
 
 
+---
 
+# TODOS
+
+1. add files and query them
 
 ---
 # Bugs
