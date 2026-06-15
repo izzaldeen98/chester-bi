@@ -5,6 +5,8 @@ import LandingPage from './pages/LandingPage'
 import HomePage from './pages/HomePage'
 import UsersPage from './pages/UsersPage'
 import DashboardsPage from './pages/DashboardsPage'
+import PackagesPage from './pages/PackagesPage'
+import ConnectionsPage from './pages/ConnectionsPage'
 
 // Placeholder for pages not yet built
 function ComingSoon({ name }) {
@@ -31,8 +33,8 @@ export default function App() {
           <Route path="/dashboard"   element={<DashboardsPage />} />
           <Route path="/query"       element={<ComingSoon name="Query Builder" />} />
           <Route path="/files"       element={<ComingSoon name="Files" />} />
-          <Route path="/connections" element={<ComingSoon name="Connections" />} />
-          <Route path="/packages"    element={<ComingSoon name="Packages" />} />
+          <Route path="/connections" element={<ConnectionsPage />} />
+          <Route path="/packages"    element={<PackagesPage />} />
           <Route path="/users"       element={<UsersPage />} />
         </Route>
 

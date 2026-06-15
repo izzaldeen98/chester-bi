@@ -29,12 +29,27 @@ class ConnectionPublicResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    created_by: UUID = Field(validation_alias=AliasPath("creator", "public_key"))
-    updated_by: UUID = Field(validation_alias=AliasPath("updater", "public_key"))
+    created_by: str = Field(validation_alias=AliasPath("creator", "username"))
+    updated_by: str = Field(validation_alias=AliasPath("updater", "username"))
 
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+class ConnectionDetailedResponse(BaseModel):
+    id: UUID = Field(validation_alias="public_key")
+    type: str
+    name: str
+    description: str | None = None
+    host: str
+    port: int
+    database: str
+    username: str
+    created_at: datetime
+    updated_at: datetime
+    created_by: UUID = Field(validation_alias=AliasPath("creator", "username"))
+    updated_by: UUID = Field(validation_alias=AliasPath("updater", "username"))
+
 
 
 class ConnectionTestResponse(BaseModel):

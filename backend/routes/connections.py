@@ -3,6 +3,7 @@ from schema.connections import (
     ConnectionUpdate,
     ConnectionCreate,
     ConnectionPublicResponse,
+    ConnectionDetailedResponse,
 )
 from utils.init_database import get_db
 from security import get_current_user
@@ -125,6 +126,46 @@ async def list_connections(
     )
     return connections
 
+
+@router.get(
+    "/get",
+    response_model=ConnectionDetailedResponse,
+    response_model_exclude_none=True,
+)
+async def get_connection(
+    connection_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+
+    permissions = ["*", "connections:*", "connections:list"]
+    if not check_permissions(current_user, *permissions):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized : Insufficient permissions",
+        )
+    connection = db.query(Connection).filter(and_(Connection.account_id == current_user.account_id, Connection.is_active == True, Connection.public_key == connection_id)).first()
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Connection not found",
+        )
+    connection_attributes = connection.connection_attributes
+
+    return {
+        "id": connection.public_key,
+        "type": connection.type,
+        "name": connection.name,
+        "host": connection_attributes.get("host"),
+        "port": connection_attributes.get("port"),
+        "database": connection_attributes.get("database"),
+        "username": connection_attributes.get("username"),
+        "description": connection.description,
+        "created_at": connection.created_at,
+        "updated_at": connection.updated_at,
+        "created_by": connection.creator.username,
+        "updated_by": connection.updater.username,
+    }
 
 @router.put(
     "/update", response_model=ConnectionPublicResponse, response_model_exclude_none=True

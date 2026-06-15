@@ -179,6 +179,109 @@ export async function getPackages(): Promise<PackageResponse[]> {
   return handleResponse<PackageResponse[]>(res);
 }
 
+// ── Connections ────────────────────────────────────────────────────────────
+
+export interface ConnectionPublicResponse {
+  id: string;
+  type: string;
+  name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string;
+  is_active: boolean;
+}
+
+export interface ConnectionDetailedResponse {
+  id: string;
+  type: string;
+  name: string;
+  description?: string;
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string;
+}
+
+export interface ConnectionCreate {
+  name: string;
+  type: string;
+  description?: string;
+  connection_attributes: {
+    host: string;
+    port: number;
+    database: string;
+    username: string;
+    password: string;
+  };
+}
+
+export interface ConnectionUpdate {
+  name?: string;
+  description?: string;
+  connection_attributes?: {
+    host?: string;
+    port?: number;
+    database?: string;
+    username?: string;
+    password?: string;
+  };
+}
+
+export async function getConnections(): Promise<ConnectionPublicResponse[]> {
+  const res = await fetch(`/api/v1/connections/list`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<ConnectionPublicResponse[]>(res);
+}
+
+export async function getConnection(connectionId: string): Promise<ConnectionDetailedResponse> {
+  const res = await fetch(`/api/v1/connections/get?connection_id=${connectionId}`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<ConnectionDetailedResponse>(res);
+}
+
+export async function createConnection(data: ConnectionCreate): Promise<void> {
+  const res = await fetch(`/api/v1/connections/create`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<void>(res);
+}
+
+export async function updateConnection(connectionId: string, data: ConnectionUpdate): Promise<ConnectionPublicResponse> {
+  const res = await fetch(`/api/v1/connections/update?connection_id=${connectionId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<ConnectionPublicResponse>(res);
+}
+
+export async function deleteConnection(connectionId: string): Promise<void> {
+  const res = await fetch(`/api/v1/connections/delete?connection_id=${connectionId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<void>(res);
+}
+
+export async function testConnection(connectionId: string): Promise<void> {
+  const res = await fetch(`/api/v1/connections/test-connection?connection_id=${connectionId}`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<void>(res);
+}
+
+// ── Packages ───────────────────────────────────────────────────────────────
+
 export async function createPackage(name: string, description?: string): Promise<void> {
   const body = new FormData();
   body.append("name", name);
