@@ -19,6 +19,14 @@ sun : import { HiSun } from "react-icons/hi";
 moon : import { HiMoon } from "react-icons/hi";
 connection : import { MdOutlineCloud } from "react-icons/md";
 chart : import { IoBarChartSharp } from "react-icons/io5";
+logout : import { RiLogoutBoxLine } from "react-icons/ri";
+home : import { RiHomeLine } from "react-icons/ri";
+search : import { FaSearch } from "react-icons/fa";
+edit : import { FaEdit } from "react-icons/fa";
+close : import { MdClose } from "react-icons/md";
+users : import { FaUsers } from "react-icons/fa";
+shield : import { FaShieldAlt } from "react-icons/fa";
+check-circle : import { FaCheckCircle } from "react-icons/fa";
 
 
 

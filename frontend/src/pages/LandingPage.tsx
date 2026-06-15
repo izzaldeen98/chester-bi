@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { GiJesterHat } from "react-icons/gi";
 import { MdDashboard, MdOutlineCloud } from "react-icons/md";
 import { PiFileSqlFill } from "react-icons/pi";
@@ -7,6 +8,7 @@ import { FaTable } from "react-icons/fa";
 import { HiSun, HiMoon } from "react-icons/hi";
 import { IoBarChartSharp } from "react-icons/io5";
 import { useTheme } from "../lib/theme";
+import CButton from "../components/CButton";
 
 // ── Data ───────────────────────────────────────────────────────────────────
 const features = [
@@ -57,7 +59,7 @@ const stats = [
 const navLinks = ["Features", "Docs", "About"];
 const footerLinks = ["Privacy", "Terms", "Contact"];
 
-// ── Reusable primitives ────────────────────────────────────────────────────
+// ── Badge ──────────────────────────────────────────────────────────────────
 function Badge({ children }: { children: React.ReactNode }) {
   return (
     <span
@@ -73,51 +75,10 @@ function Badge({ children }: { children: React.ReactNode }) {
   );
 }
 
-function BtnPrimary({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <button
-      className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition-all hover:brightness-105 active:scale-95 ${className}`}
-      style={{
-        background: "var(--accent)",
-        color: "var(--accent-fg)",
-        boxShadow: "0 0 0 0 var(--accent-ring)",
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function BtnOutline({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <button
-      className={`inline-flex cursor-pointer items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition-all hover:bg-[var(--accent-muted)] active:scale-95 ${className}`}
-      style={{
-        background: "transparent",
-        color: "var(--text-h)",
-        border: "1px solid var(--border)",
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
 // ── Navbar ─────────────────────────────────────────────────────────────────
 function Navbar() {
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
 
   return (
     <nav
@@ -179,17 +140,21 @@ function Navbar() {
             {theme === "dark" ? <HiSun size={20} /> : <HiMoon size={20} />}
           </button>
 
-          <button
-            className="hidden rounded-xl px-4 py-2 text-sm font-semibold transition-colors hover:bg-[var(--bg-subtle)] md:block"
-            style={{ color: "var(--text-h)", border: "1px solid var(--border)" }}
+          <CButton
+            variant="outline"
+            onClick={() => navigate("/login")}
+            className="hidden md:inline-flex"
           >
             Sign In
-          </button>
+          </CButton>
 
-          <BtnPrimary>
+          <CButton
+            variant="primary"
+            onClick={() => navigate("/login")}
+          >
             Get Started
             <FaArrowRight size={12} />
-          </BtnPrimary>
+          </CButton>
         </div>
       </div>
     </nav>
@@ -198,6 +163,7 @@ function Navbar() {
 
 // ── Hero ───────────────────────────────────────────────────────────────────
 function Hero() {
+  const navigate = useNavigate();
   return (
     <section className="relative overflow-hidden px-6 py-28 text-center">
       {/* Radial glow */}
@@ -244,11 +210,17 @@ function Hero() {
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-4">
-          <BtnPrimary>
+          <CButton
+            variant="primary"
+            onClick={() => navigate("/login")}
+            className="px-7 py-3"
+          >
             Get Started Free
             <FaArrowRight size={13} />
-          </BtnPrimary>
-          <BtnOutline>View Demo</BtnOutline>
+          </CButton>
+          <CButton variant="outline" className="px-7 py-3">
+            View Demo
+          </CButton>
         </div>
       </div>
 
@@ -345,6 +317,7 @@ function Features() {
 
 // ── CTA Banner ─────────────────────────────────────────────────────────────
 function CTABanner() {
+  const navigate = useNavigate();
   return (
     <section className="px-6 py-20">
       <div
@@ -363,19 +336,21 @@ function CTABanner() {
           critical business decisions.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-4">
-          <button
-            className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-black px-7 py-3 text-sm font-semibold text-yellow-400 transition-all hover:bg-stone-900 active:scale-95"
+          <CButton
+            variant="primary"
+            onClick={() => navigate("/login")}
+            className="bg-black! px-7 py-3 text-yellow-400 hover:bg-stone-900!"
           >
             Start for Free
             <FaArrowRight size={13} />
-          </button>
-          <button
-            className="inline-flex cursor-pointer items-center gap-2 rounded-xl px-7 py-3 text-sm font-semibold text-black transition-all hover:bg-black/10 active:scale-95"
-            style={{ border: "1px solid rgba(0,0,0,0.25)" }}
+          </CButton>
+          <CButton
+            variant="outline"
+            className="border-black/30! px-7 py-3 text-black! hover:bg-black/10!"
           >
             Request a Demo
             <FaUser size={13} />
-          </button>
+          </CButton>
         </div>
       </div>
     </section>
