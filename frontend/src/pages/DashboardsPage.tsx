@@ -318,7 +318,7 @@ export default function DashboardsPage() {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="p-8">
+    <div className="flex-1 overflow-y-auto p-8">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>

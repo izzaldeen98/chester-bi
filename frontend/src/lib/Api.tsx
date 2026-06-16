@@ -282,6 +282,83 @@ export async function testConnection(connectionId: string): Promise<void> {
 
 // ── Packages ───────────────────────────────────────────────────────────────
 
+export interface PackageFile {
+  file: string;
+  location: string;
+  model_id: string | null;
+}
+
+export interface PackageModelsResponse {
+  id: string;
+  name: string;
+  models : [{
+    id: string;
+    name: string;
+    file_name: string;
+  }]
+}
+
+
+export async function listPackageFiles(packageId: string): Promise<PackageFile[]> {
+  const res = await fetch(`/api/v1/packages/list-files?package_id=${packageId}`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<PackageFile[]>(res);
+}
+
+export async function saveModelFile(modelId: string, content: string, filename: string): Promise<void> {
+  const body = new FormData();
+  body.append("model_id", modelId);
+  body.append("file", new File([content], filename, { type: "text/plain" }));
+  const res = await fetch(`/api/v1/semantic-models/save`, {
+    method: "PUT",
+    headers: { ...authHeaders() },
+    body,
+  });
+  return handleResponse<void>(res);
+}
+
+export async function addSemanticModel(
+  packageId: string,
+  name: string,
+  content: string,
+  filename: string,
+  description?: string,
+): Promise<void> {
+  const body = new FormData();
+  body.append("name", name);
+  body.append("package_id", packageId);
+  if (description) body.append("description", description);
+  body.append("file", new File([content], filename, { type: "text/plain" }));
+  const res = await fetch(`/api/v1/semantic-models/add`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+    body,
+  });
+  return handleResponse<void>(res);
+}
+
+export async function loadPackage(packageId: string): Promise<void> {
+  const res = await fetch(`/api/v1/packages/load-package?package_id=${packageId}`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<void>(res);
+}
+
+export async function getModelFileContent(modelId: string): Promise<string> {
+  const res = await fetch(`/api/v1/semantic-models/file-content?model_id=${modelId}`, {
+    headers: { ...authHeaders() },
+  });
+  // Returns raw text
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.detail ?? `Request failed (${res.status})`);
+  }
+  const data = await res.json() as { content: string };
+  return data.content;
+}
+
 export async function createPackage(name: string, description?: string): Promise<void> {
   const body = new FormData();
   body.append("name", name);
@@ -292,4 +369,59 @@ export async function createPackage(name: string, description?: string): Promise
     body,
   });
   return handleResponse<void>(res);
+}
+
+// ── Semantic Models / Query ────────────────────────────────────────────────
+
+export interface ModelRef {
+  id: string;
+  name: string;
+  file_name: string;
+}
+
+export interface ModelPackage {
+  id: string;
+  name: string;
+  models: ModelRef[];
+}
+
+export interface SemanticModelField {
+  name: string;
+  type: string;
+  datatype: string;
+}
+
+export interface SemanticModelSource {
+  name: string;
+  fields: SemanticModelField[];
+}
+
+export interface SemanticModelSchema {
+  type: string;
+  package_name: string;
+  model_path?: string;
+  malloy_version: string;
+  schema: SemanticModelSource[];
+}
+
+export async function listModels(): Promise<ModelPackage[]> {
+  const res = await fetch(`/api/v1/packages/list-models`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<ModelPackage[]>(res);
+}
+
+export async function getCompiledModel(modelId: string): Promise<SemanticModelSchema> {
+  const res = await fetch(`/api/v1/semantic-models/get-compiled-model?model_id=${modelId}`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<SemanticModelSchema>(res);
+}
+
+export async function runQuery(modelId: string, query: string): Promise<any> {
+  const res = await fetch(
+    `/api/v1/semantic-models/query?model_id=${modelId}&query=${encodeURIComponent(query)}`,
+    { headers: { ...authHeaders() } },
+  );
+  return handleResponse<any>(res);
 }

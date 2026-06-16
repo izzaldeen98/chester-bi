@@ -65,7 +65,7 @@ const activity = [
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function HomePage() {
   return (
-    <div className="p-8">
+    <div className="flex-1 overflow-y-auto p-8">
       {/* Header */}
       <div className="mb-8">
         <h1

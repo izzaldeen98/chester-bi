@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { GoPackage } from "react-icons/go";
-import { FaSearch, FaPlus, FaCalendarAlt, FaCheckCircle, FaFolderOpen } from "react-icons/fa";
+import { FaSearch, FaPlus, FaCalendarAlt, FaCheckCircle, FaFolderOpen, FaCode } from "react-icons/fa";
 import { MdBlock } from "react-icons/md";
 import CMetricCard from "../components/CMetricCard";
 import CHCard from "../components/CHCard";
@@ -71,6 +72,8 @@ function CTextArea({
 
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function PackagesPage() {
+  const navigate = useNavigate();
+
   // Data
   const [packages, setPackages]   = useState<PackageResponse[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -201,6 +204,14 @@ export default function PackagesPage() {
         </div>
       );
     }
+    // view
+    if (selected) {
+      return (
+        <CButton variant="outline" fullWidth onClick={() => navigate(`/packages/${selected.id}/editor`)}>
+          <FaCode size={13} /> Open Editor
+        </CButton>
+      );
+    }
     return null;
   }
 
@@ -215,7 +226,7 @@ export default function PackagesPage() {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="p-8">
+    <div className="flex-1 overflow-y-auto p-8">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>

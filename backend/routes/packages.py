@@ -143,12 +143,13 @@ def list_models(
     output = []
     for package in packages:
         output.append({
-            "package_id": str(package.public_key),
-            "package_name": package.name,
+            "id": str(package.public_key),
+            "name": package.name,
             "models": [
                 {
-                    "model_id": str(model.public_key),
-                    "model_name": model.name,
+                    "id": str(model.public_key),
+                    "name": model.name,
+                    "file_name": model.file_name,
                 }
                 for model in package.semantic_models
             ]
