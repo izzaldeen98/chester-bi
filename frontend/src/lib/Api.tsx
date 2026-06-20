@@ -2,6 +2,7 @@
 // and the production server should be configured to do the same.
 
 import { getToken } from "./auth";
+import { FieldInfo, SourceInfo } from "@malloydata/malloy-interfaces";
 
 function authHeaders(): HeadersInit {
   const token = getToken();
@@ -385,15 +386,10 @@ export interface ModelPackage {
   models: ModelRef[];
 }
 
-export interface SemanticModelField {
-  name: string;
-  type: string;
-  datatype: string;
-}
 
 export interface SemanticModelSource {
   name: string;
-  fields: SemanticModelField[];
+  fields: FieldInfo[];
 }
 
 export interface SemanticModelSchema {
@@ -401,7 +397,7 @@ export interface SemanticModelSchema {
   package_name: string;
   model_path?: string;
   malloy_version: string;
-  schema: SemanticModelSource[];
+  sources: SourceInfo[];
 }
 
 export async function listModels(): Promise<ModelPackage[]> {

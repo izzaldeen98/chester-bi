@@ -1,0 +1,342 @@
+/* ── Chester BI · React Query Builder theme ─────────────────────────────── */
+
+.query-builder-section {
+  border-bottom: 1px solid var(--border);
+}
+
+.query-builder-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
+}
+
+.query-builder-section-header .qb-header-hint {
+  margin-left: 0.25rem;
+  font-size: 10px;
+  color: var(--text);
+}
+
+.query-builder-panel {
+  width: 100%;
+  max-height: 240px;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  overflow-y: auto;
+  background: var(--bg);
+}
+
+.query-builder-panel--empty {
+  padding-block: 0.5rem 0.75rem;
+}
+
+/* ── RQB CSS variable overrides (scoped to root) ─────────────────────────── */
+
+.query-builder-panel .queryBuilder.qb-modern-compact {
+  --rqb-spacing: 0.375rem;
+  --rqb-border-width: 1px;
+  --rqb-branch-indent: 0.875rem;
+  --rqb-branch-width: 1px;
+  --rqb-base-color: var(--accent);
+  --rqb-background-color: var(--bg-subtle);
+  --rqb-border-color: var(--border);
+  --rqb-border-style: solid;
+  --rqb-border-radius: 0.625rem;
+  --rqb-branch-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  --rqb-branch-radius: 0.375rem;
+  --rqb-branch-style: solid;
+
+  width: 100%;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-h);
+}
+
+/* ── Groups ────────────────────────────────────────────────────────────────── */
+
+.query-builder-panel .qb-modern-compact .ruleGroup {
+  padding: 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--bg-subtle);
+  box-shadow: var(--shadow-sm);
+}
+
+.query-builder-panel .qb-modern-compact .ruleGroup .ruleGroup {
+  margin-top: 0.125rem;
+  background: var(--bg);
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--border));
+  box-shadow: none;
+}
+
+.query-builder-panel .qb-modern-compact .ruleGroup-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  margin-bottom: 0.375rem;
+  padding-bottom: 0.375rem;
+  border-bottom: 1px dashed color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.query-builder-panel .qb-modern-compact .ruleGroup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.query-builder-panel .qb-modern-compact .ruleGroup-body:empty {
+  display: none;
+}
+
+/* ── Rule rows ─────────────────────────────────────────────────────────────── */
+
+.query-builder-panel .qb-modern-compact .rule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  background: var(--bg);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.query-builder-panel .qb-modern-compact .rule:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.query-builder-panel .qb-modern-compact .rule-hasSubQuery {
+  padding: 0.5rem;
+  background: var(--bg-subtle);
+}
+
+/* ── Inputs & selects ────────────────────────────────────────────────────── */
+
+.query-builder-panel .qb-modern-compact select,
+.query-builder-panel .qb-modern-compact input[type="text"],
+.query-builder-panel .qb-modern-compact input[type="number"],
+.query-builder-panel .qb-modern-compact input[type="date"],
+.query-builder-panel .qb-modern-compact input[type="datetime-local"],
+.query-builder-panel .qb-modern-compact textarea {
+  min-height: 30px;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.query-builder-panel .qb-modern-compact select {
+  padding-left: 1;
+  flex: 1;
+
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a8a29e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+}
+
+.query-builder-panel .qb-modern-compact select:focus,
+.query-builder-panel .qb-modern-compact input:focus,
+.query-builder-panel .qb-modern-compact textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.query-builder-panel .qb-modern-compact input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.query-builder-panel .qb-modern-compact .rule-fields select {
+  min-width: 9rem;
+  max-width: 14rem;
+  font-weight: 500;
+}
+
+.query-builder-panel .qb-modern-compact .rule-operators select {
+  min-width: 5.5rem;
+  font-weight: 600;
+  color: var(--accent);
+  background-color: var(--accent-muted);
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+
+.query-builder-panel .qb-modern-compact .rule-value input,
+.query-builder-panel .qb-modern-compact .rule-value select {
+  min-width: 8rem;
+  flex: 1;
+}
+
+/* ── Combinator (AND / OR) ───────────────────────────────────────────────── */
+
+.query-builder-panel .qb-modern-compact .ruleGroup-combinators select,
+.query-builder-panel .qb-modern-compact .betweenRules select {
+  min-width: 4.5rem;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-muted);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────────── */
+
+.query-builder-panel .qb-modern-compact button {
+  min-height: 30px;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  background: var(--bg);
+  color: var(--text-h);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.1s ease;
+}
+
+.query-builder-panel .qb-modern-compact button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  background: var(--accent-muted);
+}
+
+.query-builder-panel .qb-modern-compact button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.query-builder-panel .qb-modern-compact button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.query-builder-panel .qb-modern-compact .ruleGroup-addRule,
+.query-builder-panel .qb-modern-compact .ruleGroup-addGroup {
+  color: var(--accent-fg);
+  background: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 80%, #000);
+}
+
+.query-builder-panel .qb-modern-compact .ruleGroup-addRule:hover:not(:disabled),
+.query-builder-panel .qb-modern-compact .ruleGroup-addGroup:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 88%, #000);
+  border-color: color-mix(in srgb, var(--accent) 70%, #000);
+}
+
+.query-builder-panel .qb-modern-compact .rule-remove,
+.query-builder-panel .qb-modern-compact .ruleGroup-remove {
+  min-width: 30px;
+  padding-inline: 0.5rem;
+  color: #dc2626;
+  background: color-mix(in srgb, #fecaca 35%, var(--bg));
+  border-color: color-mix(in srgb, #fca5a5 60%, var(--border));
+}
+
+.dark .query-builder-panel .qb-modern-compact .rule-remove,
+.dark .query-builder-panel .qb-modern-compact .ruleGroup-remove {
+  color: #fca5a5;
+  background: color-mix(in srgb, #7f1d1d 35%, var(--bg));
+  border-color: color-mix(in srgb, #991b1b 55%, var(--border));
+}
+
+.query-builder-panel .qb-modern-compact .rule-remove:hover:not(:disabled),
+.query-builder-panel .qb-modern-compact .ruleGroup-remove:hover:not(:disabled) {
+  color: #b91c1c;
+  background: color-mix(in srgb, #fecaca 55%, var(--bg));
+  border-color: #f87171;
+}
+
+.dark .query-builder-panel .qb-modern-compact .rule-remove:hover:not(:disabled),
+.dark .query-builder-panel .qb-modern-compact .ruleGroup-remove:hover:not(:disabled) {
+  color: #fecaca;
+  background: color-mix(in srgb, #991b1b 50%, var(--bg));
+  border-color: #ef4444;
+}
+
+.query-builder-panel .qb-modern-compact .ruleGroup-notToggle label,
+.query-builder-panel .qb-modern-compact .notToggle label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* ── Branch connectors ─────────────────────────────────────────────────────── */
+
+.query-builder-panel .qb-modern-compact.queryBuilder-branches .rule::before,
+.query-builder-panel .qb-modern-compact.queryBuilder-branches .rule::after,
+.query-builder-panel .qb-modern-compact.queryBuilder-branches .ruleGroup .ruleGroup::before,
+.query-builder-panel .qb-modern-compact.queryBuilder-branches .ruleGroup .ruleGroup::after,
+.query-builder-panel .qb-modern-compact.queryBuilder-branches .betweenRules::before {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+}
+
+/* ── Drag handle ─────────────────────────────────────────────────────────────── */
+
+.query-builder-panel .qb-modern-compact .queryBuilder-dragHandle {
+  color: var(--text);
+  opacity: 0.55;
+}
+
+.query-builder-panel .qb-modern-compact .queryBuilder-dragHandle:hover {
+  opacity: 1;
+  color: var(--accent);
+}
+
+/* ── Empty state ───────────────────────────────────────────────────────────── */
+
+.query-builder-panel--empty .qb-modern-compact .ruleGroup {
+  border-style: dashed;
+  background: transparent;
+  box-shadow: none;
+}
+
+.query-builder-panel--empty .qb-modern-compact .ruleGroup-header {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+
+.query-builder-panel::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.query-builder-panel::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 25%, transparent);
+}
+
+.query-builder-panel::-webkit-scrollbar-track {
+  background: transparent;
+}

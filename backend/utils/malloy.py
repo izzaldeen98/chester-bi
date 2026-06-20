@@ -20,44 +20,7 @@ def parse_source_infos(source_infos: list) -> list:
     output_data = []
 
     for source_info in source_infos:
-        # Safely load the stringified JSON
-        s = json.loads(source_info)
-
-        if s.get("kind") != "source":
-            continue
-
-        source_name = s.get("name")
-        fields = s.get("schema", {}).get("fields", [])
-
-        # Use a list to collect data for all fields within this source
-        fields_list = []
-        for field in fields:
-            field_type = field.get("kind")
-            if field_type not in ["dimension", "measure"]:
-                continue
-
-            field_name = field.get("name")
-
-            # Safely fetch the nested datatype dictionary
-            field_type_obj = field.get("type")
-            field_datatype = (
-                field_type_obj.get("kind")
-                if isinstance(field_type_obj, dict)
-                else None
-            )
-
-            # Constructing a clean object for each field
-            fields_list.append(
-                {
-                    "name": field_name,
-                    "type": field_type,
-                    "datatype": field_datatype,
-                }
-            )
-
-        # Append the source and its collected fields to the final list
-        output_data.append({"name": source_name, "fields": fields_list})
-
+        output_data.append(json.loads(source_info))
     # Return the data back to your main script
     return output_data
 
@@ -212,15 +175,13 @@ class MalloyModel:
         if response.status_code != 200:
             raise Exception(f"Failed to get compiled model: {response.text}")
         data = response.json()
-
-        
         
         return {
             "type": data["type"],
             "package_name": data["packageName"],
             "model_path": data.get("path", None),
             "malloy_version": data["malloyVersion"],
-            "schema": parse_source_infos(data["sourceInfos"]),
+            "sources": parse_source_infos(data["sourceInfos"]),
         }
 
     def compile(self, includeSql: bool = True, sourceName: str = None):
@@ -234,6 +195,17 @@ class MalloyModel:
         if response.status_code != 200:
             raise Exception(f"Failed to compile model: {response.text}")
         return response.json()
+    def get_compiled_model_raw(self):
+        url = f"{MALLOY_URL}{self.resource}/{self.path}"
+        print(url)
+        response = requests.get(url)
+        if response.status_code != 200:
+            raise Exception(f"Failed to get compiled model: {response.text}")
+        data = response.json()
+
+        
+        
+        return data
 
     def load(self):
         response = requests.get(
@@ -501,7 +473,12 @@ class Malloy:
 if __name__ == "__main__":
     malloy = Malloy(envid="55cc0b65-59de-4dc9-97c5-07191d353f2b")
     package = malloy.get_package_by_name("public_data")
-    print(package.get)
+    model = package.get_model_by_path("a.malloy")
+    source_infos = model.get_compiled_model()
+    with open("C:\\dev\\chester-bi\\.tests\\source_infos.json", "w") as f:
+        json.dump(source_infos, f , indent=4)
+
+
 
 
     

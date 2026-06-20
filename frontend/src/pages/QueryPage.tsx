@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  FaPlay, FaTable, FaLayerGroup, FaCalendarAlt, FaFilter, FaTrash,
+  FaPlay, FaTable, FaLayerGroup, FaCalendarAlt, FaFilter, FaTrash
 } from "react-icons/fa";
 import { FaSortAmountDown } from "react-icons/fa";
 import { IoText } from "react-icons/io5";
 import { TbRulerMeasure2 } from "react-icons/tb";
 import { MdDataObject } from "react-icons/md";
 import { PiFileSqlFill } from "react-icons/pi";
-import CodeMirror from "@uiw/react-codemirror";
-import { sql } from "@codemirror/lang-sql";
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import { EditorView } from "@codemirror/view";
 import CSelect from "../components/CSelect";
@@ -21,53 +19,44 @@ import {
   getCompiledModel,
   runQuery,
   type ModelPackage,
-  type SemanticModelField,
-  type SemanticModelSource,
   type SemanticModelSchema,
 } from "../lib/Api";
+import 'react-querybuilder/dist/query-builder.css';
+import '../styles/query-builder.css';
+import { BsArrowsCollapse, BsArrowsExpand } from "react-icons/bs";
+
+
+import { ASTQuery  } from "@malloydata/malloy-query-builder";
+import { Malloy } from '@malloydata/malloy/dist/malloy';
+import { FieldInfo, SourceInfo } from "@malloydata/malloy-interfaces";
+import { QueryBuilder, type RuleGroupType } from "react-querybuilder"
+
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const TIME_GRANULARITIES = ["year", "quarter", "month", "week", "day", "hour", "minute", "second"] as const;
 type Granularity = typeof TIME_GRANULARITIES[number];
 type SortDir = "asc" | "desc";
 type ResultView = "table" | "json" | "query";
-type FilterOp = "==" | "!=" | ">" | "<" | ">=" | "<=" | "~";
 
-interface FilterRow {
-  id: string;
-  field: string;
-  datatype: string;
-  op: FilterOp;
-  value: string;
+interface SortItem {
+  field: FieldInfo;
+  dir: SortDir;
 }
 
-const ALL_OPS: { value: FilterOp; label: string }[] = [
-  { value: "==", label: "=" },
-  { value: "!=", label: "≠" },
-  { value: ">",  label: ">" },
-  { value: "<",  label: "<" },
-  { value: ">=", label: "≥" },
-  { value: "<=", label: "≤" },
-  { value: "~",  label: "~" },
-];
+
+function isDateTime(field: FieldInfo) {
+  const dt = field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "timestamp_type";
+  return dt;
+}
+
+function isBoolean(field: FieldInfo) {  
+  return field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "boolean_type";
+}
+
+
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function isDateTime(field: SemanticModelField) {
-  const dt = field.datatype.toLowerCase();
-  return dt.includes("date") || dt.includes("time") || dt.includes("timestamp");
-}
 
-function wrapField(name: string) {
-  return /[\s`]/.test(name) ? `\`${name}\`` : name;
-}
-
-function formatFilterValue(value: string, datatype: string): string {
-  const dt = datatype.toLowerCase();
-  if (dt === "string" || dt === "varchar" || dt === "text") {
-    return value.startsWith("'") ? value : `'${value}'`;
-  }
-  return value;
-}
 
 function extractRows(result: any): Record<string, unknown>[] {
   if (!result) return [];
@@ -83,48 +72,97 @@ function extractColumns(rows: Record<string, unknown>[]): string[] {
   return rows.length > 0 ? Object.keys(rows[0]) : [];
 }
 
+function countFilterRules(group: RuleGroupType): number {
+  return group.rules.reduce<number>((count, rule) => {
+    if ("rules" in rule) return count + countFilterRules(rule);
+    return count + 1;
+  }, 0);
+}
+
+const EMPTY_FILTER_QUERY: RuleGroupType = { combinator: "and", rules: [] };
+
 // ── Field icon ─────────────────────────────────────────────────────────────
-function FieldIcon({ field }: { field: SemanticModelField }) {
-  if (field.type.toLowerCase() === "measure")
+function FieldIcon({ field }: { field: FieldInfo }) {
+  if (field.kind.toLowerCase() === "measure")
     return <TbRulerMeasure2 size={13} style={{ color: "#a78bfa", flexShrink: 0 }} />;
   if (isDateTime(field))
     return <FaCalendarAlt size={11} style={{ color: "#34d399", flexShrink: 0 }} />;
   return <IoText size={13} style={{ color: "var(--text)", flexShrink: 0 }} />;
 }
 
+
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function QueryPage() {
   const { theme } = useTheme();
 
   // Model selection
-  const [modelPackages, setModelPackages]   = useState<ModelPackage[]>([]);
-  const [loadingModels, setLoadingModels]   = useState(true);
-  const [modelsError, setModelsError]       = useState("");
-  const [selectedPkgId, setSelectedPkgId]  = useState("");
+  const [modelPackages, setModelPackages] = useState<ModelPackage[]>([]);
+  const [loadingModels, setLoadingModels] = useState(true);
+  const [modelsError, setModelsError] = useState("");
+  const [selectedPkgId, setSelectedPkgId] = useState("");
   const [selectedModelId, setSelectedModelId] = useState("");
 
   // Schema
-  const [schema, setSchema]               = useState<SemanticModelSchema | null>(null);
+  const [compiledModel, setCompiledModel] = useState<SemanticModelSchema | null>(null);
   const [loadingSchema, setLoadingSchema] = useState(false);
-  const [schemaError, setSchemaError]     = useState("");
-  const [activeSource, setActiveSource]   = useState<SemanticModelSource | null>(null);
+  const [schemaError, setSchemaError] = useState("");
+  const [activeSchema, setActiveSchema] = useState<SourceInfo | null>(null);
+  const [activeSource, setActiveSource] = useState<Array<SourceInfo> | null>(null);
 
   // Field selections
-  const [groupByFields, setGroupByFields]     = useState<string[]>([]);
-  const [aggFields, setAggFields]             = useState<string[]>([]);
-  const [granularityMap, setGranularityMap]   = useState<Record<string, Granularity>>({});
-  const [sortMap, setSortMap]                 = useState<Record<string, SortDir>>({});
-  const [limit, setLimit]                     = useState(1000);
+  const [groupByFields, setGroupByFields] = useState<FieldInfo[]>([]);
+  const [aggFields, setAggFields] = useState<FieldInfo[]>([]);
+  const [granularityMap, setGranularityMap] = useState<Record<string, Granularity>>({});
+  const [sortMap, setSortMap] = useState<SortItem[]>([]);
+  const [limit, setLimit] = useState(1000);
 
-  // Filters
-  const [filters, setFilters] = useState<FilterRow[]>([]);
+  const [query, setQuery] = useState<string | null>(null);
+  const [collapseFilters, setCollapseFilters] = useState(true);
+
+  function queryBuilderDataType(field: FieldInfo): string {
+    const isMeasure = field.kind.toLowerCase() === "measure";
+    const isDimension = field.kind.toLowerCase() === "dimension";
+    const isDT = isDateTime(field);
+    const isBool = isBoolean(field);
+    if (isMeasure) return "number";
+    if (isDimension && isDT) return "datetime-local";
+    if (isDimension) return "text";
+
+    return "text";
+  }
+
+  function queryBuilderValueEditorType(field: FieldInfo): string {
+    const isMeasure = field.kind.toLowerCase() === "measure";
+    const isDimension = field.kind.toLowerCase() === "dimension";
+    const isDT = isDateTime(field);
+    const isBool = isBoolean(field);
+    if (isMeasure) return "text";
+    if (isDimension && isDT) return "text";
+    if (isDimension && isBool) return "switch";
+    return "text";
+  }
+
+  // Filters (react-querybuilder)
+  const [filterQuery, setFilterQuery] = useState<RuleGroupType>(EMPTY_FILTER_QUERY);
+  const filterRuleCount = useMemo(() => countFilterRules(filterQuery), [filterQuery]);
+
+  const filterFields = useMemo(
+    () => activeSchema?.schema?.fields?.map((field: FieldInfo) => ({
+      name: field.name,
+      label: field.name,
+      inputType: queryBuilderDataType(field),
+      valueEditorType: queryBuilderValueEditorType(field),
+
+    })) ?? [],
+    [activeSchema],
+  );
 
   // Results
-  const [running, setRunning]         = useState(false);
+  const [running, setRunning] = useState(false);
   const [queryResult, setQueryResult] = useState<any>(null);
-  const [queryError, setQueryError]   = useState("");
-  const [queryTime, setQueryTime]     = useState<number | null>(null);
-  const [resultView, setResultView]   = useState<ResultView>("table");
+  const [queryError, setQueryError] = useState("");
+  const [queryTime, setQueryTime] = useState<number | null>(null);
+  const [resultView, setResultView] = useState<ResultView>("table");
 
   // ── Load models ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -133,70 +171,144 @@ export default function QueryPage() {
       .then((pkgs) => {
         setModelPackages(pkgs);
         if (pkgs.length > 0) {
-          setSelectedPkgId(pkgs[0].id);
-          if (pkgs[0].models.length > 0) setSelectedModelId(pkgs[0].models[0].id);
+          //   setSelectedPkgId(pkgs[0].id);
+          setSelectedPkgId("");
+          //   if (pkgs[0].models.length > 0) setSelectedModelId(pkgs[0].models[0].id);
+          if (pkgs[0].models.length > 0) setSelectedModelId("");
+
         }
       })
       .catch((e: any) => setModelsError(e.message ?? "Failed to load models."))
       .finally(() => setLoadingModels(false));
   }, []);
 
-  const selectedPkg  = modelPackages.find((p) => p.id === selectedPkgId);
-  const pkgOptions   = modelPackages.map((p) => ({ label: p.name, value: p.id }));
+  const selectedPkg = modelPackages.find((p) => p.id === selectedPkgId);
+  const pkgOptions = modelPackages.map((p) => ({ label: p.name, value: p.id }));
   const modelOptions = (selectedPkg?.models ?? []).map((m) => ({ label: m.name, value: m.id }));
 
   useEffect(() => {
     const pkg = modelPackages.find((p) => p.id === selectedPkgId);
-    if (pkg && pkg.models.length > 0) setSelectedModelId(pkg.models[0].id);
+    if (pkg && pkg.models.length > 0) setSelectedModelId("");
     else setSelectedModelId("");
   }, [selectedPkgId]);
 
   // ── Load schema ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!selectedModelId) return;
-    setSchema(null); setSchemaError(""); setActiveSource(null);
-    setGroupByFields([]); setAggFields([]); setGranularityMap({}); setSortMap({}); setFilters([]);
+    setCompiledModel(null); setSchemaError(""); setActiveSource(null);
+    setGroupByFields([]); setAggFields([]); setGranularityMap({}); setSortMap([]); setFilterQuery(EMPTY_FILTER_QUERY);
     setQueryResult(null); setQueryError("");
     setLoadingSchema(true);
     getCompiledModel(selectedModelId)
-      .then((s) => { setSchema(s); if (s.schema.length > 0) setActiveSource(s.schema[0]); })
+      .then((s) => { setCompiledModel(s); if (s.sources.length > 0) setActiveSource(s.sources); })
       .catch((e: any) => setSchemaError(e.message ?? "Failed to load schema."))
       .finally(() => setLoadingSchema(false));
   }, [selectedModelId]);
 
+
+  useEffect(() => {
+    if (!activeSource) return;
+    setActiveSchema(activeSource[0]);
+  }, [activeSource]);
+
+
+  const generatedQuery = useMemo(() => {
+    if (!activeSchema) return;
+    const query = new ASTQuery({ source: activeSchema });
+    const segment = query.getOrAddDefaultSegment();
+    if (groupByFields.length > 0) {
+      for (const field of groupByFields) {
+        const isDimension = field.kind.toLowerCase() === "dimension";
+        if (isDimension && 'type' in field && field.type.kind.toLowerCase() === "timestamp_type" && granularityMap[field.name]) {
+          segment.addTimestampGroupBy(field.name, granularityMap[field.name]);
+        } else {
+          segment.addGroupBy(field.name);
+        }
+      }
+    }
+    if (aggFields.length > 0) {
+      for (const field of aggFields) {
+        segment.addAggregate(field.name);
+      }
+    }
+    // if (filters.length > 0) {
+    //   for (const filter of filters) {
+    //     segment.addwhere(filter.field, filter.op, filter.value);
+    //   }
+    // }
+    if (limit > 0) {
+      segment.setLimit(limit);
+    }
+    if (sortMap.length > 0) {
+      for (const sortItem of sortMap) {
+        if (!groupByFields.includes(sortItem.field)) return;
+        console.log(groupByFields.includes(sortItem.field));
+        segment.addOrderBy(sortItem.field.name, sortItem.dir === "asc" ? "asc" : "desc");
+      }
+    }
+    const malloyQuery = query.toMalloy();
+    setQuery(malloyQuery);
+
+    return malloyQuery;
+
+  }, [groupByFields, aggFields, filterQuery, limit, sortMap, granularityMap, activeSchema]);
+
   // ── Toggle field ─────────────────────────────────────────────────────────
-  function toggleField(field: SemanticModelField) {
-    const isMeasure = field.type.toLowerCase() === "measure";
-    const name = field.name;
+  function toggleField(field: FieldInfo) {
+
+    const isMeasure = field.kind.toLowerCase() === "measure";
     if (isMeasure) {
-      setAggFields((prev) => prev.includes(name) ? prev.filter((f) => f !== name) : [...prev, name]);
+      setAggFields((prev) => prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field]);
     } else {
       setGroupByFields((prev) => {
-        const next = prev.includes(name) ? prev.filter((f) => f !== name) : [...prev, name];
+        const next = prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field];
         // clear granularity if deselected
-        if (prev.includes(name)) setGranularityMap((g) => { const c = { ...g }; delete c[name]; return c; });
+        if (prev.includes(field)) setGranularityMap((g) => { const c = { ...g }; delete c[field.name]; return c; });
         return next;
       });
     }
     // clear sort if deselected
-    setSortMap((s) => {
-      const isSelected = isMeasure ? aggFields.includes(name) : groupByFields.includes(name);
-      if (isSelected) { const c = { ...s }; delete c[name]; return c; }
-      return s;
+    setSortMap((prev) => {
+      const isSelected = isMeasure ? aggFields.includes(field) : groupByFields.includes(field);
+      if (isSelected) { return prev.filter((s) => s.field.name !== field.name); }
+      return prev;
     });
   }
 
   // ── Toggle sort ───────────────────────────────────────────────────────────
-  function cycleSort(e: React.MouseEvent, fieldName: string) {
+  function cycleSort(e: React.MouseEvent<HTMLDivElement>, field: FieldInfo) {
+    // CRITICAL: Stops the click from bubbling up to parent rows/buttons
+    e.preventDefault();
     e.stopPropagation();
+
     setSortMap((prev) => {
-      const cur = prev[fieldName];
-      if (!cur) return { ...prev, [fieldName]: "asc" };
-      if (cur === "asc") return { ...prev, [fieldName]: "desc" };
-      const next = { ...prev }; delete next[fieldName]; return next;
+      const current = Array.isArray(prev) ? prev : [];
+      const existing = current.find((s) => s.field.name === field.name);
+
+      // State 1: Not sorted yet -> Set to ASC
+      if (!existing) {
+        console.log("Action: Adding ASC");
+        return [...current, { field, dir: "asc" }];
+      }
+
+      // State 2: Current is ASC -> Update to DESC
+      if (existing.dir === "asc") {
+        console.log("Action: Flipping to DESC");
+        return current.map((s) =>
+          s.field.name === field.name ? { ...s, dir: "desc" as const } : s
+        );
+      }
+    
+
+      // State 3: Current is DESC -> Remove completely
+      console.log("Action: Removing sort completely");
+      return current.filter((s) => s.field.name !== field.name);
     });
   }
 
+  function cycleCollapseFilters() {
+    setCollapseFilters((prev) => !prev);
+  }
   // ── Set granularity ───────────────────────────────────────────────────────
   function setGranularity(e: React.MouseEvent, fieldName: string, gran: Granularity) {
     e.stopPropagation();
@@ -204,61 +316,9 @@ export default function QueryPage() {
   }
 
   // ── Filter management ────────────────────────────────────────────────────
-  function addFilter(field: SemanticModelField) {
-    setFilters((prev) => {
-      if (prev.some((f) => f.field === field.name)) return prev;
-      const isNum = ["number","float","integer","int"].includes(field.datatype.toLowerCase());
-      return [...prev, {
-        id: `${field.name}-${Date.now()}`,
-        field: field.name,
-        datatype: field.datatype,
-        op: isNum ? ">" : "==",
-        value: "",
-      }];
-    });
-  }
-
-  function updateFilter(id: string, patch: Partial<Omit<FilterRow, "id">>) {
-    setFilters((prev) => prev.map((f) => f.id === id ? { ...f, ...patch } : f));
-  }
-
-  function removeFilter(id: string) {
-    setFilters((prev) => prev.filter((f) => f.id !== id));
-  }
-
-  // ── Build query ───────────────────────────────────────────────────────────
-  const generatedQuery = useMemo(() => {
-    if (!activeSource || (groupByFields.length === 0 && aggFields.length === 0)) return "";
-    const clauses: string[] = [];
-
-    const activeFilters = filters.filter((f) => f.value.trim() !== "");
-    if (activeFilters.length > 0) {
-      const parts = activeFilters.map((f) =>
-        `${wrapField(f.field)} ${f.op} ${formatFilterValue(f.value, f.datatype)}`
-      );
-      clauses.push(`where: ${parts.join(" and ")}`);
-    }
-
-    if (groupByFields.length > 0) {
-      const fields = groupByFields.map((f) => {
-        const gran = granularityMap[f];
-        return gran ? `${wrapField(f)}.${gran}` : wrapField(f);
-      });
-      clauses.push(`group_by: ${fields.join(", ")}`);
-    }
-    if (aggFields.length > 0) {
-      clauses.push(`aggregate: ${aggFields.map(wrapField).join(", ")}`);
-    }
-
-    const sorted = [...groupByFields, ...aggFields].filter((f) => sortMap[f]);
-    if (sorted.length > 0) {
-      clauses.push(`order_by: ${sorted.map((f) => `${wrapField(f)} ${sortMap[f]}`).join(", ")}`);
-    }
-
-    clauses.push(`limit: ${limit}`);
-    return `run: ${activeSource.name} -> {\n  ${clauses.join("\n  ")}\n}`;
-  }, [activeSource, groupByFields, aggFields, granularityMap, sortMap, limit, filters]);
-
+  useEffect(() => {
+    console.log(filterQuery);
+  }, [filterQuery]);
   // ── Run ───────────────────────────────────────────────────────────────────
   async function handleRun() {
     if (!selectedModelId || !generatedQuery) return;
@@ -273,7 +333,7 @@ export default function QueryPage() {
     } finally { setRunning(false); }
   }
 
-  const resultRows    = useMemo(() => extractRows(queryResult), [queryResult]);
+  const resultRows = useMemo(() => extractRows(queryResult), [queryResult]);
   const resultColumns = useMemo(() => extractColumns(resultRows), [resultRows]);
 
   const lightTheme = EditorView.theme({
@@ -302,7 +362,7 @@ export default function QueryPage() {
         {(["table", "json"] as ResultView[]).map((v) => {
           const meta: Record<ResultView, { label: string; icon: React.ReactNode }> = {
             table: { label: "Table", icon: <FaTable size={12} /> },
-            json:  { label: "JSON",  icon: <MdDataObject size={14} /> },
+            json: { label: "JSON", icon: <MdDataObject size={14} /> },
             query: { label: "Query", icon: null },
           };
           const active = resultView === v;
@@ -343,9 +403,9 @@ export default function QueryPage() {
             {loadingModels
               ? <div className="flex justify-center py-4"><CSpinner size={18} /></div>
               : <>
-                  <CSelect label="Package" value={selectedPkgId} onChange={setSelectedPkgId} options={pkgOptions} placeholder="Select package…" />
-                  <CSelect label="Model"   value={selectedModelId} onChange={setSelectedModelId} options={modelOptions} placeholder="Select model…" />
-                </>
+                <CSelect label="Package" value={selectedPkgId} onChange={setSelectedPkgId} options={pkgOptions} placeholder="Select package…" />
+                <CSelect label="Model" value={selectedModelId} onChange={setSelectedModelId} options={modelOptions} placeholder="Select model…" />
+              </>
             }
           </div>
 
@@ -364,21 +424,21 @@ export default function QueryPage() {
               <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Selected</p>
               <div className="flex flex-wrap gap-1">
                 {groupByFields.map((f) => (
-                  <button key={f} onClick={() => setGroupByFields((p) => p.filter((x) => x !== f))}
+                  <button key={f.name} onClick={() => setGroupByFields((p) => p.filter((x) => x !== f))}
                     className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium"
                     style={{ background: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--accent-ring)" }}
                     title="Click to remove"
                   >
-                    <IoText size={8} /> {f}{granularityMap[f] ? `.${granularityMap[f]}` : ""} ×
+                    <IoText size={8} /> {f.name}{granularityMap[f.name] ? `.${granularityMap[f.name]}` : ""} ×
                   </button>
                 ))}
                 {aggFields.map((f) => (
-                  <button key={f} onClick={() => setAggFields((p) => p.filter((x) => x !== f))}
+                  <button key={f.name} onClick={() => setAggFields((p) => p.filter((x) => x !== f))}
                     className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium"
                     style={{ background: "#ede9fe", color: "#7c3aed", border: "1px solid #c4b5fd" }}
                     title="Click to remove"
                   >
-                    <TbRulerMeasure2 size={9} /> {f} ×
+                    <TbRulerMeasure2 size={9} /> {f.name} ×
                   </button>
                 ))}
               </div>
@@ -387,107 +447,85 @@ export default function QueryPage() {
 
           {/* Schema browser */}
           <div className="flex-1 overflow-y-auto py-1">
-            {schemaError  && <div className="p-3"><CAlert variant="error" message={schemaError} /></div>}
+            {schemaError && <div className="p-3"><CAlert variant="error" message={schemaError} /></div>}
             {loadingSchema && <div className="flex justify-center py-8"><CSpinner size={20} /></div>}
 
-            {schema?.schema.map((source) => {
-              const srcActive = activeSource?.name === source.name;
+            {activeSource?.map((schema: SourceInfo) => {
+              const srcActive = activeSchema?.name === schema.name;
               return (
-                <div key={source.name}>
+                <div key={schema.name}>
                   {/* Source row */}
-                  <button type="button" onClick={() => { setActiveSource(source); setGroupByFields([]); setAggFields([]); setGranularityMap({}); setSortMap({}); }}
+                  <button type="button" onClick={() => { setActiveSchema(schema); setGroupByFields([]); setAggFields([]); setGranularityMap({}); setSortMap([]); setFilterQuery(EMPTY_FILTER_QUERY); }}
                     className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors"
                     style={srcActive ? { background: "var(--accent-muted)", color: "var(--accent)" } : { color: "var(--text-h)" }}
                   >
                     <FaLayerGroup size={12} style={{ color: srcActive ? "var(--accent)" : "var(--text)" }} />
-                    <span className="text-xs font-semibold">{source.name}</span>
-                    <span className="ml-auto text-[10px]" style={{ color: "var(--text)" }}>{source.fields.length}</span>
+                    <span className="text-xs font-semibold">{schema.name}</span>
+                    <span className="ml-auto text-[10px]" style={{ color: "var(--text)" }}>{schema.schema?.fields.length}</span>
                   </button>
 
                   {/* Fields */}
-                  {srcActive && source.fields.map((field) => {
-                    const isMeasure  = field.type.toLowerCase() === "measure";
-                    const inGroupBy  = groupByFields.includes(field.name);
-                    const inAgg      = aggFields.includes(field.name);
+                  {srcActive && schema.schema.fields.map((field: FieldInfo) => {
+                    const isMeasure = field.kind.toLowerCase() === "measure";
+                    const inGroupBy = groupByFields.includes(field);
+                    const inAgg = aggFields.includes(field);
                     const isSelected = inGroupBy || inAgg;
-                    const sortDir    = sortMap[field.name];
-                    const gran       = granularityMap[field.name];
+                    const sortDir = sortMap.find((s) => s.field === field)?.dir ?? "";
+                    const gran = granularityMap[field.name];
                     const isDatetime = isDateTime(field);
 
                     return (
-                      <div key={field.name}>
+                      <div key={field.name} className="flex flex-row items-center">
                         {/* Field row */}
-                        <div
-                          className="flex w-full items-center gap-1.5 py-1.5 pl-6 pr-2 cursor-pointer transition-colors"
-                          style={isSelected
-                            ? { background: isMeasure ? "#ede9fe" : "var(--accent-muted)", color: isMeasure ? "#7c3aed" : "var(--accent)" }
-                            : { color: "var(--text-h)" }}
-                          onClick={() => toggleField(field)}
-                          onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "var(--border)"; }}
-                          onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = ""; }}
-                        >
-                          <FieldIcon field={field} />
-                          <span className="flex-1 truncate text-xs">{field.name}</span>
-
-                          {/* Sort button */}
-                          <button
-                            type="button"
-                            onClick={(e) => cycleSort(e, field.name)}
-                            className="rounded p-0.5 transition-colors"
-                            title={sortDir ? `Sort: ${sortDir} (click to cycle)` : "Add sort"}
-                            style={{
-                              color: sortDir ? "var(--accent)" : "var(--text)",
-                              opacity: sortDir ? 1 : 0.4,
-                            }}
+                        <div className="flex flex-col gap-1 w-full" >
+                          <div
+                            className="flex w-full items-center gap-1.5 py-1.5 pl-6 pr-2 cursor-pointer transition-colors"
+                            style={isSelected
+                              ? { background: isMeasure ? "#ede9fe" : "var(--accent-muted)", color: isMeasure ? "#7c3aed" : "var(--accent)" }
+                              : { color: "var(--text-h)" }}
+                            onClick={() => toggleField(field)}
+                            onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "var(--border)"; }}
+                            onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = ""; }}
                           >
-                            <FaSortAmountDown
-                              size={11}
-                              style={{ transform: sortDir === "asc" ? "scaleY(-1)" : undefined }}
-                            />
-                          </button>
+                            <FieldIcon field={field} />
+                            <span className="flex-1 truncate text-xs">{field.name}</span>
 
-                          {/* Sort direction label */}
-                          {sortDir && (
-                            <span className="text-[9px] font-bold" style={{ color: "var(--accent)" }}>
-                              {sortDir.toUpperCase()}
-                            </span>
+                          </div>
+                          {isSelected && isDatetime && !isMeasure && (
+                            <div className="flex flex-col gap-1 pb-1.5 pl-10 pr-2"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {TIME_GRANULARITIES.map((g) => (
+                                <span
+                                  key={g}
+                                  className="px-1.5 py-0.5 text-[9px] font-semibold transition-colors cursor-pointer"
+                                  onClick={(e) => setGranularity(e, field.name, g)}
+                                  style={gran === g
+                                    ? { background: "var(--accent)", color: "var(--accent-fg)" }
+                                    : { background: "var(--border)", color: "var(--text)" }}
+                                >
+                                  {g}
+                                </span>
+                              ))}
+                            </div>
                           )}
-
-                          {/* Filter button */}
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); addFilter(field); }}
-                            className="rounded p-0.5 transition-colors"
-                            title="Add to filters"
-                            style={{
-                              color: filters.some((f) => f.field === field.name) ? "#f59e0b" : "var(--text)",
-                              opacity: filters.some((f) => f.field === field.name) ? 1 : 0.4,
-                            }}
-                          >
-                            <FaFilter size={9} />
-                          </button>
                         </div>
 
-                        {/* Granularity pills (date/time, selected, dimension) */}
-                        {isSelected && isDatetime && !isMeasure && (
-                          <div className="flex flex-wrap gap-1 pb-1.5 pl-10 pr-2"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {TIME_GRANULARITIES.map((g) => (
-                              <button
-                                key={g}
-                                type="button"
-                                onClick={(e) => setGranularity(e, field.name, g)}
-                                className="rounded px-1.5 py-0.5 text-[9px] font-semibold transition-colors"
-                                style={gran === g
-                                  ? { background: "var(--accent)", color: "var(--accent-fg)" }
-                                  : { background: "var(--border)", color: "var(--text)" }}
-                              >
-                                {g}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                        <div
+                          className="flex flex-row gap-1 transition-colors cursor-pointer items-center pl-2 pr-2 left-full"
+                          hidden={!isSelected}
+                          onClick={(e) => cycleSort(e, field)}
+                        >
+                          <FaSortAmountDown
+                            size={11}
+                            style={{ transform: sortDir === "asc" ? "scaleY(-1)" : undefined, color: sortDir ? "var(--accent)" : "var(--text)" }}
+                          />
+                          {/* <FaGear size={11} style={{ color: "var(--accent)" }} /> */}
+                          <span className="text-[9px] font-bold" style={{ color: "var(--accent)" }}>
+                            {sortDir.toUpperCase()}
+                          </span>
+
+                        </div>
                       </div>
                     );
                   })}
@@ -501,82 +539,51 @@ export default function QueryPage() {
         <main className="flex flex-1 flex-col overflow-hidden">
 
           {/* Filter builder panel */}
-          <div className="shrink-0" style={{ borderBottom: "1px solid var(--border)" }}>
-            <div className="flex items-center gap-2 px-3 py-1.5"
-              style={{ borderBottom: filters.length > 0 ? "1px solid var(--border)" : "none", background: "var(--bg-subtle)" }}
-            >
+          <div className="query-builder-section shrink-0">
+            <div className="query-builder-section-header">
+              <span className="flex items-center gap-1">
+                {collapseFilters ? <BsArrowsExpand size={14} className="cursor-pointer var(--text)" onClick={cycleCollapseFilters} /> : <BsArrowsCollapse size={14} className="cursor-pointer var(--accent)" onClick={cycleCollapseFilters} />}
+              </span>
               <FaFilter size={11} style={{ color: "var(--accent)" }} />
-              <span className="text-xs font-medium" style={{ color: "var(--text)" }}>Filters</span>
-              {filters.length > 0 && (
-                <span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold"
-                  style={{ background: "var(--accent)", color: "var(--accent-fg)" }}
-                >
-                  {filters.length}
-                </span>
-              )}
-              {filters.length > 0 && (
-                <button onClick={() => setFilters([])}
-                  className="ml-auto text-[10px] font-medium transition-colors"
+              <span className="text-xs font-medium" style={{ color: "var(--text-h)" }}>Filters</span>
+              {filterRuleCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setFilterQuery(EMPTY_FILTER_QUERY)}
+                  className="ml-auto text-[10px] font-medium transition-colors hover:opacity-80"
                   style={{ color: "var(--text)" }}
                 >
                   Clear all
                 </button>
-              )}
-              {filters.length === 0 && (
-                <span className="ml-2 text-[10px]" style={{ color: "var(--text)" }}>
-                  Click the filter icon on any field to add a condition
+              ) : (
+                <span className="qb-header-hint">
+                  Add rules below to filter your query results
                 </span>
               )}
             </div>
 
-            {filters.length > 0 && (
-              <div className="flex flex-col gap-1 p-2" style={{ background: "var(--bg)" }}>
-                {filters.map((row) => (
-                  <div key={row.id} className="flex items-center gap-2">
-                    {/* Field label */}
-                    <span
-                      className="w-36 shrink-0 truncate rounded px-2 py-1 text-xs font-medium"
-                      style={{ background: "var(--bg-subtle)", color: "var(--text-h)", border: "1px solid var(--border)" }}
-                      title={row.field}
-                    >
-                      {row.field}
-                    </span>
-
-                    {/* Operator */}
-                    <select
-                      value={row.op}
-                      onChange={(e) => updateFilter(row.id, { op: e.target.value as FilterOp })}
-                      className="rounded border px-1.5 py-1 text-xs outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]"
-                      style={{ background: "var(--bg)", color: "var(--text-h)", borderColor: "var(--border)", minWidth: 52 }}
-                    >
-                      {ALL_OPS.map((op) => (
-                        <option key={op.value} value={op.value}>{op.label}</option>
-                      ))}
-                    </select>
-
-                    {/* Value */}
-                    <input
-                      type="text"
-                      placeholder="value…"
-                      value={row.value}
-                      onChange={(e) => updateFilter(row.id, { value: e.target.value })}
-                      className="flex-1 rounded border px-2 py-1 text-xs outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]"
-                      style={{ background: "var(--bg)", color: "var(--text-h)", borderColor: "var(--border)" }}
-                    />
-
-                    {/* Remove */}
-                    <button
-                      onClick={() => removeFilter(row.id)}
-                      className="rounded p-1 transition-colors"
-                      style={{ color: "var(--text)" }}
-                      title="Remove filter"
-                    >
-                      <FaTrash size={11} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+            <div
+              className={`query-builder-panel${filterRuleCount === 0 ? " query-builder-panel--empty" : ""}`}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              hidden={collapseFilters}
+            >
+              <QueryBuilder
+                fields={filterFields}
+                query={filterQuery}
+                onQueryChange={setFilterQuery}
+                showCombinatorsBetweenRules
+                controlClassnames={{
+                  queryBuilder: "qb-modern-compact queryBuilder-branches queryBuilder-responsive",
+                }}
+                translations={{
+                  addRule: { label: "+ Rule", title: "Add filter rule" },
+                  addGroup: { label: "+ Group", title: "Add filter group" },
+                  removeRule: { label: "×", title: "Remove rule" },
+                  removeGroup: { label: "×", title: "Remove group" },
+                }}
+              />
+            </div>
           </div>
 
           {/* Results */}
