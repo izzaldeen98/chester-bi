@@ -12,6 +12,7 @@ import PackageEditorPage from './pages/PackageEditorPage'
 import QueryPage from './pages/QueryPage'
 import QueriesPage from './pages/QueriesPage'
 import FilesPage from './pages/FilesPage'
+import DashboardWorkSpace from './pages/DashboardWorkSpace'
 
 // Placeholder for pages not yet built
 function ComingSoon({ name }) {
@@ -48,6 +49,8 @@ export default function App() {
         <Route element={<FullscreenLayout />}>
           <Route path="/queries/new"             element={<QueryPage />} />
           <Route path="/queries/:queryId/edit"   element={<QueryPage />} />
+          <Route path="/workspace"                element={<DashboardWorkSpace />} />
+          <Route path="/workspace/:dashboardId"   element={<DashboardWorkSpace />} />
         </Route>
 
         {/* Fallback */}

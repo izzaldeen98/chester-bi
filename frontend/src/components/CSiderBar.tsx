@@ -24,6 +24,7 @@ const navItems: NavItem[] = [
   { label: "Connections", path: "/connections", icon: <MdOutlineCloud size={18} /> },
   { label: "Packages",    path: "/packages",    icon: <GoPackage size={18} /> },
   { label: "Users",       path: "/users",       icon: <FaUser size={16} /> },
+  { label: "Workspace",   path: "/workspace",   icon: <FaUser size={16} /> },
 ];
 
 export default function CSiderBar() {

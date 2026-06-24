@@ -49,6 +49,10 @@ function isToday(iso: string) {
   );
 }
 
+function openWorkspace(dashboardId: string) {
+  window.open(`/workspace/${dashboardId}`, "_blank", "noopener,noreferrer");
+}
+
 // ── Textarea ───────────────────────────────────────────────────────────────
 function CTextArea({
   label,
@@ -291,7 +295,7 @@ export default function DashboardsPage() {
         <CButton variant="primary" fullWidth onClick={() => openEdit(selected)}>
           <MdDashboard size={14} /> View Dashboard
         </CButton>
-        <CButton variant="outline" fullWidth onClick={() => openEdit(selected)}>
+        <CButton variant="outline" fullWidth onClick={() => openWorkspace(selected.id)}>
           <FaEdit size={14} /> Edit Dashboard
         </CButton>
         <CButton

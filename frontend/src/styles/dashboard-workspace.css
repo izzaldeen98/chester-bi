@@ -1,0 +1,32 @@
+/* react-grid-layout theme overrides */
+.dashboard-workspace-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--border) 65%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--border) 65%, transparent) 1px, transparent 1px);
+  background-size: var(--cell-size) var(--cell-size);
+  background-position: 0 0;
+}
+
+.dashboard-workspace .react-grid-layout {
+  min-height: 100%;
+}
+
+.dashboard-workspace .react-grid-item.react-grid-placeholder {
+  background: var(--accent-muted);
+  border: 1px dashed var(--accent-ring);
+  border-radius: 1rem;
+  opacity: 1;
+}
+
+.dashboard-workspace .react-resizable-handle::after {
+  border-right-color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.dashboard-workspace .react-grid-item > .react-resizable-handle {
+  opacity: 0.6;
+}
+
+.dashboard-workspace .react-grid-item:hover > .react-resizable-handle {
+  opacity: 1;
+}

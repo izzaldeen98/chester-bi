@@ -10,6 +10,18 @@ const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(file
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
   plugins: [react()],
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'development'),
+    'process.env.DRAGGABLE_DEBUG': 'undefined',
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'development'),
+        'process.env.DRAGGABLE_DEBUG': 'undefined',
+      },
+    },
+  },
   server: {
     proxy: {
       '/api': {
