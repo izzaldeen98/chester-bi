@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   FaPlay, FaTable, FaLayerGroup, FaCalendarAlt, FaHashtag, FaDatabase, FaTerminal, FaCode, FaSave
 } from "react-icons/fa";
@@ -17,10 +18,22 @@ import { useTheme } from "../lib/theme";
 import {
   listModels,
   getCompiledModel,
+  getQuery,
+  getQueries,
+  createQuery,
+  updateQuery,
   runQuery,
   type ModelPackage,
   type SemanticModelSchema,
+  type QueryDetailedResponse,
+  type QueryCreate,
 } from "../lib/Api";
+import {
+  unwrapFilters,
+  wrapFilters,
+  buildGroupByFields,
+  buildOrderByFields,
+} from "../lib/querySerialize";
 import { IoIosSwitch } from "react-icons/io";
 import { MalloyASTQueryBuilder } from "../lib/MalloyASTQueryBuilder";
 
@@ -65,6 +78,50 @@ function extractColumns(rows: Record<string, unknown>[]): string[] {
   return rows.length > 0 ? Object.keys(rows[0]) : [];
 }
 
+interface PendingHydration {
+  source: string;
+  groupBy: string[];
+  agg: string[];
+  filters: unknown;
+  orderBy: Record<string, string> | null;
+  malloyQuery: string;
+}
+
+interface PendingModelSelection {
+  packageId: string;
+  packageName: string;
+  modelId: string;
+  modelName: string;
+}
+
+function resolveModelSelection(
+  packages: ModelPackage[],
+  pending: PendingModelSelection,
+): { packageId: string; modelId: string } | null {
+  const pkg =
+    packages.find((p) => p.id === pending.packageId) ??
+    packages.find((p) => p.name === pending.packageName);
+  if (!pkg) return null;
+
+  const model =
+    pkg.models.find((m) => m.id === pending.modelId) ??
+    pkg.models.find((m) => m.name === pending.modelName);
+  if (!model) return null;
+
+  return { packageId: pkg.id, modelId: model.id };
+}
+
+function parseGroupByEntry(entry: string): { name: string; granularity?: Granularity } {
+  const dot = entry.lastIndexOf(".");
+  if (dot === -1) return { name: entry };
+  const base = entry.slice(0, dot);
+  const gran = entry.slice(dot + 1);
+  if ((TIME_GRANULARITIES as readonly string[]).includes(gran)) {
+    return { name: base, granularity: gran as Granularity };
+  }
+  return { name: entry };
+}
+
 // ── Field icon ─────────────────────────────────────────────────────────────
 function FieldIcon({ field }: { field: FieldInfo }) {
   if (field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "boolean_type")
@@ -82,7 +139,19 @@ function FieldIcon({ field }: { field: FieldInfo }) {
 
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function QueryPage() {
+  const { queryId } = useParams<{ queryId?: string }>();
+  const navigate = useNavigate();
+  const isEditMode = !!queryId;
+  const suppressCodegen = useRef(isEditMode);
+  const prevPkgIdRef = useRef("");
+  const [pendingModelSelection, setPendingModelSelection] = useState<PendingModelSelection | null>(null);
+  const [awaitingModelSelection, setAwaitingModelSelection] = useState(isEditMode);
   const { theme } = useTheme();
+
+  // Saved query (edit mode)
+  const [loadingQuery, setLoadingQuery] = useState(isEditMode);
+  const [queryLoadError, setQueryLoadError] = useState("");
+  const [pendingHydration, setPendingHydration] = useState<PendingHydration | null>(null);
 
   // Model selection
   const [modelPackages, setModelPackages] = useState<ModelPackage[]>([]);
@@ -106,6 +175,8 @@ export default function QueryPage() {
   const [limit, setLimit] = useState(1000);
 
   const [query, setQuery] = useState<string | null>(null);
+  const [queryName, setQueryName] = useState<string | null>(null);
+  const [queryNameEditing, setQueryNameEditing] = useState(false);
 
   // Filters (react-querybuilder)
   const [filterQuery, setFilterQuery] = useState<RuleGroupType>(EMPTY_FILTER_QUERY);
@@ -117,19 +188,75 @@ export default function QueryPage() {
   const [queryTime, setQueryTime] = useState<number | null>(null);
   const [resultView, setResultView] = useState<ResultView>("table");
 
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saveSuccess, setSaveSuccess] = useState("");
+
+  function applyPendingModelSelection(
+    packages: ModelPackage[],
+    pending: PendingModelSelection,
+  ) {
+    const resolved = resolveModelSelection(packages, pending);
+    if (!resolved) return false;
+
+    setSelectedPkgId(resolved.packageId);
+    setSelectedModelId(resolved.modelId);
+    return true;
+  }
+
+  // ── Load saved query (edit mode) ─────────────────────────────────────────
+  useEffect(() => {
+    if (!queryId) return;
+
+    setLoadingQuery(true);
+    setQueryLoadError("");
+    suppressCodegen.current = true;
+
+    getQuery(queryId)
+      .then((saved: QueryDetailedResponse) => {
+        setQueryName(saved.name);
+        setLimit(saved.limit ?? 1000);
+        setQuery(saved.malloy_query);
+        setPendingModelSelection({
+          packageId: saved.semantic_model.package.id,
+          packageName: saved.semantic_model.package.name,
+          modelId: saved.semantic_model.id,
+          modelName: saved.semantic_model.name,
+        });
+        setAwaitingModelSelection(true);
+        setPendingHydration({
+          source: saved.source,
+          groupBy: saved.group_by_fields ?? [],
+          agg: saved.aggregation_fields ?? [],
+          filters: saved.filters,
+          orderBy: saved.order_by_fields,
+          malloyQuery: saved.malloy_query,
+        });
+      })
+      .catch((e: any) => setQueryLoadError(e.message ?? "Failed to load query."))
+      .finally(() => setLoadingQuery(false));
+  }, [queryId]);
+
+  useEffect(() => {
+    if (!pendingModelSelection || modelPackages.length === 0) return;
+
+    if (applyPendingModelSelection(modelPackages, pendingModelSelection)) {
+      setPendingModelSelection(null);
+      setAwaitingModelSelection(false);
+      return;
+    }
+
+    setQueryLoadError("Saved package or model could not be found.");
+    setPendingModelSelection(null);
+    setAwaitingModelSelection(false);
+  }, [modelPackages, pendingModelSelection]);
+
   // ── Load models ──────────────────────────────────────────────────────────
   useEffect(() => {
     setLoadingModels(true);
     listModels()
       .then((pkgs) => {
         setModelPackages(pkgs);
-        if (pkgs.length > 0) {
-          //   setSelectedPkgId(pkgs[0].id);
-          setSelectedPkgId("");
-          //   if (pkgs[0].models.length > 0) setSelectedModelId(pkgs[0].models[0].id);
-          if (pkgs[0].models.length > 0) setSelectedModelId("");
-
-        }
       })
       .catch((e: any) => setModelsError(e.message ?? "Failed to load models."))
       .finally(() => setLoadingModels(false));
@@ -140,9 +267,11 @@ export default function QueryPage() {
   const modelOptions = (selectedPkg?.models ?? []).map((m) => ({ label: m.name, value: m.id }));
 
   useEffect(() => {
-    const pkg = modelPackages.find((p) => p.id === selectedPkgId);
-    if (pkg && pkg.models.length > 0) setSelectedModelId("");
-    else setSelectedModelId("");
+    const prev = prevPkgIdRef.current;
+    prevPkgIdRef.current = selectedPkgId;
+    if (prev && prev !== selectedPkgId) {
+      setSelectedModelId("");
+    }
   }, [selectedPkgId]);
 
   // ── Load schema ──────────────────────────────────────────────────────────
@@ -163,6 +292,64 @@ export default function QueryPage() {
     if (!activeSource) return;
     setActiveSchema(activeSource[0]);
   }, [activeSource]);
+
+  // ── Hydrate UI from saved query after schema loads ───────────────────────
+  useEffect(() => {
+    if (!pendingHydration || !activeSource?.length) return;
+
+    const source =
+      activeSource.find((s) => s.name === pendingHydration.source) ?? activeSource[0];
+    setActiveSchema(source);
+
+    const fields = source.schema?.fields ?? [];
+    const findField = (name: string) => fields.find((f) => f.name === name);
+
+    const nextGroupBy: FieldInfo[] = [];
+    const nextGranularity: Record<string, Granularity> = {};
+
+    for (const entry of pendingHydration.groupBy) {
+      const parsed = parseGroupByEntry(entry);
+      const field = findField(parsed.name);
+      if (!field) continue;
+      nextGroupBy.push(field);
+      if (parsed.granularity) nextGranularity[field.name] = parsed.granularity;
+    }
+
+    const nextAgg = pendingHydration.agg
+      .map((name) => findField(name))
+      .filter((f): f is FieldInfo => !!f);
+
+    const nextSort: SortItem[] = [];
+    if (pendingHydration.orderBy) {
+      for (const [fieldName, dir] of Object.entries(pendingHydration.orderBy)) {
+        const field = findField(fieldName);
+        if (!field) continue;
+        nextSort.push({ field, dir: dir === "desc" ? "desc" : "asc" });
+      }
+    }
+
+    setGroupByFields(nextGroupBy);
+    setAggFields(nextAgg);
+    setGranularityMap(nextGranularity);
+    setSortMap(nextSort);
+
+    const unwrappedFilters = unwrapFilters(pendingHydration.filters);
+    if (unwrappedFilters) {
+      setFilterQuery(unwrappedFilters);
+    }
+
+    setQuery(pendingHydration.malloyQuery);
+    setPendingHydration(null);
+    suppressCodegen.current = false;
+  }, [pendingHydration, activeSource]);
+
+  useEffect(() => {
+    if (!pendingHydration || loadingSchema) return;
+    if (schemaError || (selectedModelId && !activeSource?.length)) {
+      setPendingHydration(null);
+      suppressCodegen.current = false;
+    }
+  }, [pendingHydration, loadingSchema, schemaError, selectedModelId, activeSource]);
 
 
   const generatedQuery = useMemo(() => {
@@ -222,8 +409,7 @@ export default function QueryPage() {
   // 6. SAFE STATE SYNCHRONIZATION FLOW
   // Automatically pipes the pure calculation results straight to your engine's state manager 
   useEffect(() => {
-    if (generatedQuery) {
-      console.log(generatedQuery);
+    if (generatedQuery && !suppressCodegen.current) {
       setQuery(generatedQuery);
     }
   }, [generatedQuery]);
@@ -283,6 +469,66 @@ export default function QueryPage() {
     setGranularityMap((prev) => ({ ...prev, [fieldName]: gran }));
   }
 
+  // ── Save ─────────────────────────────────────────────────────────────────
+  function buildSavePayload(): QueryCreate | null {
+    const name = queryName?.trim();
+    if (!name || !selectedModelId || !activeSchema || !query) return null;
+
+    const groupBy = buildGroupByFields(groupByFields, granularityMap);
+    const orderBy = buildOrderByFields(sortMap);
+    const filters = wrapFilters(filterQuery);
+
+    return {
+      name,
+      source: activeSchema.name,
+      aggregation_fields: aggFields.map((field) => field.name),
+      ...(groupBy.length ? { group_by_fields: groupBy } : {}),
+      ...(filters ? { filters } : {}),
+      ...(orderBy ? { order_by_fields: orderBy } : {}),
+      limit,
+      malloy_query: query,
+    };
+  }
+
+  async function handleSave() {
+    const payload = buildSavePayload();
+    if (!payload) {
+      setSaveError("Enter a query name and build a query before saving.");
+      setSaveSuccess("");
+      return;
+    }
+    if (!selectedModelId) {
+      setSaveError("Select a semantic model before saving.");
+      setSaveSuccess("");
+      return;
+    }
+
+    setSaving(true);
+    setSaveError("");
+    setSaveSuccess("");
+
+    try {
+      if (isEditMode && queryId) {
+        await updateQuery(queryId, {
+          ...payload,
+          semantic_model_id: selectedModelId,
+        });
+        setSaveSuccess("Query updated.");
+      } else {
+        await createQuery(selectedModelId, payload);
+        const created = (await getQueries()).find((q) => q.name === payload.name);
+        setSaveSuccess("Query created.");
+        if (created) {
+          navigate(`/queries/${created.id}/edit`, { replace: true });
+        }
+      }
+    } catch (e: any) {
+      setSaveError(e.message ?? "Save failed.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   // ── Run ───────────────────────────────────────────────────────────────────
   async function handleRun() {
     if (!selectedModelId || !activeSchema) return;
@@ -330,9 +576,40 @@ export default function QueryPage() {
   });
   const editorTheme = theme === "dark" ? vscodeDark : lightTheme;
 
+  const pageBusy =
+    loadingModels ||
+    loadingQuery ||
+    !!pendingHydration ||
+    awaitingModelSelection;
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-1 flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
+    <div className="flex h-full flex-1 flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
+
+      {queryLoadError && (
+        <div className="px-4 py-2">
+          <CAlert variant="error" message={queryLoadError} />
+        </div>
+      )}
+
+      {saveError && (
+        <div className="px-4 py-2">
+          <CAlert variant="error" message={saveError} />
+        </div>
+      )}
+
+      {saveSuccess && (
+        <div className="px-4 py-2">
+          <CAlert variant="success" message={saveSuccess} />
+        </div>
+      )}
+
+      {pageBusy ? (
+        <div className="flex flex-1 items-center justify-center">
+          <CSpinner size={32} />
+        </div>
+      ) : (
+        <>
 
       {/* Top bar */}
       <header
@@ -340,7 +617,35 @@ export default function QueryPage() {
         style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-subtle)" }}
       >
         <PiFileSqlFill size={18} style={{ color: "var(--accent)" }} />
-        <span className="text-sm font-bold" style={{ color: "var(--text-h)" }}>Query Builder</span>
+        <span className="text-sm font-bold" style={{ color: "var(--text-h)" }}>
+          {isEditMode ? "Edit Query" : "Query Builder"}
+        </span>
+        {queryNameEditing ? (
+          <input
+            type="text"
+            value={queryName ?? "New Query"}
+            autoFocus
+            onChange={(e) => setQueryName(e.target.value)}
+            onBlur={() => setQueryNameEditing(false)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setQueryNameEditing(false);
+              if (e.key === 'Escape') {setQueryNameEditing(false)};
+            }}
+            className="w-48 rounded-lg border px-2 py-1 text-left text-xs font-semibold outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]"
+            style={{ background: "var(--bg)", color: "var(--text-h)", borderColor: "var(--border)" }}
+          />
+        ) : (
+          <span
+            className="text-xs cursor-pointer"
+            style={{ color: "var(--text)" }}
+            onClick={() => setQueryNameEditing(true)}
+            tabIndex={0}
+            onBlur={() => setQueryNameEditing(false)}
+          >
+            {queryName ?? "New Query"}
+          </span>
+        )}
+  
         <div className="flex-1" />
 
         <CToggleButtons buttons={[
@@ -361,12 +666,14 @@ export default function QueryPage() {
         >
           {running ? <CSpinner size={12} /> : <FaPlay size={11} />} Run
         </button>
-        <CButton variant="primary"
+        <CButton
+          variant="primary"
+          onClick={handleSave}
+          loading={saving}
           disabled={!query || running}
+          className="!px-4 !py-1.5 !text-xs"
         >
-          
-          <FaSave size={11} />
-          Save
+          <FaSave size={11} /> Save
         </CButton>
       </header>
 
@@ -577,6 +884,8 @@ export default function QueryPage() {
           </div>
         </main>
       </div>
+        </>
+      )}
     </div>
   );
 }

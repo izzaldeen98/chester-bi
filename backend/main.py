@@ -8,6 +8,7 @@ from routes.connections import router as connections_router
 from routes.packages import router as packages_router
 from routes.semantic_models import router as semantic_models_router
 from routes.queries import router as queries_router
+from routes.files import router as files_router
 app = fa.FastAPI(title="API", description="API for the application" , version="1.0.0" , openapi_url="/api/v1/openapi.json" , docs_url="/api/v1/docs" , redoc_url="/api/v1/redoc" )
 app.include_router(auth_router)
 app.include_router(users_router)
@@ -16,6 +17,7 @@ app.include_router(connections_router)
 app.include_router(packages_router)
 app.include_router(semantic_models_router)
 app.include_router(queries_router)
+app.include_router(files_router)
 Base.metadata.create_all(bind=engine)
 
 if __name__ == "__main__":

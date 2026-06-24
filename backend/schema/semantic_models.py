@@ -33,7 +33,7 @@ class SemanticModelFieldType(BaseModel):
 
 class SemanticModelField(BaseModel):    
     name: str
-    kind: Literal["dimension", "measure"]
+    kind: Literal["dimension", "measure" , "join" , "view"]
     type: Optional[SemanticModelFieldType] = None
 
 # New layer to map the nested JSON structure cleanly

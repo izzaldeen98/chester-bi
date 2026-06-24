@@ -421,3 +421,159 @@ export async function runQuery(modelId: string, query: string): Promise<any> {
   );
   return handleResponse<any>(res);
 }
+
+
+// ── Queries ───────────────────────────────────────────────────────────────
+
+export interface QueryPublicResponse {
+  id: string;
+  name: string;
+  description: string | null;
+  source: string;
+  semantic_model: QuerySemanticModel;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string;
+}
+
+export interface QueryUpdate {
+  name?: string;
+  description?: string;
+  source?: string;
+  aggregation_fields?: string[];
+  group_by_fields?: string[];
+  filters?: Record<string, unknown>;
+  order_by_fields?: Record<string, string>;
+  limit?: number;
+  malloy_query?: string;
+  sql_query?: string;
+  semantic_model_id?: string;
+}
+
+export interface QueryCreate {
+  name: string;
+  description?: string;
+  source: string;
+  aggregation_fields: string[];
+  group_by_fields?: string[];
+  filters?: Record<string, unknown>;
+  order_by_fields?: Record<string, string>;
+  limit?: number;
+  malloy_query: string;
+  sql_query?: string;
+}
+
+export interface QuerySemanticModel {
+  id: string;
+  name: string;
+  package: QueryPackage;
+}
+export interface QueryPackage {
+  id: string;
+  name: string;
+}
+export interface QueryDetailedResponse {
+  id: string;
+  name: string;
+  source: string;
+  aggregation_fields: string[];
+  group_by_fields: string[] | null;
+  filters: unknown;
+  order_by_fields: Record<string, string> | null;
+  limit: number;
+  malloy_query: string;
+  sql_query: string;
+  semantic_model: QuerySemanticModel;
+  description: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string;
+}
+
+export async function getQueries(): Promise<QueryPublicResponse[]> {
+  const res = await fetch(`/api/v1/queries/list`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<QueryPublicResponse[]>(res);
+}
+
+export async function getQuery(queryId: string): Promise<QueryDetailedResponse> {
+  const res = await fetch(`/api/v1/queries/get?id=${queryId}`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<QueryDetailedResponse>(res);
+}
+
+export async function createQuery(semanticModelId: string, data: QueryCreate): Promise<void> {
+  const res = await fetch(`/api/v1/queries/create?semantic_model_id=${semanticModelId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<void>(res);
+}
+
+export async function updateQuery(queryId: string, data: QueryUpdate): Promise<void> {
+  const res = await fetch(`/api/v1/queries/update?query_id=${queryId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<void>(res);
+}
+
+export async function deleteQuery(queryId: string): Promise<void> {
+  const res = await fetch(`/api/v1/queries/delete?query_id=${queryId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<void>(res);
+}
+
+// ── Files ──────────────────────────────────────────────────────────────────
+
+export interface FilePublicResponse {
+  id: string;
+  name: string;
+  description: string | null;
+  path: string;
+  extension: string;
+  file_size: number;
+  file_name: string;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string;
+}
+
+export async function getFiles(): Promise<FilePublicResponse[]> {
+  const res = await fetch(`/api/v1/files/list`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<FilePublicResponse[]>(res);
+}
+
+export async function createFile(name: string, file: globalThis.File, description?: string): Promise<void> {
+  const body = new FormData();
+  body.append("name", name);
+  if (description) body.append("description", description);
+  body.append("file", file);
+
+  const res = await fetch(`/api/v1/files/create`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+    body,
+  });
+  return handleResponse<void>(res);
+}
+
+export async function deleteFile(fileId: string): Promise<void> {
+  const res = await fetch(`/api/v1/files/delete?file_id=${fileId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<void>(res);
+}
+

@@ -1,0 +1,45 @@
+import type { RuleGroupType } from "react-querybuilder";
+import type { FieldInfo } from "@malloydata/malloy-interfaces";
+
+export const FILTER_WRAPPER_KEY = "filter";
+
+type Granularity = string;
+
+export function isRuleGroupType(value: unknown): value is RuleGroupType {
+  return !!value && typeof value === "object" && "combinator" in value && "rules" in value;
+}
+
+/** Persist filters as wrapped RuleGroupType JSON: `{ filter: RuleGroupType }`. */
+export function wrapFilters(filter: RuleGroupType): Record<string, RuleGroupType> | undefined {
+  if (!filter.rules?.length) return undefined;
+  return { [FILTER_WRAPPER_KEY]: filter };
+}
+
+/** Unwrap filters saved as `{ filter: RuleGroupType }` or raw RuleGroupType. */
+export function unwrapFilters(stored: unknown): RuleGroupType | null {
+  if (!stored) return null;
+  if (isRuleGroupType(stored)) return stored;
+  if (typeof stored === "object" && stored !== null && FILTER_WRAPPER_KEY in stored) {
+    const inner = (stored as Record<string, unknown>)[FILTER_WRAPPER_KEY];
+    if (isRuleGroupType(inner)) return inner;
+  }
+  return null;
+}
+
+/** Serialize group-by fields; granularity stored as `field_name.gran`. */
+export function buildGroupByFields(
+  fields: FieldInfo[],
+  granularityMap: Record<string, Granularity>,
+): string[] {
+  return fields.map((field) => {
+    const gran = granularityMap[field.name];
+    return gran ? `${field.name}.${gran}` : field.name;
+  });
+}
+
+export function buildOrderByFields(
+  sortMap: Array<{ field: FieldInfo; dir: "asc" | "desc" }>,
+): Record<string, string> | undefined {
+  if (!sortMap.length) return undefined;
+  return Object.fromEntries(sortMap.map((item) => [item.field.name, item.dir]));
+}

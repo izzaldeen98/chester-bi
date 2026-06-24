@@ -56,20 +56,20 @@ export class MalloyASTQueryBuilder {
     // 2. Map Dimensions (Replaces commas with clean newlines and indentation layouts)
     if (this.groupByFields && this.groupByFields.length > 0) {
       lines.push('  group_by:');
-      this.groupByFields.forEach((name) => lines.push(`    ${name}`));
+      this.groupByFields.forEach((name) => lines.push(`    \`${name}\``));
     }
 
     // 3. Map Measures Aggregations 
     if (this.aggFields && this.aggFields.length > 0) {
       lines.push('  aggregate:');
-      this.aggFields.forEach((f: FieldInfo) => lines.push(`    ${f.name}`));
+      this.aggFields.forEach((f: FieldInfo) => lines.push(`   \`${f.name}\``));
     }
 
     // 4. Map Sorting Ordering Layout
     if (this.sortMap && this.sortMap.length > 0) {
       lines.push('  order_by:');
       this.sortMap.forEach((sortItem: { field: FieldInfo; dir: SortDir }) => {
-        lines.push(`    ${sortItem.field.name} ${sortItem.dir}`);
+        lines.push(`    \`${sortItem.field.name}\` ${sortItem.dir}`);
       });
     }
 
@@ -87,6 +87,7 @@ export class MalloyASTQueryBuilder {
     }
 
     lines.push('}');
+    console.log("LINES:", lines);
     return lines.join('\n');
   }
 

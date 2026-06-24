@@ -380,6 +380,31 @@ No request body.
 
 ---
 
+### `GET /api/v1/connections/get`
+
+**Summary:** Get Connection
+
+**Operation ID:** `get_connection_api_v1_connections_get_get`
+
+#### Parameters
+
+| Name | In | Type | Required | Description |
+|---|---|---|---|---|
+| `connection_id` | `query` | `string` | Yes |  |
+
+#### Request Body
+
+No request body.
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `200` | Successful Response | `ConnectionDetailedResponse` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+---
+
 ### `PUT /api/v1/connections/update`
 
 **Summary:** Update Connection
@@ -748,6 +773,201 @@ No request body.
 
 ---
 
+### `POST /api/v1/queries/create`
+
+**Summary:** Create Query
+
+**Operation ID:** `create_query_api_v1_queries_create_post`
+
+#### Parameters
+
+| Name | In | Type | Required | Description |
+|---|---|---|---|---|
+| `semantic_model_id` | `query` | `string` | Yes |  |
+
+#### Request Body
+
+- Content-Type: `application/json`
+- Schema: `QueryCreateRequest`
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `201` | Successful Response | `N/A` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+---
+
+### `GET /api/v1/queries/get`
+
+**Summary:** Get Query
+
+**Operation ID:** `get_query_api_v1_queries_get_get`
+
+#### Parameters
+
+| Name | In | Type | Required | Description |
+|---|---|---|---|---|
+| `id` | `query` | `string` | Yes |  |
+
+#### Request Body
+
+No request body.
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `200` | Successful Response | `QueryDetailedResponse` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+---
+
+### `PUT /api/v1/queries/update`
+
+**Summary:** Update Query
+
+**Operation ID:** `update_query_api_v1_queries_update_put`
+
+#### Parameters
+
+| Name | In | Type | Required | Description |
+|---|---|---|---|---|
+| `query_id` | `query` | `string` | Yes |  |
+
+#### Request Body
+
+- Content-Type: `application/json`
+- Schema: `QueryUpdateRequest`
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `200` | Successful Response | `QueryDetailedResponse` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+---
+
+### `DELETE /api/v1/queries/delete`
+
+**Summary:** Delete Query
+
+**Operation ID:** `delete_query_api_v1_queries_delete_delete`
+
+#### Parameters
+
+| Name | In | Type | Required | Description |
+|---|---|---|---|---|
+| `query_id` | `query` | `string` | Yes |  |
+
+#### Request Body
+
+No request body.
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `204` | Successful Response | `N/A` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+---
+
+### `GET /api/v1/queries/list`
+
+**Summary:** List Queries
+
+**Operation ID:** `list_queries_api_v1_queries_list_get`
+
+#### Parameters
+
+No parameters.
+
+#### Request Body
+
+No request body.
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `200` | Successful Response | `array[QueryPublicResponse]` |
+
+---
+
+### `POST /api/v1/files/create`
+
+**Summary:** Create File
+
+**Operation ID:** `create_file_api_v1_files_create_post`
+
+#### Parameters
+
+No parameters.
+
+#### Request Body
+
+- Content-Type: `multipart/form-data`
+- Schema: `Body_create_file_api_v1_files_create_post`
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `201` | Successful Response | `N/A` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+---
+
+### `GET /api/v1/files/list`
+
+**Summary:** List Files
+
+**Operation ID:** `list_files_api_v1_files_list_get`
+
+#### Parameters
+
+No parameters.
+
+#### Request Body
+
+No request body.
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `200` | Successful Response | `array[FilePublicResponse]` |
+
+---
+
+### `DELETE /api/v1/files/delete`
+
+**Summary:** Delete File
+
+**Operation ID:** `delete_file_api_v1_files_delete_delete`
+
+#### Parameters
+
+| Name | In | Type | Required | Description |
+|---|---|---|---|---|
+| `file_id` | `query` | `string` | Yes |  |
+
+#### Request Body
+
+No request body.
+
+#### Responses
+
+| Status | Description | Schema |
+|---|---|---|
+| `204` | Successful Response | `N/A` |
+| `422` | Validation Error | `HTTPValidationError` |
+
+---
+
 ## Schemas
 
 ### `Body_add_semantic_model_api_v1_semantic_models_add_post`
@@ -756,6 +976,14 @@ No request body.
 |---|---|---|---|
 | `name` | `string` | Yes |  |
 | `package_id` | `string` | Yes |  |
+| `description` | `string` | No |  |
+| `file` | `string` | Yes |  |
+
+### `Body_create_file_api_v1_files_create_post`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | Yes |  |
 | `description` | `string` | No |  |
 | `file` | `string` | Yes |  |
 
@@ -792,6 +1020,23 @@ No request body.
 | `description` | `object` | No |  |
 | `type` | `string` | Yes |  |
 | `connection_attributes` | `object` | Yes |  |
+
+### `ConnectionDetailedResponse`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | `string` | Yes |  |
+| `type` | `string` | Yes |  |
+| `name` | `string` | Yes |  |
+| `description` | `object` | No |  |
+| `host` | `string` | Yes |  |
+| `port` | `integer` | Yes |  |
+| `database` | `string` | Yes |  |
+| `username` | `string` | Yes |  |
+| `created_at` | `string` | Yes |  |
+| `updated_at` | `string` | Yes |  |
+| `created_by` | `string` | Yes |  |
+| `updated_by` | `string` | Yes |  |
 
 ### `ConnectionPublicResponse`
 
@@ -843,6 +1088,22 @@ No request body.
 | `description` | `object` | No |  |
 | `config_file` | `object` | No |  |
 
+### `FilePublicResponse`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | `string` | Yes |  |
+| `name` | `string` | Yes |  |
+| `description` | `object` | No |  |
+| `path` | `string` | Yes |  |
+| `extension` | `string` | Yes |  |
+| `file_size` | `integer` | Yes |  |
+| `file_name` | `string` | Yes |  |
+| `created_at` | `string` | Yes |  |
+| `updated_at` | `string` | Yes |  |
+| `created_by` | `string` | Yes |  |
+| `updated_by` | `string` | Yes |  |
+
 ### `HTTPValidationError`
 
 | Field | Type | Required | Description |
@@ -874,13 +1135,107 @@ No request body.
 | `updated_by` | `string` | Yes |  |
 | `is_active` | `boolean` | Yes |  |
 
+### `QueryCreateRequest`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `string` | Yes |  |
+| `description` | `object` | No |  |
+| `source` | `string` | Yes |  |
+| `aggregation_fields` | `array[string]` | Yes |  |
+| `group_by_fields` | `object` | No |  |
+| `filters` | `object` | No |  |
+| `order_by_fields` | `object` | No |  |
+| `limit` | `object` | No |  |
+| `malloy_query` | `string` | Yes |  |
+| `sql_query` | `object` | No |  |
+
+### `QueryDetailedResponse`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | `string` | Yes |  |
+| `name` | `string` | Yes |  |
+| `description` | `object` | No |  |
+| `source` | `string` | Yes |  |
+| `semantic_model` | `QuerySemanticModel` | Yes |  |
+| `created_at` | `string` | Yes |  |
+| `updated_at` | `string` | Yes |  |
+| `created_by` | `string` | Yes |  |
+| `updated_by` | `string` | Yes |  |
+| `aggregation_fields` | `array[string]` | Yes |  |
+| `group_by_fields` | `object` | No |  |
+| `filters` | `object` | No |  |
+| `order_by_fields` | `object` | No |  |
+| `limit` | `object` | No |  |
+| `malloy_query` | `string` | Yes |  |
+| `sql_query` | `object` | No |  |
+
+### `QueryPackage`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | `string` | Yes |  |
+| `name` | `string` | Yes |  |
+
+### `QueryPublicResponse`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | `string` | Yes |  |
+| `name` | `string` | Yes |  |
+| `description` | `object` | No |  |
+| `source` | `string` | Yes |  |
+| `semantic_model` | `QuerySemanticModel` | Yes |  |
+| `created_at` | `string` | Yes |  |
+| `updated_at` | `string` | Yes |  |
+| `created_by` | `string` | Yes |  |
+| `updated_by` | `string` | Yes |  |
+
+### `QuerySemanticModel`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | `string` | Yes |  |
+| `name` | `string` | Yes |  |
+| `package` | `QueryPackage` | Yes |  |
+
+### `QueryUpdateRequest`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | `object` | No |  |
+| `description` | `object` | No |  |
+| `source` | `object` | No |  |
+| `aggregation_fields` | `object` | No |  |
+| `group_by_fields` | `object` | No |  |
+| `filters` | `object` | No |  |
+| `order_by_fields` | `object` | No |  |
+| `limit` | `object` | No |  |
+| `malloy_query` | `object` | No |  |
+| `sql_query` | `object` | No |  |
+| `semantic_model_id` | `object` | No |  |
+
+### `SchemaContainer`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `fields` | `array[SemanticModelField]` | Yes |  |
+
 ### `SemanticModelField`
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `name` | `string` | Yes |  |
-| `type` | `string` | Yes |  |
-| `datatype` | `string` | Yes |  |
+| `kind` | `string` | Yes |  |
+| `type` | `object` | No |  |
+
+### `SemanticModelFieldType`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `kind` | `string` | Yes |  |
+| `subtype` | `object` | No |  |
 
 ### `SemanticModelSchema`
 
@@ -890,14 +1245,16 @@ No request body.
 | `package_name` | `string` | Yes |  |
 | `model_path` | `object` | No |  |
 | `malloy_version` | `string` | Yes |  |
-| `schema` | `array[SemanticModelSource]` | Yes |  |
+| `sources` | `array[SemanticModelSource]` | Yes |  |
 
 ### `SemanticModelSource`
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `name` | `string` | Yes |  |
-| `fields` | `array[SemanticModelField]` | Yes |  |
+| `kind` | `string` | Yes |  |
+| `schema` | `SchemaContainer` | Yes |  |
+| `annotations` | `array[N/A]` | No |  |
 
 ### `UserCreate`
 

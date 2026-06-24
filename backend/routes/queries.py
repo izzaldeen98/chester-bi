@@ -84,6 +84,12 @@ async def update_query(
     target_query = db.query(Query).filter(Query.public_key == query_id).first()
     if not target_query:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Query not found")
+    account_id = target_query.semantic_model.package.account_id
+    if account_id != current_user.account_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized : Insufficient permissions")
+    semantic_model = db.query(SemanticModel).filter(SemanticModel.public_key == query.semantic_model_id).first()
+    if not semantic_model:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Semantic model not found")
     target_query.name = query.name if query.name else target_query.name
     target_query.description = query.description if query.description else target_query.description
     target_query.aggregation_fields = query.aggregation_fields if query.aggregation_fields else target_query.aggregation_fields
@@ -93,7 +99,7 @@ async def update_query(
     target_query.limit = query.limit if query.limit else target_query.limit
     target_query.malloy_query = query.malloy_query if query.malloy_query else target_query.malloy_query
     target_query.sql_query = query.sql_query if query.sql_query else target_query.sql_query
-    target_query.semantic_model_id = query.semantic_model_id if query.semantic_model_id else target_query.semantic_model_id
+    target_query.semantic_model_id = semantic_model.id
     target_query.updated_by = current_user.id
     db.commit()
     db.refresh(target_query)

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AppLayout from './lib/AppLayout'
+import FullscreenLayout from './lib/FullscreenLayout'
 import LoginPage from './pages/LoginPage'
 import LandingPage from './pages/LandingPage'
 import HomePage from './pages/HomePage'
@@ -9,6 +10,8 @@ import PackagesPage from './pages/PackagesPage'
 import ConnectionsPage from './pages/ConnectionsPage'
 import PackageEditorPage from './pages/PackageEditorPage'
 import QueryPage from './pages/QueryPage'
+import QueriesPage from './pages/QueriesPage'
+import FilesPage from './pages/FilesPage'
 
 // Placeholder for pages not yet built
 function ComingSoon({ name }) {
@@ -29,16 +32,22 @@ export default function App() {
         <Route path="/"       element={<LandingPage />} />
         <Route path="/login"  element={<LoginPage />} />
 
-        {/* Protected — all share the sidebar layout */}
+        {/* Protected — sidebar layout */}
         <Route element={<AppLayout />}>
           <Route path="/home"        element={<HomePage />} />
           <Route path="/dashboard"   element={<DashboardsPage />} />
-          <Route path="/query"       element={<QueryPage />} />
-          <Route path="/files"       element={<ComingSoon name="Files" />} />
+          <Route path="/queries"     element={<QueriesPage />} />
+          <Route path="/files"       element={<FilesPage />} />
           <Route path="/connections" element={<ConnectionsPage />} />
           <Route path="/packages"                      element={<PackagesPage />} />
           <Route path="/packages/:packageId/editor"  element={<PackageEditorPage />} />
           <Route path="/users"       element={<UsersPage />} />
+        </Route>
+
+        {/* Fullscreen — no app sidebar */}
+        <Route element={<FullscreenLayout />}>
+          <Route path="/queries/new"             element={<QueryPage />} />
+          <Route path="/queries/:queryId/edit"   element={<QueryPage />} />
         </Route>
 
         {/* Fallback */}
