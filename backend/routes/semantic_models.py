@@ -241,7 +241,8 @@ async def query_semantic_model(
     
     result = model.query(query)
     end_time = time.time()
-    cache_query(redis_key, result)
+    if result.get("result") != []:
+        cache_query(redis_key, result)
     return {**result, "time": end_time - start_time}
 
 

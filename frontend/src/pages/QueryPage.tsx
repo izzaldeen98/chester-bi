@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  FaPlay, FaTable, FaLayerGroup, FaCalendarAlt, FaFilter, FaTrash
+  FaPlay, FaTable, FaLayerGroup, FaCalendarAlt, FaHashtag, FaDatabase, FaTerminal, FaCode, FaSave
 } from "react-icons/fa";
 import { FaSortAmountDown } from "react-icons/fa";
 import { IoText } from "react-icons/io5";
 import { TbRulerMeasure2 } from "react-icons/tb";
-import { MdDataObject } from "react-icons/md";
 import { PiFileSqlFill } from "react-icons/pi";
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import { EditorView } from "@codemirror/view";
@@ -13,6 +12,7 @@ import CSelect from "../components/CSelect";
 import CTable from "../components/CTable";
 import CAlert from "../components/CAlert";
 import CSpinner from "../components/CSpinner";
+import CQueryBuilder, { EMPTY_FILTER_QUERY } from "../components/CQueryBuilder";
 import { useTheme } from "../lib/theme";
 import {
   listModels,
@@ -21,22 +21,21 @@ import {
   type ModelPackage,
   type SemanticModelSchema,
 } from "../lib/Api";
-import 'react-querybuilder/dist/query-builder.css';
-import '../styles/query-builder.css';
-import { BsArrowsCollapse, BsArrowsExpand } from "react-icons/bs";
+import { IoIosSwitch } from "react-icons/io";
+import { MalloyASTQueryBuilder } from "../lib/MalloyASTQueryBuilder";
 
 
-import { ASTQuery  } from "@malloydata/malloy-query-builder";
-import { Malloy } from '@malloydata/malloy/dist/malloy';
 import { FieldInfo, SourceInfo } from "@malloydata/malloy-interfaces";
-import { QueryBuilder, type RuleGroupType } from "react-querybuilder"
+import { type RuleGroupType } from "react-querybuilder";
+import CToggleButtons from "../components/CToggleButtons";
+import CButton from "../components/CButton";
 
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const TIME_GRANULARITIES = ["year", "quarter", "month", "week", "day", "hour", "minute", "second"] as const;
 type Granularity = typeof TIME_GRANULARITIES[number];
 type SortDir = "asc" | "desc";
-type ResultView = "table" | "json" | "query";
+type ResultView = "table" | "json"  | "malloy" | "sql";
 
 interface SortItem {
   field: FieldInfo;
@@ -48,12 +47,6 @@ function isDateTime(field: FieldInfo) {
   const dt = field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "timestamp_type";
   return dt;
 }
-
-function isBoolean(field: FieldInfo) {  
-  return field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "boolean_type";
-}
-
-
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -72,24 +65,20 @@ function extractColumns(rows: Record<string, unknown>[]): string[] {
   return rows.length > 0 ? Object.keys(rows[0]) : [];
 }
 
-function countFilterRules(group: RuleGroupType): number {
-  return group.rules.reduce<number>((count, rule) => {
-    if ("rules" in rule) return count + countFilterRules(rule);
-    return count + 1;
-  }, 0);
-}
-
-const EMPTY_FILTER_QUERY: RuleGroupType = { combinator: "and", rules: [] };
-
 // ── Field icon ─────────────────────────────────────────────────────────────
 function FieldIcon({ field }: { field: FieldInfo }) {
+  if (field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "boolean_type")
+    return <IoIosSwitch size={13} style={{ color: "var(--text)", flexShrink: 0 }} />;
+  if (field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "number_type")
+    return <FaHashtag size={13} style={{ color: "var(--text)", flexShrink: 0 }} />;
+  if (field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "timestamp_type")
+    return <FaCalendarAlt size={13} style={{ color: "var(--text)", flexShrink: 0 }} />;
   if (field.kind.toLowerCase() === "measure")
-    return <TbRulerMeasure2 size={13} style={{ color: "#a78bfa", flexShrink: 0 }} />;
+    return <TbRulerMeasure2 size={13} style={{ color: "#7c3aed", flexShrink: 0 }} />;
   if (isDateTime(field))
-    return <FaCalendarAlt size={11} style={{ color: "#34d399", flexShrink: 0 }} />;
+    return <FaCalendarAlt size={11} style={{ color: "var(--text)", flexShrink: 0 }} />;
   return <IoText size={13} style={{ color: "var(--text)", flexShrink: 0 }} />;
 }
-
 
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function QueryPage() {
@@ -117,45 +106,9 @@ export default function QueryPage() {
   const [limit, setLimit] = useState(1000);
 
   const [query, setQuery] = useState<string | null>(null);
-  const [collapseFilters, setCollapseFilters] = useState(true);
-
-  function queryBuilderDataType(field: FieldInfo): string {
-    const isMeasure = field.kind.toLowerCase() === "measure";
-    const isDimension = field.kind.toLowerCase() === "dimension";
-    const isDT = isDateTime(field);
-    const isBool = isBoolean(field);
-    if (isMeasure) return "number";
-    if (isDimension && isDT) return "datetime-local";
-    if (isDimension) return "text";
-
-    return "text";
-  }
-
-  function queryBuilderValueEditorType(field: FieldInfo): string {
-    const isMeasure = field.kind.toLowerCase() === "measure";
-    const isDimension = field.kind.toLowerCase() === "dimension";
-    const isDT = isDateTime(field);
-    const isBool = isBoolean(field);
-    if (isMeasure) return "text";
-    if (isDimension && isDT) return "text";
-    if (isDimension && isBool) return "switch";
-    return "text";
-  }
 
   // Filters (react-querybuilder)
   const [filterQuery, setFilterQuery] = useState<RuleGroupType>(EMPTY_FILTER_QUERY);
-  const filterRuleCount = useMemo(() => countFilterRules(filterQuery), [filterQuery]);
-
-  const filterFields = useMemo(
-    () => activeSchema?.schema?.fields?.map((field: FieldInfo) => ({
-      name: field.name,
-      label: field.name,
-      inputType: queryBuilderDataType(field),
-      valueEditorType: queryBuilderValueEditorType(field),
-
-    })) ?? [],
-    [activeSchema],
-  );
 
   // Results
   const [running, setRunning] = useState(false);
@@ -213,47 +166,68 @@ export default function QueryPage() {
 
 
   const generatedQuery = useMemo(() => {
-    if (!activeSchema) return;
-    const query = new ASTQuery({ source: activeSchema });
-    const segment = query.getOrAddDefaultSegment();
-    if (groupByFields.length > 0) {
-      for (const field of groupByFields) {
-        const isDimension = field.kind.toLowerCase() === "dimension";
-        if (isDimension && 'type' in field && field.type.kind.toLowerCase() === "timestamp_type" && granularityMap[field.name]) {
-          segment.addTimestampGroupBy(field.name, granularityMap[field.name]);
-        } else {
-          segment.addGroupBy(field.name);
+    if (!activeSchema) return null;
+  
+    try {
+      const builder = new MalloyASTQueryBuilder(activeSchema);
+  
+      // 1. Map over active Dimensions & Time Granularities
+      if (groupByFields.length > 0) {
+        for (const field of groupByFields) {
+          builder.addGroupBy(field.name, granularityMap[field.name]);
         }
       }
-    }
-    if (aggFields.length > 0) {
-      for (const field of aggFields) {
-        segment.addAggregate(field.name);
+      // 2. Add Aggregate Fields Measures
+      if (aggFields.length > 0) {
+        for (const field of aggFields) {
+          
+          builder.addAgg(field );
+        }
       }
-    }
-    // if (filters.length > 0) {
-    //   for (const filter of filters) {
-    //     segment.addwhere(filter.field, filter.op, filter.value);
-    //   }
-    // }
-    if (limit > 0) {
-      segment.setLimit(limit);
-    }
-    if (sortMap.length > 0) {
-      for (const sortItem of sortMap) {
-        if (!groupByFields.includes(sortItem.field)) return;
-        console.log(groupByFields.includes(sortItem.field));
-        segment.addOrderBy(sortItem.field.name, sortItem.dir === "asc" ? "asc" : "desc");
+  
+      // 3. Set Execution Record Maximum Window Limit
+      if (limit > 0) {
+        builder.setLimit(limit);
       }
+  
+      // 4. FIXED: String-Based Field Verification Loop for Order Modifiers
+      if (sortMap.length > 0) {
+        // Create a flat array of active group-by string names for proper lookups
+        const activeGroupNames = groupByFields.map((f: any) => f.name);
+  
+        for (const sortItem of sortMap) {
+          // Safe string-to-string comparative lookup mapping
+          if (!activeGroupNames.includes(sortItem.field.name)) {
+            continue; // Skip invalid sorting columns cleanly without breaking the whole hook
+          }
+          builder.addSort(sortItem.field, sortItem.dir === "asc" ? "asc" : "desc");
+        }
+      }
+  
+      // 5. Build and Apply Tree-Aware Filters
+      if (filterQuery && filterQuery.rules && filterQuery.rules.length > 0) {
+        builder.addFilter(filterQuery);
+      }
+  
+      // Return the completed object directly from the memo calculation tree
+
+      return builder.buildQuery();
+  
+    } catch (e: any) {
+      console.error("Failed compiling Malloy AST target syntax query structures:", e);
+      return null;
     }
-    const malloyQuery = query.toMalloy();
-    setQuery(malloyQuery);
-
-    return malloyQuery;
-
-  }, [groupByFields, aggFields, filterQuery, limit, sortMap, granularityMap, activeSchema]);
-
-  // ── Toggle field ─────────────────────────────────────────────────────────
+  }, [groupByFields, aggFields, limit, sortMap, filterQuery, granularityMap, activeSchema]);
+  
+  // 6. SAFE STATE SYNCHRONIZATION FLOW
+  // Automatically pipes the pure calculation results straight to your engine's state manager 
+  useEffect(() => {
+    if (generatedQuery) {
+      console.log(generatedQuery);
+      setQuery(generatedQuery);
+    }
+  }, [generatedQuery]);
+    // ── Toggle field ─────────────────────────────────────────────────────────
   function toggleField(field: FieldInfo) {
 
     const isMeasure = field.kind.toLowerCase() === "measure";
@@ -287,50 +261,61 @@ export default function QueryPage() {
 
       // State 1: Not sorted yet -> Set to ASC
       if (!existing) {
-        console.log("Action: Adding ASC");
         return [...current, { field, dir: "asc" }];
       }
 
       // State 2: Current is ASC -> Update to DESC
       if (existing.dir === "asc") {
-        console.log("Action: Flipping to DESC");
         return current.map((s) =>
           s.field.name === field.name ? { ...s, dir: "desc" as const } : s
         );
       }
-    
+
 
       // State 3: Current is DESC -> Remove completely
-      console.log("Action: Removing sort completely");
       return current.filter((s) => s.field.name !== field.name);
     });
   }
 
-  function cycleCollapseFilters() {
-    setCollapseFilters((prev) => !prev);
-  }
   // ── Set granularity ───────────────────────────────────────────────────────
   function setGranularity(e: React.MouseEvent, fieldName: string, gran: Granularity) {
     e.stopPropagation();
     setGranularityMap((prev) => ({ ...prev, [fieldName]: gran }));
   }
 
-  // ── Filter management ────────────────────────────────────────────────────
-  useEffect(() => {
-    console.log(filterQuery);
-  }, [filterQuery]);
   // ── Run ───────────────────────────────────────────────────────────────────
   async function handleRun() {
-    if (!selectedModelId || !generatedQuery) return;
-    setRunning(true); setQueryError(""); setQueryResult(null); setQueryTime(null);
+    if (!selectedModelId || !activeSchema) return;
+
+    setRunning(true);
+    setQueryError("");
+    setQueryResult(null);
+    setQueryTime(null);
+
+    
+      let result;
+      try {
+        result = await runQuery(selectedModelId, generatedQuery ?? "");
+      } catch (err: any) {
+        setRunning(false);
+        setQueryError(err?.message ?? "Query execution failed.");
+        setQueryResult(null);
+        setQueryTime(null);
+        return;
+      }
+
     try {
-      const result = await runQuery(selectedModelId, generatedQuery);
+
       setQueryTime(result?.time ?? null);
       setQueryResult(result);
       setResultView("table");
+      setRunning(false);
     } catch (e: any) {
-      setQueryError(e.message ?? "Query failed.");
-    } finally { setRunning(false); }
+      setRunning(false);
+      setQueryError(e?.message ?? "Query failed.");
+      setQueryResult(null);
+      setQueryTime(null);
+    }
   }
 
   const resultRows = useMemo(() => extractRows(queryResult), [queryResult]);
@@ -358,36 +343,31 @@ export default function QueryPage() {
         <span className="text-sm font-bold" style={{ color: "var(--text-h)" }}>Query Builder</span>
         <div className="flex-1" />
 
-        {/* View tabs */}
-        {(["table", "json"] as ResultView[]).map((v) => {
-          const meta: Record<ResultView, { label: string; icon: React.ReactNode }> = {
-            table: { label: "Table", icon: <FaTable size={12} /> },
-            json: { label: "JSON", icon: <MdDataObject size={14} /> },
-            query: { label: "Query", icon: null },
-          };
-          const active = resultView === v;
-          return (
-            <button key={v} onClick={() => setResultView(v)}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors"
-              style={active
-                ? { background: "var(--accent)", color: "var(--accent-fg)" }
-                : { color: "var(--text)", background: "transparent" }}
-            >
-              {meta[v].icon} {meta[v].label}
-            </button>
-          );
-        })}
+        <CToggleButtons buttons={[
+          {label: "Table", value: "table", icon: FaTable},
+          {label: "JSON", value: "json", icon: FaCode},
+          {label: "Malloy", value: "malloy", icon: FaDatabase , disabled: query === null},
+          {label: "SQL", value: "sql", icon: FaTerminal , disabled: query === null},
+        ]} selected={resultView} onChange={(value) => setResultView(value as ResultView)} />
 
         {queryTime !== null && (
           <span className="text-xs" style={{ color: "var(--text)" }}>{queryTime.toFixed(3)}s</span>
         )}
 
-        <button onClick={handleRun} disabled={!generatedQuery || running}
-          className="flex items-center gap-2 rounded-xl px-4 py-1.5 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        <button onClick={handleRun}
+          disabled={!query || running}
+          className="flex items-center gap-2 rounded-xl px-4 py-1.5 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           style={{ background: "var(--accent)", color: "var(--accent-fg)" }}
         >
           {running ? <CSpinner size={12} /> : <FaPlay size={11} />} Run
         </button>
+        <CButton variant="primary"
+          disabled={!query || running}
+        >
+          
+          <FaSave size={11} />
+          Save
+        </CButton>
       </header>
 
       {/* Body */}
@@ -538,53 +518,11 @@ export default function QueryPage() {
         {/* ── Right main area ─────────────────────────────────────────── */}
         <main className="flex flex-1 flex-col overflow-hidden">
 
-          {/* Filter builder panel */}
-          <div className="query-builder-section shrink-0">
-            <div className="query-builder-section-header">
-              <span className="flex items-center gap-1">
-                {collapseFilters ? <BsArrowsExpand size={14} className="cursor-pointer var(--text)" onClick={cycleCollapseFilters} /> : <BsArrowsCollapse size={14} className="cursor-pointer var(--accent)" onClick={cycleCollapseFilters} />}
-              </span>
-              <FaFilter size={11} style={{ color: "var(--accent)" }} />
-              <span className="text-xs font-medium" style={{ color: "var(--text-h)" }}>Filters</span>
-              {filterRuleCount > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => setFilterQuery(EMPTY_FILTER_QUERY)}
-                  className="ml-auto text-[10px] font-medium transition-colors hover:opacity-80"
-                  style={{ color: "var(--text)" }}
-                >
-                  Clear all
-                </button>
-              ) : (
-                <span className="qb-header-hint">
-                  Add rules below to filter your query results
-                </span>
-              )}
-            </div>
-
-            <div
-              className={`query-builder-panel${filterRuleCount === 0 ? " query-builder-panel--empty" : ""}`}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-              hidden={collapseFilters}
-            >
-              <QueryBuilder
-                fields={filterFields}
-                query={filterQuery}
-                onQueryChange={setFilterQuery}
-                showCombinatorsBetweenRules
-                controlClassnames={{
-                  queryBuilder: "qb-modern-compact queryBuilder-branches queryBuilder-responsive",
-                }}
-                translations={{
-                  addRule: { label: "+ Rule", title: "Add filter rule" },
-                  addGroup: { label: "+ Group", title: "Add filter group" },
-                  removeRule: { label: "×", title: "Remove rule" },
-                  removeGroup: { label: "×", title: "Remove group" },
-                }}
-              />
-            </div>
-          </div>
+          <CQueryBuilder
+            fields={activeSchema?.schema?.fields}
+            query={filterQuery}
+            onQueryChange={setFilterQuery}
+          />
 
           {/* Results */}
           <div className="flex flex-1 flex-col overflow-hidden">
@@ -624,6 +562,15 @@ export default function QueryPage() {
                       {JSON.stringify(queryResult, null, 2)}
                     </pre>
                   )}
+                  {resultView === "malloy" && (
+                    <div className="flex flex-col gap-2">
+                    <pre className="p-4 text-xs font-mono leading-relaxed overflow-auto"
+                      style={{ color: "var(--text-h)", background: "var(--bg)" }}
+                    >
+                      {query}
+                    </pre>
+                    </div>
+                    )}
                 </>
               )}
             </div>
