@@ -14,7 +14,7 @@ import "../styles/query-builder.css";
 export const EMPTY_FILTER_QUERY: RuleGroupType = { combinator: "and", rules: [] };
 
 function isDateTime(field: FieldInfo) {
-    const dt = field.kind.toLowerCase() === "dimension" && "type" in field && field.type.kind.toLowerCase() === "timestamp_type";
+    const dt = field.kind.toLowerCase() === "dimension" && "type" in field && (field.type.kind.toLowerCase() === "timestamp_type" || field.type.kind.toLowerCase() === "date_type");
     return dt;
 }
 

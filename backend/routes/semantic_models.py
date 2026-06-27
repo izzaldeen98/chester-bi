@@ -238,6 +238,8 @@ async def query_semantic_model(
     malloy = Malloy(envid=current_user.account.public_key)
     package = malloy.get_package_by_name(target_model.package.name)
     model = package.get_model_by_path(target_model.file_name)
+
+    print(query)
     
     result = model.query(query)
     end_time = time.time()

@@ -57,7 +57,7 @@ interface SortItem {
 
 
 function isDateTime(field: FieldInfo) {
-  const dt = field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "timestamp_type";
+  const dt = field.kind.toLowerCase() === "dimension" && 'type' in field && (field.type.kind.toLowerCase() === "timestamp_type" || field.type.kind.toLowerCase() === "date_type");
   return dt;
 }
 
@@ -128,7 +128,7 @@ function FieldIcon({ field }: { field: FieldInfo }) {
     return <IoIosSwitch size={13} style={{ color: "var(--text)", flexShrink: 0 }} />;
   if (field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "number_type")
     return <FaHashtag size={13} style={{ color: "var(--text)", flexShrink: 0 }} />;
-  if (field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "timestamp_type")
+  if (field.kind.toLowerCase() === "dimension" && 'type' in field && (field.type.kind.toLowerCase() === "timestamp_type" || field.type.kind.toLowerCase() === "date_type"))
     return <FaCalendarAlt size={13} style={{ color: "var(--text)", flexShrink: 0 }} />;
   if (field.kind.toLowerCase() === "measure")
     return <TbRulerMeasure2 size={13} style={{ color: "#7c3aed", flexShrink: 0 }} />;

@@ -56,7 +56,7 @@ export class MalloyASTQueryBuilder {
     // 2. Map Dimensions (Replaces commas with clean newlines and indentation layouts)
     if (this.groupByFields && this.groupByFields.length > 0) {
       lines.push('  group_by:');
-      this.groupByFields.forEach((name) => lines.push(`    \`${name}\``));
+      this.groupByFields.forEach((name) => lines.push(`    ${name}`));
     }
 
     // 3. Map Measures Aggregations 
@@ -69,7 +69,7 @@ export class MalloyASTQueryBuilder {
     if (this.sortMap && this.sortMap.length > 0) {
       lines.push('  order_by:');
       this.sortMap.forEach((sortItem: { field: FieldInfo; dir: SortDir }) => {
-        lines.push(`    \`${sortItem.field.name}\` ${sortItem.dir}`);
+        lines.push(`    ${sortItem.field.name} ${sortItem.dir}`);
       });
     }
 
@@ -148,33 +148,34 @@ private handleFilter(): string {
     }
 
     // 2. Timestamp Handling Logic
-    if (filedDataType === "timestamp_type") {
+    if (filedDataType === "timestamp_type" || filedDataType === "date_type") {
       if (["before", "after"].includes(filter.operator)) {
         const [addingType, unit, amount] = String(filter.value).split("|") || ['relative', 'days', '1'];
         const operatorSymbol = filter.operator === 'before' ? '-' : '+';
+        const nowOrToday = filedDataType === "date_type" ? "now::date" : "now";
         
         if (addingType === "relative") {
           if (filter.operator === "before") {
-            return `${filter.field} < now ${operatorSymbol} ${amount} ${unit}`;
+            return `${filter.field} < ${nowOrToday} ${operatorSymbol} ${amount} ${unit}`;
           }
           if (filter.operator === "after") {
-            return `${filter.field} > now ${operatorSymbol} ${amount} ${unit}`;
+            return `${filter.field} > ${nowOrToday} ${operatorSymbol} ${amount} ${unit}`;
           }
         }
         if (addingType === "absolute") {
           const [, dateValue] = String(filter.value).split("|") || ['absolute', ''];
           if (filter.operator === "before") {
-            return `${filter.field} < @${this.formatDate(dateValue)}`;
+            return `${filter.field} < @${this.formatDate(dateValue , filedDataType)}`;
           }
           if (filter.operator === "after") {
-            return `${filter.field} > @${this.formatDate(dateValue)}`;
+            return `${filter.field} > @${this.formatDate(dateValue , filedDataType)}`;
           }
         }
       }
       if (["between", "not between"].includes(filter.operator)) {
         const [startValue, endValue] = String(filter.value).split(",") || ['', ''];
         if (startValue && endValue) {
-          const rangeSyntax = `@${this.formatDate(startValue)} to @${this.formatDate(endValue)}`;
+          const rangeSyntax = `@${this.formatDate(startValue , filedDataType)} to @${this.formatDate(endValue , filedDataType)}`;
           if (filter.operator === "between") {
             return `${filter.field} ? ${rangeSyntax}`;
           }
@@ -185,11 +186,12 @@ private handleFilter(): string {
       }
       if (["next", "last"].includes(filter.operator)) {
         const [amount, unit] = String(filter.value).split(":") || ['1', 'days'];
+        const nowOrToday = filedDataType === "date_type" ? "now::date" : "now";
         if (filter.operator === "next") {
-          return `${filter.field} = now to now + ${amount} ${unit}`;
+          return `${filter.field} = ${nowOrToday} to ${nowOrToday} + ${amount} ${unit}`;
         }
         if (filter.operator === "last") {
-          return `${filter.field} = now - ${amount} ${unit} to now`;
+          return `${filter.field} = ${nowOrToday} - ${amount} ${unit} to ${nowOrToday}`;
         }
       }
       if (["equals", "not equals"].includes(filter.operator)) {
@@ -203,7 +205,7 @@ private handleFilter(): string {
     if (filedDataType === "number_type") {
       if (filter.operator === "greater than") return `${filter.field} > ${filter.value}`;
       if (filter.operator === "greater than or equal to") return `${filter.field} >= ${filter.value}`;
-      if (filter.operator === "less than") return `${filter.field} < ${filter.value}`;
+      if (filter.operator === "less than") return `${filter.field}   < ${filter.value}`;
       if (filter.operator === "less than or equal to") return `${filter.field} <= ${filter.value}`;
       if (filter.operator === "between" || filter.operator === "not between") {
         const [startValue, endValue] = String(filter.value).split(",") || ['', ''];
@@ -252,10 +254,12 @@ private handleFilter(): string {
       return "number_type";
     if (field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "string_type")
       return "string_type";
+    if (field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "date_type")
+      return "date_type";
     return "text";
   }
 
-  private formatDate(val: string): string {
+  private formatDate(val: string, filedDataType?: string): string {
     const date = new Date(val);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -263,6 +267,10 @@ private handleFilter(): string {
     const hour = String(date.getHours()).padStart(2, "0");
     const minute = String(date.getMinutes()).padStart(2, "0");
     const second = String(date.getSeconds()).padStart(2, "0");
+
+    if (filedDataType === "date_type") {
+      return `${year}-${month}-${day}`;
+    }
     return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
   }
 }

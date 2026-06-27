@@ -472,12 +472,11 @@ class Malloy:
 
 if __name__ == "__main__":
     malloy = Malloy(envid="55cc0b65-59de-4dc9-97c5-07191d353f2b")
-    package = malloy.get_package_by_name("public_data")
-    model = package.get_model_by_path("a.malloy")
-    source_infos = model.get_compiled_model()
-    with open("C:\\dev\\chester-bi\\.tests\\source_infos.json", "w") as f:
-        json.dump(source_infos, f , indent=4)
+    package = malloy.get_package_by_name("sales-analytics")
+    query = "run: ecommerce_orders -> { group_by: Order_Date.week aggregate: `order_count` limit: 1000 }"
 
+    model = package.get_model_by_path("sales.malloy")
+    print(model.query(query))
 
 
 

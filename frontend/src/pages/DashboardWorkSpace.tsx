@@ -1,40 +1,119 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Responsive, useContainerWidth, verticalCompactor } from "react-grid-layout";
-import type { Layout, LayoutItem, ResponsiveLayouts } from "react-grid-layout";
-import { MdDashboard, MdDragIndicator,MdClose , MdEdit } from "react-icons/md";
+import type { LayoutItem, ResponsiveLayouts } from "react-grid-layout";
+import { MdDashboard } from "react-icons/md";
 import { FaPlus, FaSave } from "react-icons/fa";
 import { IoBarChartSharp } from "react-icons/io5";
 import CButton from "../components/CButton";
-import CardChart from "../components/charts/CardChart";
-import WidgetEditDialog from "../components/WidgetEditDialog";
+import CWidget from "../components/CWidget/CWidget";
+import CardChart from "../components/charts/CardChart/CardChart";
+import LineChart from "../components/charts/LineChart";
+import BarChart from "../components/charts/BarChart";
+import type { WidgetChartConfig, WidgetSaveResult } from "../components/WidgetEditDialog";
 
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import "../styles/dashboard-workspace.css";
-import React from "react";
 
 interface WidgetMeta {
   title: string;
-  subtitle: string;
+  query?: string;
+  queryId?: string;
+  chartType?: WidgetChartConfig["chartType"];
+  chartConfig?: Record<string, string>;
+  previewValue?: number | null;
+  previewRows?: Record<string, unknown>[] | null;
 }
 
+function isConfigTruthy(value: string | undefined) {
+  return value === "true" || value === "1" || value === "on";
+}
 
-const INITIAL_ITEMS: LayoutItem[] = [
-  { i: "widget-a", x: 0, y: 0, w: 8, h: 8, minW: 2, minH: 2 },
-  { i: "widget-b", x: 8, y: 0, w: 8, h: 8, minW: 2, minH: 2 },
-  { i: "widget-c", x: 16, y: 0, w: 8, h: 8, minW: 2, minH: 2 },
-];
+function toWidgetConfig(meta: WidgetMeta): WidgetChartConfig | undefined {
+  if (!meta.queryId && !meta.chartType && !meta.chartConfig) return undefined;
+  return {
+    queryId: meta.queryId,
+    queryName: meta.query,
+    chartType: meta.chartType,
+    chartConfig: meta.chartConfig,
+    previewValue: meta.previewValue,
+    previewRows: meta.previewRows,
+  };
+}
 
-const INITIAL_META: Record<string, WidgetMeta> = {
-  "widget-a": { title: "Revenue Overview", subtitle: "Monthly trend" },
-  "widget-b": { title: "Active Users", subtitle: "Last 7 days" },
-  "widget-c": { title: "Top Products", subtitle: "By sales volume" },
-};
+function renderWidgetChart(meta: WidgetMeta) {
+  if (!meta.queryId || !meta.chartConfig) return undefined;
+
+  const cfg = meta.chartConfig;
+
+  if (meta.chartType === "card") {
+    const hasTarget = isConfigTruthy(cfg.hasTarget);
+    const displayValue = meta.previewValue ?? (cfg.value ? Number(cfg.value) : 0);
+
+    return (
+      <CardChart
+        title={{
+          value: cfg.title || meta.title,
+          valueFontSize: Number(cfg.titleFontSize) || undefined,
+          valueFontColor: cfg.titleFontColor || undefined,
+        }}
+        value={{
+          value: Number.isFinite(displayValue) ? displayValue : 0,
+          valueFontSize: Number(cfg.valueFontSize) || undefined,
+          valueFontColor: cfg.valueFontColor || undefined,
+        }}
+        target={hasTarget ? { value: Number(cfg.target) || 0 } : undefined}
+        targetBarColor={hasTarget ? cfg.targetBarColor : undefined}
+        valueFormat={(cfg.valueFormat as "currency" | "percentage" | "number" | "decimal") || "currency"}
+      />
+    );
+  }
+
+  if (meta.chartType === "line") {
+    return (
+      <LineChart
+        title={{
+          value: cfg.title || meta.title,
+          valueFontSize: Number(cfg.titleFontSize) || undefined,
+          valueFontColor: cfg.titleFontColor || undefined,
+        }}
+        xAxis={cfg.xAxis}
+        xAxisColor={cfg.xAxisColor}
+        yAxis={cfg.yAxis}
+        yAxisColor={cfg.yAxisColor}
+        legend={cfg.legend}
+        data={meta.previewRows ?? []}
+      />
+    );
+  }
+
+  if (meta.chartType === "bar") {
+    return (
+      <BarChart
+        title={{
+          value: cfg.title || meta.title,
+          valueFontSize: Number(cfg.titleFontSize) || undefined,
+          valueFontColor: cfg.titleFontColor || undefined,
+        }}
+        xAxis={cfg.xAxis}
+        xAxisColor={cfg.xAxisColor}
+        yAxis={cfg.yAxis}
+        yAxisColor={cfg.yAxisColor}
+        legend={cfg.legend}
+        barOrientation={cfg.barOrientation}
+        stacked={cfg.stacked}
+        data={meta.previewRows ?? []}
+      />
+    );
+  }
+
+  return undefined;
+}
 
 const breakpoints = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
 const cols = { lg: 32, md: 24, sm: 16, xs: 8, xxs: 4 };
 const GRID_ROWS = 24;
-const GRID_MARGIN: [number, number] = [6, 6];
+const GRID_MARGIN: [number, number] = [8, 8];
 
 function getActiveCols(containerWidth: number) {
   if (containerWidth >= breakpoints.lg) return cols.lg;
@@ -66,108 +145,10 @@ function getNextY(items: LayoutItem[]) {
   return items.reduce((max, item) => Math.max(max, item.y + item.h), 0);
 }
 
-function DashboardWidget(props: { meta: WidgetMeta; chart?: React.ReactNode }) {
-  const { meta, chart } = props;
-  const [editOpen, setEditOpen] = useState(false);
-
-  return (
-    <>
-      <div
-        className="flex h-full flex-col overflow-hidden rounded-2xl"
-        style={{
-          background: "var(--bg-subtle)",
-          border: "1px solid var(--border)",
-          boxShadow: "var(--shadow-sm)",
-        }}
-      >
-
-      <div
-        className="handle flex w-full cursor-grab items-center gap-2 px-3 py-0.5 active:cursor-grabbing"
-        style={{
-          borderBottom: "1px solid var(--border)",
-          background: "var(--bg)",
-          minHeight: 28,
-          height: 28,
-          maxHeight: 28,
-        }}
-      >
-        <MdDragIndicator size={16} style={{ color: "var(--text)", flexShrink: 0 }} />
-        <div className="ml-auto flex shrink-0 items-center gap-0.5">
-          <button
-            type="button"
-            className="flex items-center justify-center rounded-lg p-0.5 transition hover:bg-black/5"
-            style={{
-              border: "none",
-              background: "none",
-              color: "var(--text)",
-              boxShadow: "none",
-              minWidth: 20,
-              height: 20,
-            }}
-            aria-label="Edit widget"
-            onClick={(e) => {
-              e.stopPropagation();
-              setEditOpen(true);
-            }}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <MdEdit size={14} />
-          </button>
-          <button
-            type="button"
-            className="flex items-center justify-center rounded-lg p-0.5 transition hover:bg-red-100"
-            style={{
-              border: "none",
-              background: "none",
-              color: "var(--error-fg)",
-              boxShadow: "none",
-              minWidth: 20,
-              height: 20,
-            }}
-            aria-label="Remove widget"
-          >
-            <MdClose size={14} style={{ color: "var(--error-fg)" }} />
-          </button>
-        </div>
-      </div>
-
-      {!chart && (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-4 text-center">
-          <span
-            className="flex h-10 w-10 items-center justify-center rounded-xl"
-            style={{ background: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--accent-ring)" }}
-          >
-            <IoBarChartSharp size={18} />
-          </span>
-          <p className="text-xs font-medium cursor-pointer" style={{ color: "var(--text-h)" }}>
-            Create chart
-          </p>
-          <p className="text-[10px]" style={{ color: "var(--text)" }}>
-            Drag to reposition · resize from the corner
-          </p>
-        </div>
-      )}
-
-      {chart && (
-        <div className="flex min-h-0 flex-1 flex-col">
-          {chart}
-        </div>
-      )}
-      </div>
-
-      <WidgetEditDialog
-        isOpen={editOpen}
-        widgetTitle={meta.title}
-        onClose={() => setEditOpen(false)}
-      />
-    </>
-  );
-}
-
 export default function DashboardWorkSpace() {
-  const widgetCount = useRef(INITIAL_ITEMS.length);
-  const [layouts, setLayouts] = useState<ResponsiveLayouts>(() => buildLayouts(INITIAL_ITEMS));
-  const [widgetMeta, setWidgetMeta] = useState<Record<string, WidgetMeta>>(INITIAL_META);
+  const widgetCount = useRef(0);
+  const [layouts, setLayouts] = useState<ResponsiveLayouts>(() => buildLayouts([]));
+  const [widgetMeta, setWidgetMeta] = useState<Record<string, WidgetMeta>>({});
   const { width, containerRef, mounted } = useContainerWidth();
 
   const { rowHeight, canvasHeight, cellSize } = useMemo(
@@ -177,8 +158,23 @@ export default function DashboardWorkSpace() {
 
   const layoutItems = (layouts.lg ?? []) as LayoutItem[];
 
-  const handleLayoutChange = useCallback((_layout: Layout, allLayouts: ResponsiveLayouts) => {
+  const handleLayoutChange = useCallback((_layout: any, allLayouts: any) => {
     setLayouts(allLayouts);
+  }, []);
+
+  const handleDeleteWidget = useCallback((id: string) => {
+    setLayouts((prevLayouts) => {
+      const newLayouts: ResponsiveLayouts = {};
+      for (const [breakpoint, items] of Object.entries(prevLayouts)) {
+        newLayouts[breakpoint] = (items ?? []).filter((widget) => widget.i !== id);
+      }
+      return newLayouts;
+    });
+    setWidgetMeta((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   }, []);
 
   const addWidget = useCallback(() => {
@@ -197,13 +193,27 @@ export default function DashboardWorkSpace() {
       minH: 2,
     };
 
-    const nextItems = [...current, newItem];
-    setLayouts(buildLayouts(nextItems));
+    setLayouts(buildLayouts([...current, newItem]));
     setWidgetMeta((prev) => ({
       ...prev,
-      [id]: { title: `Widget ${widgetCount.current}`, subtitle: "New chart" },
+      [id]: { title: `Widget ${widgetCount.current}` },
     }));
   }, [layouts.lg]);
+
+  const handleConfigChange = useCallback((widgetId: string, result: WidgetSaveResult) => {
+    setWidgetMeta((prev) => ({
+      ...prev,
+      [widgetId]: {
+        title: result.chartConfig.title || prev[widgetId]?.title || "Widget",
+        query: result.query.name,
+        queryId: result.query.id,
+        chartType: result.chartType,
+        chartConfig: result.chartConfig,
+        previewValue: result.previewValue,
+        previewRows: result.previewRows,
+      },
+    }));
+  }, []);
 
   return (
     <div className="flex h-full flex-1 flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
@@ -238,7 +248,7 @@ export default function DashboardWorkSpace() {
       >
         {mounted && layoutItems.length > 0 && (
           <div
-            className="dashboard-workspace-grid relative rounded-2xl"
+            className="dashboard-workspace-grid relative"
             style={{
               height: canvasHeight,
               minHeight: canvasHeight,
@@ -257,27 +267,28 @@ export default function DashboardWorkSpace() {
               containerPadding={[0, 0] as const}
               maxRows={GRID_ROWS}
               autoSize={false}
-              dragConfig={{ enabled: true, handle: ".handle" }}
+              dragConfig={{ enabled: true, handle: ".widget-drag-handle" }}
               resizeConfig={{ enabled: true }}
               compactor={verticalCompactor}
               onLayoutChange={handleLayoutChange}
               style={{ minHeight: canvasHeight }}
             >
-              {layoutItems.map((item) => (
-                <div key={item.i}>
-                  <DashboardWidget
-                    meta={widgetMeta[item.i] ?? { title: "Widget", subtitle: "" }}
-                    chart={
-                      <CardChart
-                        title={widgetMeta[item.i]?.title}
-                        value={{ value: 128400 }}
-                        target={{ label: "Target", value: 150000 }}
-                        compare={{ label: "Compare", value: 12.4 }}
-                      />
-                    }
-                  />
-                </div>
-              ))}
+              {layoutItems.map((item) => {
+                const meta = widgetMeta[item.i] ?? { title: "Widget" };
+                return (
+                  <div key={item.i}>
+                    <CWidget
+                      id={item.i}
+                      title={meta.title}
+                      query={meta.query}
+                      config={toWidgetConfig(meta)}
+                      chart={renderWidgetChart(meta)}
+                      onConfigChange={(result) => handleConfigChange(item.i, result)}
+                      onDelete={() => handleDeleteWidget(item.i)}
+                    />
+                  </div>
+                );
+              })}
             </Responsive>
           </div>
         )}
