@@ -20,7 +20,9 @@ import CardChart from "./charts/CardChart/CardChart";
 import LineChart from "./charts/LineChart";
 import BarChart from "./charts/BarChart";
 import { CardSchema, LineChartSchema, BarChartSchema } from "./charts/ChartsSchemas";
-import { getQueries, getQuery, runQuery, type QueryPublicResponse, type QueryDetailedResponse } from "../lib/Api";
+import { getQueries, getQuery, runQuery, getCompiledModel, type QueryPublicResponse, type QueryDetailedResponse, type SemanticModelSchema } from "../lib/Api";
+import { normalizeQueryRows } from "../lib/queryResult";
+import { isDateTimeTypeKind, resolveXAxisFieldType } from "../lib/fieldTypes";
 import { VscDebugRerun } from "react-icons/vsc";
 
 type ChartType = "card" | "line" | "bar";
@@ -84,13 +86,7 @@ function normalizeFields(fields: Array<Record<string, unknown>>): SchemaField[] 
 }
 
 function extractRows(result: unknown): Record<string, unknown>[] {
-  if (!result || typeof result !== "object") return [];
-  const r = result as Record<string, unknown>;
-  if (Array.isArray(result)) return result as Record<string, unknown>[];
-  for (const key of ["result", "data", "rows", "results"]) {
-    if (Array.isArray(r[key])) return r[key] as Record<string, unknown>[];
-  }
-  return [];
+  return normalizeQueryRows(result);
 }
 
 function readNumericCell(rows: Record<string, unknown>[], fieldName: string): number | null {
@@ -457,6 +453,7 @@ export default function WidgetEditDialog({
   const wasOpenRef = useRef(false);
   const [queries, setQueries] = useState<QueryPublicResponse[]>([]);
   const [queryDetails, setQueryDetails] = useState<QueryDetailedResponse | null>(null);
+  const [compiledModel, setCompiledModel] = useState<SemanticModelSchema | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -507,6 +504,7 @@ export default function WidgetEditDialog({
   useEffect(() => {
     if (!selectedId) {
       setQueryDetails(null);
+      setCompiledModel(null);
       if (!isHydratingRef.current) {
         setPreviewValue(null);
         setPreviewRows(null);
@@ -528,6 +526,17 @@ export default function WidgetEditDialog({
       .finally(() => setDetailsLoading(false));
   }, [selectedId]);
 
+  useEffect(() => {
+    if (!queryDetails?.semantic_model?.id) {
+      setCompiledModel(null);
+      return;
+    }
+
+    getCompiledModel(queryDetails.semantic_model.id)
+      .then(setCompiledModel)
+      .catch(() => setCompiledModel(null));
+  }, [queryDetails?.semantic_model?.id]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return queries;
@@ -545,11 +554,6 @@ export default function WidgetEditDialog({
 
   const hasTarget = isConfigTruthy(chartConfig.hasTarget);
 
-  const visibleFields = useMemo(() => {
-    if (!activeSchema) return [];
-    return activeSchema.fields.filter((field) => shouldShowField(field, chartConfig));
-  }, [activeSchema, chartConfig]);
-
   const fieldOptions = useMemo(() => {
     if (!queryDetails) return [];
     const dims = queryDetails.group_by_fields ?? [];
@@ -557,12 +561,48 @@ export default function WidgetEditDialog({
     return [...dims, ...measures].map((f) => ({ value: f, label: f }));
   }, [queryDetails]);
 
+  const querySource = useMemo(() => {
+    if (!compiledModel || !queryDetails?.source) return null;
+    return compiledModel.sources.find((source) => source.name === queryDetails.source) ?? null;
+  }, [compiledModel, queryDetails?.source]);
+
+  const xAxisTypeKind = useMemo(
+    () => resolveXAxisFieldType(chartConfig.xAxis, querySource),
+    [chartConfig.xAxis, querySource],
+  );
+
+  const isXAxisDateTime = isDateTimeTypeKind(xAxisTypeKind);
+
+  const visibleFields = useMemo(() => {
+    if (!activeSchema) return [];
+    return activeSchema.fields.filter((field) => {
+      if (!shouldShowField(field, chartConfig)) return false;
+      if (selectedChart === "line" && field.name === "format" && !isXAxisDateTime) return false;
+      return true;
+    });
+  }, [activeSchema, chartConfig, selectedChart, isXAxisDateTime]);
+
+  useEffect(() => {
+    if (selectedChart !== "line" || isXAxisDateTime || !chartConfig.format) return;
+    setChartConfig((prev) => ({ ...prev, format: "" }));
+  }, [selectedChart, isXAxisDateTime, chartConfig.format]);
+
   const step1Done = !!selected;
   const step2Done = !!selectedChart;
   const canSave = step1Done && step2Done;
 
   function updateConfig(name: string, value: string) {
-    setChartConfig((prev) => ({ ...prev, [name]: value }));
+    setChartConfig((prev) => {
+      const next = { ...prev, [name]: value };
+      if (name === "xAxis" && selectedChart === "line") {
+        const source = compiledModel?.sources.find((item) => item.name === queryDetails?.source) ?? null;
+        const typeKind = resolveXAxisFieldType(value, source);
+        if (!isDateTimeTypeKind(typeKind)) {
+          next.format = "";
+        }
+      }
+      return next;
+    });
   }
 
   function updateYAxisFields(values: string[]) {
@@ -710,7 +750,12 @@ export default function WidgetEditDialog({
       await onSave({
         query: selected,
         chartType: selectedChart,
-        chartConfig,
+        chartConfig: {
+          ...chartConfig,
+          ...(selectedChart === "line"
+            ? { xAxisIsDateTime: isXAxisDateTime ? "true" : "false" }
+            : {}),
+        },
         previewValue,
         previewRows,
       });
@@ -1020,7 +1065,7 @@ export default function WidgetEditDialog({
               )}
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-center p-8">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-start overflow-auto p-6 pt-5">
               {runError && (selectedChart === "card" || isSeriesChart) && (
                 <div className="mb-4 w-full max-w-md">
                   <CAlert variant="error" message={runError} />
@@ -1062,10 +1107,10 @@ export default function WidgetEditDialog({
                 </div>
               ) : selectedChart === "line" ? (
                 <div
-                  className="flex h-80 w-full max-w-2xl flex-col overflow-hidden rounded-2xl border shadow-sm"
+                  className="flex h-64 w-full max-w-2xl flex-col overflow-hidden rounded-2xl border shadow-sm"
                   style={{ borderColor: "var(--border)", background: "var(--bg)" }}
                 >
-                  <div className="h-full min-h-0 p-3">
+                  <div className="h-full min-h-0 p-1">
                     <LineChart
                       title={{
                         value: chartConfig.title || widgetTitle,
@@ -1077,6 +1122,11 @@ export default function WidgetEditDialog({
                       yAxis={chartConfig.yAxis}
                       yAxisColor={chartConfig.yAxisColor}
                       legend={chartConfig.legend}
+                      lineType={chartConfig.lineType}
+                      format={chartConfig.format}
+                      yAxisFormat={chartConfig.yAxisFormat}
+                      showDataPoints={chartConfig.showDataPoints}
+                      xAxisIsDateTime={isXAxisDateTime}
                       data={previewRows ?? []}
                     />
                   </div>

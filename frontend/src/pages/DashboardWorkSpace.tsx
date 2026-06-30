@@ -9,6 +9,7 @@ import CWidget from "../components/CWidget/CWidget";
 import CardChart from "../components/charts/CardChart/CardChart";
 import LineChart from "../components/charts/LineChart";
 import BarChart from "../components/charts/BarChart";
+import PieChart from "../components/charts/PieChart";
 import type { WidgetChartConfig, WidgetSaveResult } from "../components/WidgetEditDialog";
 
 import "react-grid-layout/css/styles.css";
@@ -82,6 +83,11 @@ function renderWidgetChart(meta: WidgetMeta) {
         yAxis={cfg.yAxis}
         yAxisColor={cfg.yAxisColor}
         legend={cfg.legend}
+        lineType={cfg.lineType}
+        format={cfg.format}
+        yAxisFormat={cfg.yAxisFormat}
+        showDataPoints={cfg.showDataPoints}
+        xAxisIsDateTime={cfg.xAxisIsDateTime === "true" || Boolean(cfg.format?.trim())}
         data={meta.previewRows ?? []}
       />
     );
@@ -102,6 +108,27 @@ function renderWidgetChart(meta: WidgetMeta) {
         legend={cfg.legend}
         barOrientation={cfg.barOrientation}
         stacked={cfg.stacked}
+        data={meta.previewRows ?? []}
+      />
+    );
+  }
+
+  if (meta.chartType === "pie") {
+    return (
+      <PieChart
+        title={{
+          value: cfg.title || meta.title,
+          valueFontSize: Number(cfg.titleFontSize) || undefined,
+          valueFontColor: cfg.titleFontColor || undefined,
+        }}
+        category={cfg.category}
+        value={cfg.value}
+        sliceColor={cfg.sliceColor}
+        legend={cfg.legend}
+        radius={cfg.radius}
+        showValue={cfg.showValue}
+        showPercentage={cfg.showPercentage}
+        valuePosition={cfg.valuePosition}
         data={meta.previewRows ?? []}
       />
     );
@@ -276,7 +303,7 @@ export default function DashboardWorkSpace() {
               {layoutItems.map((item) => {
                 const meta = widgetMeta[item.i] ?? { title: "Widget" };
                 return (
-                  <div key={item.i}>
+                  <div key={item.i} className="h-full">
                     <CWidget
                       id={item.i}
                       title={meta.title}

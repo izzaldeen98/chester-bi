@@ -66,9 +66,11 @@ export default function CWidget({
           </div>
         </div>
 
-        <div className="flex-1 bg-gray-50 rounded-lg flex items-center justify-center border border-dashed border-gray-200 min-h-0">
-          {chart ?? (
-            <div className="flex items-center justify-center gap-2 flex-col">
+        <div className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-lg border border-dashed border-gray-200 bg-gray-50">
+          {chart ? (
+            <div className="flex min-h-0 flex-1 flex-col">{chart}</div>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-2">
               <span className="text-gray-400 text-sm">
                 {query ? query : "No chart data provided"}
               </span>

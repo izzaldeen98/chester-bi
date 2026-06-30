@@ -36,6 +36,7 @@ import {
 } from "../lib/querySerialize";
 import { IoIosSwitch } from "react-icons/io";
 import { MalloyASTQueryBuilder } from "../lib/MalloyASTQueryBuilder";
+import { normalizeQueryRows } from "../lib/queryResult";
 
 
 import { FieldInfo, SourceInfo } from "@malloydata/malloy-interfaces";
@@ -63,15 +64,8 @@ function isDateTime(field: FieldInfo) {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-
-function extractRows(result: any): Record<string, unknown>[] {
-  if (!result) return [];
-  if (Array.isArray(result)) return result;
-  if (Array.isArray(result.result)) return result.result;
-  if (Array.isArray(result.data)) return result.data;
-  if (Array.isArray(result.rows)) return result.rows;
-  if (Array.isArray(result.results)) return result.results;
-  return [];
+function extractRows(result: unknown): Record<string, unknown>[] {
+  return normalizeQueryRows(result);
 }
 
 function extractColumns(rows: Record<string, unknown>[]): string[] {

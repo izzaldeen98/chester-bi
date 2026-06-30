@@ -27,6 +27,6 @@
   opacity: 0.6;
 }
 
-.dashboard-workspace .react-grid-item:hover > .react-resizable-handle {
-  opacity: 1;
+.dashboard-workspace .react-grid-item > div {
+  height: 100%;
 }

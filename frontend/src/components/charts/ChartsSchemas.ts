@@ -121,7 +121,7 @@ export const LineChartSchema= {
             options : [
                 { value: "smooth", label: "Smooth" },
                 { value: "straight", label: "Straight" },
-                
+
 
             ],
         },
@@ -131,6 +131,26 @@ export const LineChartSchema= {
             label : "X Axis",
             placeholder : "Enter x axis",
             required : true,
+        },
+        {
+            name: "format",
+            inputType: "select",
+            label: "Format",
+            placeholder: "Select format",
+            required: false,
+            options: [
+                { value: "yyyy-mm-dd", label: "yyyy-mm-dd" },
+                { value: "yyyy-mm-dd hh:mm:ss", label: "yyyy-mm-dd hh:mm:ss" },
+                { value: "yyyy-mm-dd hh:mm", label: "yyyy-mm-dd hh:mm" },
+                { value: "mmm day", label: "mmm day" },
+                { value: "mmm day, yyyy", label: "mmm day, yyyy" },
+                { value: "dd/mm/yyyy", label: "dd/mm/yyyy" },
+                { value: "dd/mm/yyyy hh:mm:ss", label: "dd/mm/yyyy hh:mm:ss" },
+                { value: "dd/mm/yyyy hh:mm", label: "dd/mm/yyyy hh:mm" },
+                { value: "dd mmmm yyyy", label: "dd mmmm yyyy" },
+                { value: "dd mmmm yyyy hh:mm:ss", label: "dd mmmm yyyy hh:mm:ss" },
+                { value: "dd mmmm yyyy hh:mm", label: "dd mmmm yyyy hh:mm" },
+            ],
         },
         {
             name:"xAxisColor",
@@ -148,11 +168,31 @@ export const LineChartSchema= {
             required : true,
         },
         {
+            name: "showDataPoints",
+            inputType: "switch",
+            label: "Show Data Points",
+            placeholder: "Show data points",
+            required: false,
+            defaultValue: "false",
+        },
+        {
             name: "yAxisColor",
             inputType : "multi-color",
             label : "Y Axis Color",
             placeholder : "Enter y axis color",
             required : false,
+        },
+        {
+            name: "yAxisFormat",
+            inputType: "select",
+            label: "Y Axis Format",
+            placeholder: "Select Y axis format",
+            required: false,
+            options: [
+                { value: "currency", label: "Currency" },
+                { value: "number", label: "Number" },
+                { value: "decimal", label: "Decimal" },
+            ],
         },
         {
             name : "legend",
@@ -244,5 +284,100 @@ export const BarChartSchema = {
             placeholder: "Enter legend",
             required: false,
         },
+         ],
+};
+
+
+export const PieChartSchema = {
+    chartType: "pie",
+    fields: [
+        {
+            name: "title",
+            inputType: "text",
+            label: "Title",
+            placeholder: "Enter title",
+            required: false,
+        },
+        {
+            name: "titleFontSize",
+            inputType: "number",
+            label: "Title Font Size",
+            placeholder: "Enter title font size",
+            required: false,
+        },
+        {
+            name: "titleFontColor",
+            inputType: "color",
+            label: "Title Font Color",
+            placeholder: "Enter title font color",
+            required: false,
+        },
+        {
+            name: "category",
+            inputType: "select",
+            label: "Category",
+            placeholder: "Select category field",
+            required: true,
+        },
+        {
+            name: "value",
+            inputType: "select",
+            label: "Value",
+            placeholder: "Select value field",
+            required: true,
+        },
+        {
+            name: "sliceColor",
+            inputType: "multi-color",
+            label: "Slice Colors",
+            placeholder: "Enter slice colors",
+            required: false,
+        },
+        {
+            name: "legend",
+            inputType: "multi-text",
+            label: "Legend",
+            placeholder: "Enter legend labels",
+            required: false,
+        },
+        {
+            name: "radius",
+            inputType: "number",
+            label: "Inner Radius (%)",
+            placeholder: "0 for pie, >0 for donut",
+            defaultValue: "0",
+            required: false,
+        },
+        {
+            name: "showValue",
+            inputType: "switch",
+            label: "Show Value",
+            placeholder: "Show actual value on slices",
+            required: false,
+            defaultValue: "false",
+        },
+        {
+            name: "showPercentage",
+            inputType: "switch",
+            label: "Show Percentage",
+            placeholder: "Show percentage on slices",
+            required: false,
+            defaultValue: "false",
+        },
+        {
+            name : "valuePosition",
+            inputType: "select",
+            label: "Value Position",
+            placeholder: "Select value position",
+            required: false,
+            defaultValue: "inside",
+            options: [
+                { value: "inside", label: "Inside" },
+                { value: "outside", label: "Outside" },
+                { value: "center", label: "Center" },
+                { value : "left", label: "Left" },
+                { value : "right", label: "Right" },
+            ],
+        }
     ],
 };
