@@ -53,6 +53,10 @@ function openWorkspace(dashboardId: string) {
   window.open(`/workspace/${dashboardId}`, "_blank", "noopener,noreferrer");
 }
 
+function openViewDashboard(dashboardId: string) {
+  window.open(`/view/${dashboardId}`, "_blank", "noopener,noreferrer");
+}
+
 // ── Textarea ───────────────────────────────────────────────────────────────
 function CTextArea({
   label,
@@ -292,7 +296,7 @@ export default function DashboardsPage() {
     return (
       <div className="flex flex-col gap-2">
         {deleteError && <CAlert variant="error" message={deleteError} />}
-        <CButton variant="primary" fullWidth onClick={() => openEdit(selected)}>
+        <CButton variant="primary" fullWidth onClick={() => openViewDashboard(selected.id)}>
           <MdDashboard size={14} /> View Dashboard
         </CButton>
         <CButton variant="outline" fullWidth onClick={() => openWorkspace(selected.id)}>

@@ -160,6 +160,55 @@ export async function deleteDashboard(dashboardId: string): Promise<void> {
   return handleResponse<void>(res);
 }
 
+// ── Dashboard config (save/load widget layout + data) ─────────────────────
+
+export interface DashboardElementLayout {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+  minH?: number;
+}
+
+export interface DashboardElementMeta {
+  title: string;
+  query?: string;
+  queryId?: string;
+  chartType?: string;
+  chartConfig?: Record<string, string>;
+  previewValue?: number | null;
+  previewRows?: Record<string, unknown>[] | null;
+}
+
+export interface DashboardElement {
+  id: string;
+  layout: DashboardElementLayout;
+  meta: DashboardElementMeta;
+}
+
+export interface DashboardConfig {
+  version: string;
+  name: string;
+  elements: DashboardElement[];
+}
+
+export async function getDashboardConfig(dashboardId: string): Promise<DashboardConfig> {
+  const res = await fetch(`/api/v1/dashboards/config/${dashboardId}`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<DashboardConfig>(res);
+}
+
+export async function saveDashboardConfig(dashboardId: string, config: DashboardConfig): Promise<void> {
+  const res = await fetch(`/api/v1/dashboards/config/${dashboardId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(config),
+  });
+  return handleResponse<void>(res);
+}
+
 // ── Packages ───────────────────────────────────────────────────────────────
 
 export interface PackageResponse {

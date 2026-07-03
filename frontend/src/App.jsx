@@ -13,6 +13,7 @@ import QueryPage from './pages/QueryPage'
 import QueriesPage from './pages/QueriesPage'
 import FilesPage from './pages/FilesPage'
 import DashboardWorkSpace from './pages/DashboardWorkSpace'
+import DashboardViewPage from './pages/DashboardViewPage'
 
 // Placeholder for pages not yet built
 function ComingSoon({ name }) {
@@ -51,6 +52,7 @@ export default function App() {
           <Route path="/queries/:queryId/edit"   element={<QueryPage />} />
           <Route path="/workspace"                element={<DashboardWorkSpace />} />
           <Route path="/workspace/:dashboardId"   element={<DashboardWorkSpace />} />
+          <Route path="/view/:dashboardId"         element={<DashboardViewPage />} />
         </Route>
 
         {/* Fallback */}

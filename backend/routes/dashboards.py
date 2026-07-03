@@ -1,4 +1,5 @@
-from fastapi import APIRouter , Depends , HTTPException , status
+from fastapi import APIRouter , Depends , HTTPException , status , Body
+from fastapi.responses import JSONResponse
 from schema.dashboards import DashboardCreate , DashboardUpdate , DashboardPublicResponse
 from models.dashboard import Dashboard
 from utils.init_database import get_db
@@ -7,12 +8,13 @@ from sqlalchemy.orm import Session
 from models.user import User
 from utils.config_files import storage
 from uuid import uuid4
-from json import dumps
+from json import dumps, loads
 from io import BytesIO
 from uuid import UUID
 from sqlalchemy import and_
-from typing import List
+from typing import List, Any
 from security import check_permissions
+from pathlib import Path
 
 router = APIRouter(prefix="/api/v1/dashboards" , tags=["dashboards"])
 
@@ -31,6 +33,28 @@ async def create_dashboard(
     if existing_dashboard:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Dashboard with this name already exists")
 
+    folder_path = f"publisher_data/{str(current_user.account.public_key)}/dashboards"
+
+    # Add dashboard to database first
+    new_dashboard = Dashboard(
+        name=dashboard.name,
+        description=dashboard.description,
+        config_file=f"{folder_path}",  # path *without* file name
+        account_id=current_user.account_id,
+        created_by=current_user.id,
+        updated_by=current_user.id,
+    )
+
+    try:
+        db.add(new_dashboard)
+        db.commit()
+        db.refresh(new_dashboard)  # This will assign .public_key
+        dashboard_public_key = str(new_dashboard.public_key)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create dashboard: {str(e)}")
+
+    # Now we have the DB-generated public_key, use that as file_name
     file_payload = {
         "version": "1.0.0",
         "name": dashboard.name,
@@ -38,33 +62,15 @@ async def create_dashboard(
         "elements": [],
     }
 
-    uuid_str = uuid4()
-
     try:
         file_payload_json = dumps(file_payload)
-        file_payload_bytes = BytesIO(file_payload_json.encode('utf-8'))
-        file_path = await storage.upload_file(file_payload_bytes, str(current_user.account.public_key)+ f"dashboards", f"{dashboard.name}.json")
+        file_payload_bytes = BytesIO(file_payload_json.encode("utf-8"))
+        await storage.upload_file(file_payload_bytes, folder_path, f"{dashboard_public_key}.json")
     except Exception as e:
-        await storage.delete_file(str(current_user.account.public_key)+  f"/dashboards", f"{dashboard.name}.json")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to upload config file: {str(e)}")
-
-    try:
-        new_dashboard = Dashboard(
-            name=dashboard.name,
-            description=dashboard.description,
-            config_file=file_path,
-            account_id=current_user.account_id,
-            created_by=current_user.id,
-            updated_by=current_user.id,
-        )
-
-        db.add(new_dashboard)
-        
+        # Rollback db addition by deleting, if storage upload fails
+        db.delete(new_dashboard)
         db.commit()
-        db.refresh(new_dashboard)
-    except Exception as e:
-        await storage.delete_file(current_user.account_id, f"dashboards", f"{uuid_str}.json")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create dashboard: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to upload config file: {str(e)}")
 
     return {"message": "Dashboard created successfully"}
 
@@ -129,6 +135,30 @@ async def delete_dashboard(
     db.commit()
     return {"message": "Dashboard deleted successfully"}
 
+@router.get("/config/{dashboard_id}")
+async def get_dashboard_config(
+    dashboard_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    permissions = ["*", "dashboards:*", "dashboards:list"]
+    if not check_permissions(current_user, *permissions):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized : Insufficient permissions")
+
+    dashboard = db.query(Dashboard).filter(and_(Dashboard.public_key == dashboard_id, Dashboard.account_id == current_user.account_id)).first()
+    if not dashboard:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dashboard not found")
+
+
+    file_path = dashboard.config_file
+    file_content = await storage.get_file(file_path , f"{dashboard.public_key}.json")
+    if not file_content:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Config file not found at the path: {file_path}/{dashboard.public_key}.json")
+
+    return JSONResponse(content=loads(file_content.getvalue().decode('utf-8')))
+
+
+
 @router.put("/update", status_code=status.HTTP_204_NO_CONTENT)
 async def update_dashboard(
     dashboard_id: UUID,
@@ -149,3 +179,30 @@ async def update_dashboard(
     db.commit()
     db.refresh(dashboard)
     return {"message": "Dashboard updated successfully"}
+
+
+@router.put("/config/{dashboard_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def save_dashboard_config(
+    dashboard_id: UUID,
+    config: Any = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    permissions = ["*", "dashboards:*", "dashboards:edit"]
+    if not check_permissions(current_user, *permissions):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized : Insufficient permissions")
+    dashboard = db.query(Dashboard).filter(and_(Dashboard.public_key == dashboard_id, Dashboard.account_id == current_user.account_id)).first()
+    if not dashboard:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dashboard not found")
+    file_path = dashboard.config_file
+    file_content = await storage.get_file(file_path , f"{dashboard.public_key}.json")
+    if not file_content:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Config file not found at the path: {file_path}/{dashboard.public_key}.json")
+    file_content = loads(file_content.getvalue().decode('utf-8'))
+    if "name" in config:
+        file_content["name"] = config["name"]
+    if "version" in config:
+        file_content["version"] = config["version"]
+    file_content["elements"] = config.get("elements", [])
+    await storage.upload_file(BytesIO(dumps(file_content).encode('utf-8')), file_path , f"{dashboard.public_key}.json")
+    return {"message": "Dashboard config saved successfully"}

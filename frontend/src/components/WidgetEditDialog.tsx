@@ -451,6 +451,7 @@ export default function WidgetEditDialog({
 }: WidgetEditDialogProps) {
   const isHydratingRef = useRef(false);
   const wasOpenRef = useRef(false);
+  const prevSelectedIdRef = useRef<string | null | undefined>(undefined);
   const [queries, setQueries] = useState<QueryPublicResponse[]>([]);
   const [queryDetails, setQueryDetails] = useState<QueryDetailedResponse | null>(null);
   const [compiledModel, setCompiledModel] = useState<SemanticModelSchema | null>(null);
@@ -473,6 +474,7 @@ export default function WidgetEditDialog({
     if (!justOpened) return;
 
     isHydratingRef.current = true;
+    prevSelectedIdRef.current = undefined;
     setSearch("");
     setError("");
     setRunError("");
@@ -505,19 +507,23 @@ export default function WidgetEditDialog({
     if (!selectedId) {
       setQueryDetails(null);
       setCompiledModel(null);
-      if (!isHydratingRef.current) {
+      if (prevSelectedIdRef.current !== undefined) {
         setPreviewValue(null);
         setPreviewRows(null);
         setRunError("");
       }
+      prevSelectedIdRef.current = selectedId;
       return;
     }
 
-    if (!isHydratingRef.current) {
+    const queryChanged =
+      prevSelectedIdRef.current !== undefined && prevSelectedIdRef.current !== selectedId;
+    if (queryChanged) {
       setPreviewValue(null);
       setPreviewRows(null);
       setRunError("");
     }
+    prevSelectedIdRef.current = selectedId;
 
     setDetailsLoading(true);
     getQuery(selectedId)
@@ -584,8 +590,9 @@ export default function WidgetEditDialog({
 
   useEffect(() => {
     if (selectedChart !== "line" || isXAxisDateTime || !chartConfig.format) return;
+    if (isConfigTruthy(chartConfig.xAxisIsDateTime)) return;
     setChartConfig((prev) => ({ ...prev, format: "" }));
-  }, [selectedChart, isXAxisDateTime, chartConfig.format]);
+  }, [selectedChart, isXAxisDateTime, chartConfig.format, chartConfig.xAxisIsDateTime]);
 
   const step1Done = !!selected;
   const step2Done = !!selectedChart;
@@ -1110,7 +1117,7 @@ export default function WidgetEditDialog({
                   className="flex h-64 w-full max-w-2xl flex-col overflow-hidden rounded-2xl border shadow-sm"
                   style={{ borderColor: "var(--border)", background: "var(--bg)" }}
                 >
-                  <div className="h-full min-h-0 p-1">
+                  <div className="h-full min-h-0">
                     <LineChart
                       title={{
                         value: chartConfig.title || widgetTitle,

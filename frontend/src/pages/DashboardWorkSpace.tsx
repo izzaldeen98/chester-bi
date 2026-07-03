@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "react-router-dom";
 import { Responsive, useContainerWidth, verticalCompactor } from "react-grid-layout";
 import type { LayoutItem, ResponsiveLayouts } from "react-grid-layout";
 import { MdDashboard } from "react-icons/md";
@@ -6,11 +7,14 @@ import { FaPlus, FaSave } from "react-icons/fa";
 import { IoBarChartSharp } from "react-icons/io5";
 import CButton from "../components/CButton";
 import CWidget from "../components/CWidget/CWidget";
-import CardChart from "../components/charts/CardChart/CardChart";
-import LineChart from "../components/charts/LineChart";
-import BarChart from "../components/charts/BarChart";
-import PieChart from "../components/charts/PieChart";
+import DashboardWidgetChart from "../components/DashboardWidgetChart";
 import type { WidgetChartConfig, WidgetSaveResult } from "../components/WidgetEditDialog";
+import {
+  getDashboardConfig,
+  saveDashboardConfig,
+  type DashboardElement,
+} from "../lib/Api";
+import { toSavedWidgetMeta } from "../lib/dashboardWidgetData";
 
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -26,115 +30,16 @@ interface WidgetMeta {
   previewRows?: Record<string, unknown>[] | null;
 }
 
-function isConfigTruthy(value: string | undefined) {
-  return value === "true" || value === "1" || value === "on";
-}
-
 function toWidgetConfig(meta: WidgetMeta): WidgetChartConfig | undefined {
-  if (!meta.queryId && !meta.chartType && !meta.chartConfig) return undefined;
+  if (!meta.queryId && !meta.chartConfig) return undefined;
   return {
     queryId: meta.queryId,
     queryName: meta.query,
     chartType: meta.chartType,
     chartConfig: meta.chartConfig,
-    previewValue: meta.previewValue,
-    previewRows: meta.previewRows,
+    previewValue: meta.previewValue ?? null,
+    previewRows: meta.previewRows ?? null,
   };
-}
-
-function renderWidgetChart(meta: WidgetMeta) {
-  if (!meta.queryId || !meta.chartConfig) return undefined;
-
-  const cfg = meta.chartConfig;
-
-  if (meta.chartType === "card") {
-    const hasTarget = isConfigTruthy(cfg.hasTarget);
-    const displayValue = meta.previewValue ?? (cfg.value ? Number(cfg.value) : 0);
-
-    return (
-      <CardChart
-        title={{
-          value: cfg.title || meta.title,
-          valueFontSize: Number(cfg.titleFontSize) || undefined,
-          valueFontColor: cfg.titleFontColor || undefined,
-        }}
-        value={{
-          value: Number.isFinite(displayValue) ? displayValue : 0,
-          valueFontSize: Number(cfg.valueFontSize) || undefined,
-          valueFontColor: cfg.valueFontColor || undefined,
-        }}
-        target={hasTarget ? { value: Number(cfg.target) || 0 } : undefined}
-        targetBarColor={hasTarget ? cfg.targetBarColor : undefined}
-        valueFormat={(cfg.valueFormat as "currency" | "percentage" | "number" | "decimal") || "currency"}
-      />
-    );
-  }
-
-  if (meta.chartType === "line") {
-    return (
-      <LineChart
-        title={{
-          value: cfg.title || meta.title,
-          valueFontSize: Number(cfg.titleFontSize) || undefined,
-          valueFontColor: cfg.titleFontColor || undefined,
-        }}
-        xAxis={cfg.xAxis}
-        xAxisColor={cfg.xAxisColor}
-        yAxis={cfg.yAxis}
-        yAxisColor={cfg.yAxisColor}
-        legend={cfg.legend}
-        lineType={cfg.lineType}
-        format={cfg.format}
-        yAxisFormat={cfg.yAxisFormat}
-        showDataPoints={cfg.showDataPoints}
-        xAxisIsDateTime={cfg.xAxisIsDateTime === "true" || Boolean(cfg.format?.trim())}
-        data={meta.previewRows ?? []}
-      />
-    );
-  }
-
-  if (meta.chartType === "bar") {
-    return (
-      <BarChart
-        title={{
-          value: cfg.title || meta.title,
-          valueFontSize: Number(cfg.titleFontSize) || undefined,
-          valueFontColor: cfg.titleFontColor || undefined,
-        }}
-        xAxis={cfg.xAxis}
-        xAxisColor={cfg.xAxisColor}
-        yAxis={cfg.yAxis}
-        yAxisColor={cfg.yAxisColor}
-        legend={cfg.legend}
-        barOrientation={cfg.barOrientation}
-        stacked={cfg.stacked}
-        data={meta.previewRows ?? []}
-      />
-    );
-  }
-
-  if (meta.chartType === "pie") {
-    return (
-      <PieChart
-        title={{
-          value: cfg.title || meta.title,
-          valueFontSize: Number(cfg.titleFontSize) || undefined,
-          valueFontColor: cfg.titleFontColor || undefined,
-        }}
-        category={cfg.category}
-        value={cfg.value}
-        sliceColor={cfg.sliceColor}
-        legend={cfg.legend}
-        radius={cfg.radius}
-        showValue={cfg.showValue}
-        showPercentage={cfg.showPercentage}
-        valuePosition={cfg.valuePosition}
-        data={meta.previewRows ?? []}
-      />
-    );
-  }
-
-  return undefined;
 }
 
 const breakpoints = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
@@ -173,6 +78,9 @@ function getNextY(items: LayoutItem[]) {
 }
 
 export default function DashboardWorkSpace() {
+  const { dashboardId } = useParams<{ dashboardId: string }>();
+  const dashboardNameRef = useRef("Dashboard Workspace");
+
   const widgetCount = useRef(0);
   const [layouts, setLayouts] = useState<ResponsiveLayouts>(() => buildLayouts([]));
   const [widgetMeta, setWidgetMeta] = useState<Record<string, WidgetMeta>>({});
@@ -184,6 +92,49 @@ export default function DashboardWorkSpace() {
   );
 
   const layoutItems = (layouts.lg ?? []) as LayoutItem[];
+
+  useEffect(() => {
+    if (!dashboardId) return;
+
+    getDashboardConfig(dashboardId)
+      .then((config) => {
+        dashboardNameRef.current = config.name || "Dashboard Workspace";
+
+        const items: LayoutItem[] = [];
+        const meta: Record<string, WidgetMeta> = {};
+
+        for (const el of config.elements ?? []) {
+          items.push({
+            i: el.id,
+            x: el.layout.x,
+            y: el.layout.y,
+            w: el.layout.w,
+            h: el.layout.h,
+            minW: el.layout.minW ?? 2,
+            minH: el.layout.minH ?? 2,
+          });
+          meta[el.id] = {
+            title: el.meta.title,
+            query: el.meta.query,
+            queryId: el.meta.queryId,
+            chartType: el.meta.chartType as WidgetChartConfig["chartType"],
+            chartConfig: el.meta.chartConfig,
+          };
+
+          const match = el.id.match(/^widget-(\d+)$/);
+          if (match) {
+            const n = parseInt(match[1], 10);
+            if (n > widgetCount.current) widgetCount.current = n;
+          }
+        }
+
+        setLayouts(buildLayouts(items));
+        setWidgetMeta(meta);
+      })
+      .catch(() => {
+        // Keep empty workspace on load failure; save still requires dashboardId
+      });
+  }, [dashboardId]);
 
   const handleLayoutChange = useCallback((_layout: any, allLayouts: any) => {
     setLayouts(allLayouts);
@@ -242,6 +193,29 @@ export default function DashboardWorkSpace() {
     }));
   }, []);
 
+  const handleSave = useCallback(async () => {
+    if (!dashboardId) return;
+
+    const elements: DashboardElement[] = layoutItems.map((item) => ({
+      id: item.i,
+      layout: {
+        x: item.x,
+        y: item.y,
+        w: item.w,
+        h: item.h,
+        minW: item.minW ?? 2,
+        minH: item.minH ?? 2,
+      },
+      meta: toSavedWidgetMeta(widgetMeta[item.i] ?? { title: "Widget" }),
+    }));
+
+    await saveDashboardConfig(dashboardId, {
+      version: "1.0.0",
+      name: dashboardNameRef.current,
+      elements,
+    });
+  }, [dashboardId, layoutItems, widgetMeta]);
+
   return (
     <div className="flex h-full flex-1 flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
       <header
@@ -263,7 +237,7 @@ export default function DashboardWorkSpace() {
         <CButton variant="outline" className="!px-3 !py-1.5 !text-xs" onClick={addWidget}>
           <FaPlus size={11} /> Add Widget
         </CButton>
-        <CButton variant="primary" className="!px-3 !py-1.5 !text-xs" disabled>
+        <CButton variant="primary" className="!px-3 !py-1.5 !text-xs" disabled={!dashboardId} onClick={handleSave}>
           <FaSave size={11} /> Save Layout
         </CButton>
       </header>
@@ -309,7 +283,7 @@ export default function DashboardWorkSpace() {
                       title={meta.title}
                       query={meta.query}
                       config={toWidgetConfig(meta)}
-                      chart={renderWidgetChart(meta)}
+                      chart={<DashboardWidgetChart meta={meta} preferCachedPreview />}
                       onConfigChange={(result) => handleConfigChange(item.i, result)}
                       onDelete={() => handleDeleteWidget(item.i)}
                     />

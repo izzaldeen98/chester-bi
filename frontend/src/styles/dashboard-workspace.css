@@ -8,7 +8,15 @@
 }
 
 .dashboard-workspace .react-grid-layout {
-  min-height: 100%;
+  position: relative;
+}
+
+.dashboard-workspace .react-resizable {
+  overflow: visible;
+}
+
+.dashboard-workspace .react-grid-item {
+  overflow: visible;
 }
 
 .dashboard-workspace .react-grid-item.react-grid-placeholder {
@@ -18,15 +26,62 @@
   opacity: 1;
 }
 
+/* Handles are appended as direct children of the grid item by react-resizable */
+.dashboard-workspace .react-grid-item > .react-resizable-handle {
+  z-index: 40;
+  pointer-events: auto;
+  opacity: 0.55;
+}
+
+.dashboard-workspace .react-grid-item:hover > .react-resizable-handle {
+  opacity: 1;
+}
+
+.dashboard-workspace .react-grid-item > .react-resizable-handle-se {
+  width: 24px;
+  height: 24px;
+  right: 0;
+  bottom: 0;
+  cursor: se-resize;
+}
+
+.dashboard-workspace .react-grid-item > .react-resizable-handle-e {
+  width: 12px;
+  height: calc(100% - 24px);
+  top: 0;
+  right: 0;
+  margin-top: 0;
+  cursor: ew-resize;
+}
+
+.dashboard-workspace .react-grid-item > .react-resizable-handle-s {
+  height: 12px;
+  width: calc(100% - 24px);
+  left: 0;
+  bottom: 0;
+  margin-left: 0;
+  cursor: ns-resize;
+}
+
+.dashboard-workspace .react-grid-item > .react-resizable-handle-w {
+  width: 12px;
+  height: calc(100% - 24px);
+  top: 0;
+  left: 0;
+  margin-top: 0;
+  cursor: ew-resize;
+}
+
 .dashboard-workspace .react-resizable-handle::after {
   border-right-color: var(--accent);
   border-bottom-color: var(--accent);
 }
 
-.dashboard-workspace .react-grid-item > .react-resizable-handle {
-  opacity: 0.6;
+/* View mode: hide resize handles and selection outline */
+.dashboard-view-mode .react-resizable-handle {
+  display: none !important;
 }
 
-.dashboard-workspace .react-grid-item > div {
-  height: 100%;
+.dashboard-view-mode .react-grid-item {
+  cursor: default !important;
 }
