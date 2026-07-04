@@ -2,3 +2,4 @@ sqlite.db
 chesterBI.db
 .local/*
 .tests/*
+.env
