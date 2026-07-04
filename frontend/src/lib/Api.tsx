@@ -65,7 +65,39 @@ export async function login(username: string, password: string) {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
   });
-  return handleResponse<{ access_token: string; token_type: string }>(res);
+  return handleResponse<{
+    access_token: string;
+    token_type: string;
+    user: {
+      id: string;
+      username: string;
+      email: string;
+      first_name: string;
+      last_name: string;
+      account_name: string;
+      role: string;
+      permissions: string[];
+    };
+  }>(res);
+}
+
+export interface RegisterPayload {
+  name: string;
+  description: string;
+  username: string;
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+}
+
+export async function register(payload: RegisterPayload): Promise<{ message: string }> {
+  const res = await fetch(`/api/v1/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<{ message: string }>(res);
 }
 
 // ── Users ──────────────────────────────────────────────────────────────────

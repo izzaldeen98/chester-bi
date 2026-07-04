@@ -1,38 +1,130 @@
 version: '3.8'
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  chester-bi  –  Full-stack Docker Compose
+#
+#  Services:
+#    frontend   – React/Vite SPA served by nginx  (port 3000)
+#    backend    – FastAPI / Uvicorn               (port 8989, internal only)
+#    postgres   – PostgreSQL 16                   (port 5432)
+#    redis      – Redis 7 cache                   (port 6379, internal only)
+#    publisher  – Malloy Publisher (query engine) (port 4000)
+#
+#  Quick start:
+#    1. cp .example.env .env   and fill in the values
+#    2. docker compose up --build
+#    3. Open http://localhost:3000
+# ─────────────────────────────────────────────────────────────────────────────
+
 services:
-  postgres_test:
+
+  # ── Frontend ───────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: chester_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # ── Backend ────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: chester_backend
+    # Port is intentionally NOT exposed to the host.
+    # All traffic goes through the frontend nginx proxy at /api/*.
+    # Uncomment the line below if you need direct access during development:
+    # ports:
+    #   - "8989:8989"
+    env_file:
+      - .env
+    environment:
+      # PostgreSQL connection (points to the postgres service below)
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-bi_db}
+      DB_USER: ${POSTGRES_USER:-bi_admin}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+
+      # Malloy Publisher (points to the publisher service below)
+      MALLOY_HOST: publisher
+      MALLOY_PORT: 4000
+
+      # Redis (points to the redis service below)
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      publisher:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      # Share the same data folder with the Malloy Publisher
+      - local_data:/app/.local
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
     image: postgres:16-alpine
-    container_name: bi_postgres_container
+    container_name: chester_postgres
     restart: always
     environment:
-      POSTGRES_USER: dev_admin
-      POSTGRES_PASSWORD: SecretPassword123
-      POSTGRES_DB: bi_testing_db
+      POSTGRES_USER:     ${POSTGRES_USER:-bi_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB:       ${POSTGRES_DB:-bi_db}
     ports:
       - "5432:5432"
     volumes:
-      - pg_bi_data:/var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dev_admin -d bi_testing_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bi_admin} -d ${POSTGRES_DB:-bi_db}"]
       interval: 5s
       timeout: 5s
+      retries: 10
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: chester_redis
+    restart: unless-stopped
+    # Port is intentionally NOT exposed to the host.
+    # Uncomment if you need direct access during development:
+    # ports:
+    #   - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
       retries: 5
 
+  # ── Malloy Publisher ───────────────────────────────────────────────────────
   publisher:
     image: ms2data/malloy-publisher
+    container_name: chester_publisher
+    restart: unless-stopped
     ports:
       - "4000:4000"
-      - "4040:4040"  # MCP endpoint for AI agents
-    restart: unless-stopped
+      - "4040:4040"   # MCP endpoint for AI agents
     volumes:
-      - ./.local/publisher_data:/publisher/publisher_data/
+      - local_data:/publisher/publisher_data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/status"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 15s
 
+# ── Volumes ────────────────────────────────────────────────────────────────
 volumes:
-  pg_bi_data:
-  publisher_data:
+  pg_data:
+  redis_data:
+  local_data:       # shared between backend and publisher (Malloy data files)

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { GiJesterHat } from "react-icons/gi";
 import { IoMdMail } from "react-icons/io";
 import { RiLockPasswordFill } from "react-icons/ri";
@@ -8,13 +8,15 @@ import CTextInput from "../components/CTextInput";
 import CButton from "../components/CButton";
 import CAlert from "../components/CAlert";
 import { login } from "../lib/Api";
-import { setToken } from "../lib/auth";
+import { setToken, setUser } from "../lib/auth";
 import { useTheme } from "../lib/theme";
 
 
 export default function LoginPage() {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+  const justRegistered = (location.state as any)?.registered === true;
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -29,8 +31,8 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const data = await login(username.trim(), password);
-      console.log("Login success", data);
       setToken(data.access_token);
+      if (data.user) setUser(data.user);
       navigate("/home", { replace: true });
     } catch (err: any) {
       setError(err.message ?? "Something went wrong. Please try again.");
@@ -88,6 +90,9 @@ export default function LoginPage() {
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
           {error && <CAlert variant="error" message={error} />}
+          {justRegistered && !error && (
+            <CAlert variant="success" message="Account created! Sign in to continue." />
+          )}
 
           <CTextInput
             label="Username or Email"

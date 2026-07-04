@@ -1,63 +1,94 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GiJesterHat } from "react-icons/gi";
 import { MdDashboard, MdOutlineCloud } from "react-icons/md";
 import { PiFileSqlFill } from "react-icons/pi";
-import { FaFileAlt, FaArrowRight, FaUser } from "react-icons/fa";
+import { FaArrowRight, FaGithub, FaStar } from "react-icons/fa";
 import { GoPackage } from "react-icons/go";
 import { FaTable } from "react-icons/fa";
 import { HiSun, HiMoon } from "react-icons/hi";
 import { IoBarChartSharp } from "react-icons/io5";
+import { FiFilter, FiLock } from "react-icons/fi";
 import { useTheme } from "../lib/theme";
 import CButton from "../components/CButton";
 
-// ── Data ───────────────────────────────────────────────────────────────────
+const GITHUB_URL = "https://github.com/izzaldeen98/chester-bi";
+const GITHUB_API  = "https://api.github.com/repos/izzaldeen98/chester-bi";
+
+// ── Star count hook ─────────────────────────────────────────────────────────
+function fmtStars(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
+
+function useGitHubStars(): string | null {
+  const [stars, setStars] = useState<string | null>(null);
+  useEffect(() => {
+    fetch(GITHUB_API, { headers: { Accept: "application/vnd.github+json" } })
+      .then((r) => r.json())
+      .then((d) => { if (typeof d.stargazers_count === "number") setStars(fmtStars(d.stargazers_count)); })
+      .catch(() => {/* silently ignore */});
+  }, []);
+  return stars;
+}
+
+// ── Features ───────────────────────────────────────────────────────────────
 const features = [
   {
-    icon: <MdDashboard size={24} />,
-    title: "Interactive Dashboards",
+    icon: <MdDashboard size={22} />,
+    title: "Drag-and-Drop Dashboards",
     description:
-      "Build rich, real-time dashboards that surface the metrics that matter most to your team.",
+      "Build and share interactive dashboards with a fully resizable grid. No code required.",
   },
   {
-    icon: <PiFileSqlFill size={24} />,
-    title: "SQL Query Builder",
+    icon: <PiFileSqlFill size={22} />,
+    title: "Malloy Query Builder",
     description:
-      "Write and run SQL queries directly in the browser with syntax highlighting and autocomplete.",
+      "Write powerful Malloy queries in the browser with syntax highlighting, autocomplete, and live previews.",
   },
   {
-    icon: <IoBarChartSharp size={24} />,
-    title: "Visual Analytics",
+    icon: <IoBarChartSharp size={22} />,
+    title: "Rich Visualisations",
     description:
-      "Drag-and-drop chart builder turns raw data into beautiful, shareable visualisations.",
+      "Bar, line, scatter, and more — chart types powered by ECharts that look great out of the box.",
   },
   {
-    icon: <FaTable size={24} />,
-    title: "Smart Data Tables",
+    icon: <FiFilter size={22} />,
+    title: "Live Dashboard Filters",
     description:
-      "Paginate, filter, and sort millions of rows without breaking a sweat.",
+      "Add interactive filter widgets that slice chart queries in real time without rebuilding the dashboard.",
   },
   {
-    icon: <MdOutlineCloud size={24} />,
-    title: "Cloud Connections",
+    icon: <MdOutlineCloud size={22} />,
+    title: "Multi-Database Connections",
     description:
-      "Connect to PostgreSQL, BigQuery, Snowflake, and more in just a few clicks.",
+      "Connect to PostgreSQL, BigQuery, DuckDB, Snowflake, and more through a single encrypted config.",
   },
   {
-    icon: <GoPackage size={24} />,
-    title: "Package Management",
+    icon: <GoPackage size={22} />,
+    title: "Malloy Packages",
     description:
-      "Bundle and share reusable query logic and dashboards across your organisation.",
+      "Organise and share reusable semantic models and query bundles across your whole organisation.",
+  },
+  {
+    icon: <FaTable size={22} />,
+    title: "File & Model Management",
+    description:
+      "Upload data files, manage Malloy model files, and keep everything organised in one place.",
+  },
+  {
+    icon: <FiLock size={22} />,
+    title: "Role-Based Access Control",
+    description:
+      "Invite team members, assign roles, and control exactly who can view or edit what.",
   },
 ];
 
-const stats = [
-  { value: "10×", label: "Faster insights" },
-  { value: "50+", label: "Data sources" },
-  { value: "99.9%", label: "Uptime SLA" },
+// ── Steps ──────────────────────────────────────────────────────────────────
+const steps = [
+  { n: "01", title: "Clone & configure", body: "Clone the repo, copy .example.env to .env, and fill in your secret keys and database credentials." },
+  { n: "02", title: "docker compose up", body: "One command starts Postgres, Redis, the Malloy Publisher, the FastAPI backend, and the React frontend." },
+  { n: "03", title: "Create your account", body: "Register your organisation owner account and start connecting data sources immediately." },
 ];
-
-const navLinks = ["Features", "Docs", "About"];
-const footerLinks = ["Privacy", "Terms", "Contact"];
 
 // ── Badge ──────────────────────────────────────────────────────────────────
 function Badge({ children }: { children: React.ReactNode }) {
@@ -76,7 +107,7 @@ function Badge({ children }: { children: React.ReactNode }) {
 }
 
 // ── Navbar ─────────────────────────────────────────────────────────────────
-function Navbar() {
+function Navbar({ stars }: { stars: string | null }) {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
@@ -91,69 +122,49 @@ function Navbar() {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <GiJesterHat size={30} style={{ color: "var(--accent)" }} />
-          <span
-            className="text-xl font-bold tracking-tight"
-            style={{ color: "var(--text-h)" }}
-          >
-            Chester{" "}
-            <span style={{ color: "var(--accent)" }}>BI</span>
+          <GiJesterHat size={28} style={{ color: "var(--accent)" }} />
+          <span className="text-xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
+            Chester <span style={{ color: "var(--accent)" }}>BI</span>
           </span>
-        </div>
-
-        {/* Nav links */}
-        <div className="hidden items-center gap-8 md:flex">
-          {navLinks.map((link) => (
-            <a
-              key={link}
-              href="#"
-              className="text-sm font-medium transition-colors"
-              style={{ color: "var(--text)" }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.color = "var(--accent)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = "var(--text)")
-              }
-            >
-              {link}
-            </a>
-          ))}
         </div>
 
         {/* Right side */}
         <div className="flex items-center gap-3">
+          {/* GitHub + star count */}
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors hover:bg-[var(--bg-subtle)]"
+            style={{ color: "var(--text)" }}
+          >
+            <FaGithub size={17} />
+            <span className="hidden sm:inline">GitHub</span>
+            {stars && (
+              <span
+                className="hidden items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-bold sm:flex"
+                style={{ background: "var(--accent-muted)", color: "var(--accent)" }}
+              >
+                <FaStar size={9} />
+                {stars}
+              </span>
+            )}
+          </a>
+
           <button
             onClick={toggleTheme}
             aria-label="Toggle theme"
-            className="rounded-lg p-2 transition-colors"
+            className="rounded-lg p-2 transition-colors hover:bg-[var(--bg-subtle)]"
             style={{ color: "var(--text)" }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "var(--accent-muted)";
-              e.currentTarget.style.color = "var(--accent)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
-              e.currentTarget.style.color = "var(--text)";
-            }}
           >
-            {theme === "dark" ? <HiSun size={20} /> : <HiMoon size={20} />}
+            {theme === "dark" ? <HiSun size={19} /> : <HiMoon size={19} />}
           </button>
 
-          <CButton
-            variant="outline"
-            onClick={() => navigate("/login")}
-            className="hidden md:inline-flex"
-          >
+          <CButton variant="outline" onClick={() => navigate("/login")} className="hidden sm:inline-flex">
             Sign In
           </CButton>
-
-          <CButton
-            variant="primary"
-            onClick={() => navigate("/login")}
-          >
-            Get Started
-            <FaArrowRight size={12} />
+          <CButton variant="primary" onClick={() => navigate("/register")}>
+            Get Started <FaArrowRight size={11} />
           </CButton>
         </div>
       </div>
@@ -162,8 +173,9 @@ function Navbar() {
 }
 
 // ── Hero ───────────────────────────────────────────────────────────────────
-function Hero() {
+function Hero({ stars }: { stars: string | null }) {
   const navigate = useNavigate();
+
   return (
     <section className="relative overflow-hidden px-6 py-28 text-center">
       {/* Radial glow */}
@@ -176,19 +188,27 @@ function Hero() {
         }}
       />
 
-      <div className="mx-auto max-w-4xl">
-        <div className="mb-6 flex justify-center">
-          <Badge>
-            <GiJesterHat size={13} />
-            Business Intelligence, Reimagined
-          </Badge>
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-6 flex items-center justify-center gap-3">
+          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="transition-opacity hover:opacity-80">
+            <Badge>
+              <FaGithub size={11} /> Open Source · MIT License
+            </Badge>
+          </a>
+          {stars && (
+            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="transition-opacity hover:opacity-80">
+              <Badge>
+                <FaStar size={10} style={{ color: "#eab308" }} /> {stars} stars
+              </Badge>
+            </a>
+          )}
         </div>
 
         <h1
-          className="mb-6 text-5xl font-extrabold leading-tight tracking-tight md:text-6xl lg:text-7xl"
+          className="mb-6 text-5xl font-extrabold leading-tight tracking-tight md:text-6xl"
           style={{ color: "var(--text-h)" }}
         >
-          Turn Data Into{" "}
+          Self-Hosted{" "}
           <span
             className="bg-clip-text text-transparent"
             style={{
@@ -196,49 +216,31 @@ function Hero() {
                 "linear-gradient(135deg, #d97706 0%, #eab308 40%, #facc15 100%)",
             }}
           >
-            Insights
-          </span>{" "}
-          Instantly
+            Business Intelligence
+          </span>
+          <br />for Your Team
         </h1>
 
-        <p
-          className="mx-auto mb-10 max-w-2xl text-lg md:text-xl"
-          style={{ color: "var(--text)" }}
-        >
-          Chester BI connects to your data sources, lets you query with SQL,
-          and transforms results into stunning dashboards — all in one place.
+        <p className="mx-auto mb-10 max-w-2xl text-lg" style={{ color: "var(--text)" }}>
+          Chester BI is a free, open-source BI platform you run on your own infrastructure.
+          Connect your databases, write Malloy queries, build dashboards, and share insights —
+          with full control over your data.
         </p>
 
         <div className="flex flex-wrap items-center justify-center gap-4">
-          <CButton
-            variant="primary"
-            onClick={() => navigate("/login")}
-            className="px-7 py-3"
+          <CButton variant="primary" onClick={() => navigate("/register")} className="px-7 py-3">
+            Create Your Instance <FaArrowRight size={13} />
+          </CButton>
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
           >
-            Get Started Free
-            <FaArrowRight size={13} />
-          </CButton>
-          <CButton variant="outline" className="px-7 py-3">
-            View Demo
-          </CButton>
+            <CButton variant="outline" className="px-7 py-3">
+              <FaGithub size={16} /> View on GitHub
+            </CButton>
+          </a>
         </div>
-      </div>
-
-      {/* Stats */}
-      <div className="mx-auto mt-20 flex max-w-sm flex-wrap justify-center gap-10">
-        {stats.map((s) => (
-          <div key={s.label} className="text-center">
-            <p
-              className="text-3xl font-extrabold"
-              style={{ color: "var(--accent)" }}
-            >
-              {s.value}
-            </p>
-            <p className="text-sm" style={{ color: "var(--text)" }}>
-              {s.label}
-            </p>
-          </div>
-        ))}
       </div>
     </section>
   );
@@ -247,49 +249,40 @@ function Hero() {
 // ── Features ───────────────────────────────────────────────────────────────
 function Features() {
   return (
-    <section className="px-6 py-20">
+    <section className="px-6 py-20" style={{ borderTop: "1px solid var(--border)" }}>
       <div className="mx-auto max-w-6xl">
         <div className="mb-14 text-center">
           <div className="mb-4 flex justify-center">
-            <Badge>Everything you need</Badge>
+            <Badge>What's included</Badge>
           </div>
-          <h2
-            className="text-4xl font-bold tracking-tight"
-            style={{ color: "var(--text-h)" }}
-          >
-            Powerful features,{" "}
-            <span style={{ color: "var(--accent)" }}>zero complexity</span>
+          <h2 className="text-4xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
+            Everything you need,{" "}
+            <span style={{ color: "var(--accent)" }}>nothing you don't</span>
           </h2>
-          <p
-            className="mx-auto mt-4 max-w-xl"
-            style={{ color: "var(--text)" }}
-          >
-            From raw queries to polished dashboards, Chester BI gives every
-            analyst and engineer the tools they need.
+          <p className="mx-auto mt-4 max-w-xl text-base" style={{ color: "var(--text)" }}>
+            Chester BI ships with a complete analytics stack. No plugins, no paywalled features,
+            no usage caps.
           </p>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {features.map((f) => (
             <div
               key={f.title}
-              className="group rounded-2xl p-6 transition-all"
+              className="rounded-2xl p-5 transition-all"
               style={{
                 background: "var(--bg-subtle)",
                 border: "1px solid var(--border)",
-                boxShadow: "var(--shadow-sm)",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = "var(--accent-ring)";
-                e.currentTarget.style.boxShadow = "var(--shadow-md)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = "var(--border)";
-                e.currentTarget.style.boxShadow = "var(--shadow-sm)";
               }}
             >
               <div
-                className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl"
+                className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl"
                 style={{
                   background: "var(--accent-muted)",
                   color: "var(--accent)",
@@ -298,13 +291,10 @@ function Features() {
               >
                 {f.icon}
               </div>
-              <h3
-                className="mb-1 font-semibold"
-                style={{ color: "var(--text-h)" }}
-              >
+              <h3 className="mb-1 text-sm font-semibold" style={{ color: "var(--text-h)" }}>
                 {f.title}
               </h3>
-              <p className="text-sm" style={{ color: "var(--text)" }}>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text)" }}>
                 {f.description}
               </p>
             </div>
@@ -315,11 +305,66 @@ function Features() {
   );
 }
 
+// ── Quick-start steps ──────────────────────────────────────────────────────
+function QuickStart() {
+  return (
+    <section className="px-6 py-20" style={{ borderTop: "1px solid var(--border)" }}>
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-12 text-center">
+          <div className="mb-4 flex justify-center">
+            <Badge>Quick start</Badge>
+          </div>
+          <h2 className="text-4xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
+            Up and running in{" "}
+            <span style={{ color: "var(--accent)" }}>minutes</span>
+          </h2>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          {steps.map((s) => (
+            <div key={s.n} className="flex flex-col gap-3">
+              <span
+                className="text-4xl font-black tabular-nums"
+                style={{ color: "var(--accent)", opacity: 0.25 }}
+              >
+                {s.n}
+              </span>
+              <h3 className="text-base font-semibold" style={{ color: "var(--text-h)" }}>
+                {s.title}
+              </h3>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--text)" }}>
+                {s.body}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* Code block */}
+        <div
+          className="mt-12 overflow-x-auto rounded-2xl p-5 text-sm font-mono"
+          style={{
+            background: "var(--bg-subtle)",
+            border: "1px solid var(--border)",
+            color: "var(--text-h)",
+          }}
+        >
+          <p><span style={{ color: "var(--accent)", opacity: 0.7 }}># 1. Clone the repo</span></p>
+          <p>git clone https://github.com/chester-bi/chester-bi.git && cd chester-bi</p>
+          <p className="mt-2"><span style={{ color: "var(--accent)", opacity: 0.7 }}># 2. Configure environment</span></p>
+          <p>cp .example.env .env  <span style={{ color: "var(--accent)", opacity: 0.5 }}># fill in SECRET_KEY & FERNET_KEY</span></p>
+          <p className="mt-2"><span style={{ color: "var(--accent)", opacity: 0.7 }}># 3. Launch everything</span></p>
+          <p>docker compose up --build</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── CTA Banner ─────────────────────────────────────────────────────────────
 function CTABanner() {
   const navigate = useNavigate();
   return (
-    <section className="px-6 py-20">
+    <section className="px-6 py-20" style={{ borderTop: "1px solid var(--border)" }}>
       <div
         className="mx-auto max-w-4xl overflow-hidden rounded-3xl p-12 text-center"
         style={{
@@ -327,30 +372,30 @@ function CTABanner() {
             "linear-gradient(135deg, #d97706 0%, #eab308 45%, #facc15 100%)",
         }}
       >
-        <GiJesterHat size={48} className="mx-auto mb-4" style={{ color: "rgba(0,0,0,0.6)" }} />
-        <h2 className="mb-4 text-4xl font-extrabold tracking-tight text-black">
-          Ready to unlock your data?
+        <GiJesterHat size={44} className="mx-auto mb-4" style={{ color: "rgba(0,0,0,0.55)" }} />
+        <h2 className="mb-3 text-4xl font-extrabold tracking-tight text-black">
+          Ready to own your data?
         </h2>
         <p className="mx-auto mb-8 max-w-lg text-black/70">
-          Join thousands of analysts who trust Chester BI to power their most
-          critical business decisions.
+          Deploy Chester BI on your own server in minutes. No vendor lock-in,
+          no per-seat pricing, no data leaving your infrastructure.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-4">
           <CButton
             variant="primary"
-            onClick={() => navigate("/login")}
+            onClick={() => navigate("/register")}
             className="bg-black! px-7 py-3 text-yellow-400 hover:bg-stone-900!"
           >
-            Start for Free
-            <FaArrowRight size={13} />
+            Create Your Account <FaArrowRight size={13} />
           </CButton>
-          <CButton
-            variant="outline"
-            className="border-black/30! px-7 py-3 text-black! hover:bg-black/10!"
-          >
-            Request a Demo
-            <FaUser size={13} />
-          </CButton>
+          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
+            <CButton
+              variant="outline"
+              className="border-black/30! px-7 py-3 text-black! hover:bg-black/10!"
+            >
+              <FaGithub size={15} /> Star on GitHub
+            </CButton>
+          </a>
         </div>
       </div>
     </section>
@@ -363,32 +408,27 @@ function Footer() {
     <footer style={{ borderTop: "1px solid var(--border)" }} className="px-6 py-8">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 md:flex-row">
         <div className="flex items-center gap-2">
-          <GiJesterHat size={22} style={{ color: "var(--accent)" }} />
-          <span className="font-semibold" style={{ color: "var(--text-h)" }}>
-            Chester BI
+          <GiJesterHat size={20} style={{ color: "var(--accent)" }} />
+          <span className="font-semibold" style={{ color: "var(--text-h)" }}>Chester BI</span>
+          <span
+            className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold"
+            style={{ background: "var(--accent-muted)", color: "var(--accent)" }}
+          >
+            MIT
           </span>
         </div>
         <p className="text-sm" style={{ color: "var(--text)" }}>
-          © {new Date().getFullYear()} Chester BI. All rights reserved.
+          Free and open source. Self-host with confidence.
         </p>
-        <div className="flex gap-6 text-sm">
-          {footerLinks.map((item) => (
-            <a
-              key={item}
-              href="#"
-              className="transition-colors"
-              style={{ color: "var(--text)" }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.color = "var(--accent)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = "var(--text)")
-              }
-            >
-              {item}
-            </a>
-          ))}
-        </div>
+        <a
+          href={GITHUB_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-sm transition-opacity hover:opacity-70"
+          style={{ color: "var(--text)" }}
+        >
+          <FaGithub size={16} /> GitHub
+        </a>
       </div>
     </footer>
   );
@@ -396,12 +436,14 @@ function Footer() {
 
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function LandingPage() {
+  const stars = useGitHubStars();
   return (
     <div style={{ background: "var(--bg)", color: "var(--text)" }}>
-      <Navbar />
+      <Navbar stars={stars} />
       <main>
-        <Hero />
+        <Hero stars={stars} />
         <Features />
+        <QuickStart />
         <CTABanner />
       </main>
       <Footer />

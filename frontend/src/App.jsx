@@ -14,6 +14,7 @@ import QueriesPage from './pages/QueriesPage'
 import FilesPage from './pages/FilesPage'
 import DashboardWorkSpace from './pages/DashboardWorkSpace'
 import DashboardViewPage from './pages/DashboardViewPage'
+import RegisterPage from './pages/RegisterPage'
 
 // Placeholder for pages not yet built
 function ComingSoon({ name }) {
@@ -31,8 +32,9 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Public */}
-        <Route path="/"       element={<LandingPage />} />
-        <Route path="/login"  element={<LoginPage />} />
+        <Route path="/"          element={<LandingPage />} />
+        <Route path="/login"     element={<LoginPage />} />
+        <Route path="/register"  element={<RegisterPage />} />
 
         {/* Protected — sidebar layout */}
         <Route element={<AppLayout />}>
