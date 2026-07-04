@@ -19,7 +19,6 @@ import { toSavedWidgetMeta } from "../lib/dashboardWidgetData";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import "../styles/dashboard-workspace.css";
-
 interface WidgetMeta {
   title: string;
   query?: string;
@@ -44,7 +43,9 @@ function toWidgetConfig(meta: WidgetMeta): WidgetChartConfig | undefined {
 
 const breakpoints = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
 const cols = { lg: 32, md: 24, sm: 16, xs: 8, xxs: 4 };
-const GRID_ROWS = 24;
+const DEFAULT_GRID_ROWS = 24;
+const MIN_GRID_ROWS = 8;
+const MAX_GRID_ROWS = 200;
 const GRID_MARGIN: [number, number] = [8, 8];
 
 function getActiveCols(containerWidth: number) {
@@ -55,16 +56,16 @@ function getActiveCols(containerWidth: number) {
   return cols.xxs;
 }
 
-function getSquareGridMetrics(containerWidth: number) {
+function getSquareGridMetrics(containerWidth: number, gridRows: number) {
   if (containerWidth <= 0) {
-    return { rowHeight: 48, canvasHeight: GRID_ROWS * 48, cellSize: 48, activeCols: cols.lg };
+    return { rowHeight: 48, canvasHeight: gridRows * 48, cellSize: 48, activeCols: cols.lg };
   }
 
   const activeCols = getActiveCols(containerWidth);
   const [mx, my] = GRID_MARGIN;
   const cellSize = Math.floor((containerWidth - mx * (activeCols - 1)) / activeCols);
   const rowHeight = cellSize;
-  const canvasHeight = GRID_ROWS * cellSize + my * (GRID_ROWS - 1);
+  const canvasHeight = gridRows * cellSize + my * (gridRows - 1);
 
   return { rowHeight, canvasHeight, cellSize, activeCols };
 }
@@ -84,11 +85,13 @@ export default function DashboardWorkSpace() {
   const widgetCount = useRef(0);
   const [layouts, setLayouts] = useState<ResponsiveLayouts>(() => buildLayouts([]));
   const [widgetMeta, setWidgetMeta] = useState<Record<string, WidgetMeta>>({});
+  const [gridRows, setGridRows] = useState(DEFAULT_GRID_ROWS);
+  const [gridRowsInput, setGridRowsInput] = useState(String(DEFAULT_GRID_ROWS));
   const { width, containerRef, mounted } = useContainerWidth();
 
   const { rowHeight, canvasHeight, cellSize } = useMemo(
-    () => getSquareGridMetrics(width),
-    [width],
+    () => getSquareGridMetrics(width, gridRows),
+    [width, gridRows],
   );
 
   const layoutItems = (layouts.lg ?? []) as LayoutItem[];
@@ -99,6 +102,10 @@ export default function DashboardWorkSpace() {
     getDashboardConfig(dashboardId)
       .then((config) => {
         dashboardNameRef.current = config.name || "Dashboard Workspace";
+
+        const loadedRows = config.gridRows ?? DEFAULT_GRID_ROWS;
+        setGridRows(loadedRows);
+        setGridRowsInput(String(loadedRows));
 
         const items: LayoutItem[] = [];
         const meta: Record<string, WidgetMeta> = {};
@@ -212,6 +219,7 @@ export default function DashboardWorkSpace() {
     await saveDashboardConfig(dashboardId, {
       version: "1.0.0",
       name: dashboardNameRef.current,
+      gridRows,
       elements,
     });
   }, [dashboardId, layoutItems, widgetMeta]);
@@ -233,6 +241,31 @@ export default function DashboardWorkSpace() {
         </div>
 
         <div className="flex-1" />
+
+        <div className="flex items-center gap-1.5">
+          <label className="text-[11px] font-medium" style={{ color: "var(--text)" }}>
+            Rows
+          </label>
+          <input
+            type="number"
+            min={MIN_GRID_ROWS}
+            max={MAX_GRID_ROWS}
+            value={gridRowsInput}
+            onChange={(e) => setGridRowsInput(e.target.value)}
+            onBlur={() => {
+              const n = Math.min(MAX_GRID_ROWS, Math.max(MIN_GRID_ROWS, parseInt(gridRowsInput, 10) || DEFAULT_GRID_ROWS));
+              setGridRows(n);
+              setGridRowsInput(String(n));
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            }}
+            className="w-16 rounded-lg border px-2 py-1 text-xs tabular-nums outline-none transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]"
+            style={{ borderColor: "var(--border)", background: "var(--bg)", color: "var(--text-h)" }}
+          />
+        </div>
+
+        <div className="h-4 w-px" style={{ background: "var(--border)" }} />
 
         <CButton variant="outline" className="!px-3 !py-1.5 !text-xs" onClick={addWidget}>
           <FaPlus size={11} /> Add Widget
@@ -266,7 +299,7 @@ export default function DashboardWorkSpace() {
               rowHeight={rowHeight}
               margin={GRID_MARGIN}
               containerPadding={[0, 0] as const}
-              maxRows={GRID_ROWS}
+              maxRows={gridRows}
               autoSize={false}
               dragConfig={{ enabled: true, handle: ".widget-drag-handle" }}
               resizeConfig={{ enabled: true }}

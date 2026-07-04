@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import GridLayout, { useContainerWidth } from "react-grid-layout";
-import type { LayoutItem } from "react-grid-layout";
+import { Responsive, useContainerWidth } from "react-grid-layout";
+import type { LayoutItem, ResponsiveLayouts } from "react-grid-layout";
 import { MdDashboard, MdArrowBack, MdEdit } from "react-icons/md";
 import CWidget from "../components/CWidget/CWidget";
 import CSpinner from "../components/CSpinner";
@@ -15,7 +15,7 @@ import "../styles/dashboard-workspace.css";
 
 const breakpoints = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
 const cols = { lg: 32, md: 24, sm: 16, xs: 8, xxs: 4 };
-const GRID_ROWS = 24;
+const DEFAULT_GRID_ROWS = 24;
 const GRID_MARGIN: [number, number] = [8, 8];
 
 function getActiveCols(containerWidth: number) {
@@ -26,16 +26,16 @@ function getActiveCols(containerWidth: number) {
   return cols.xxs;
 }
 
-function getSquareGridMetrics(containerWidth: number) {
+function getSquareGridMetrics(containerWidth: number, gridRows: number) {
   if (containerWidth <= 0) {
-    return { rowHeight: 48, canvasHeight: GRID_ROWS * 48, cellSize: 48, activeCols: cols.lg };
+    return { rowHeight: 48, canvasHeight: gridRows * 48, cellSize: 48 };
   }
   const activeCols = getActiveCols(containerWidth);
   const [mx, my] = GRID_MARGIN;
   const cellSize = Math.floor((containerWidth - mx * (activeCols - 1)) / activeCols);
   const rowHeight = cellSize;
-  const canvasHeight = GRID_ROWS * cellSize + my * (GRID_ROWS - 1);
-  return { rowHeight, canvasHeight, cellSize, activeCols };
+  const canvasHeight = gridRows * cellSize + my * (gridRows - 1);
+  return { rowHeight, canvasHeight, cellSize };
 }
 
 export default function DashboardViewPage() {
@@ -45,11 +45,17 @@ export default function DashboardViewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dashboardName, setDashboardName] = useState("Dashboard");
+  const [gridRows, setGridRows] = useState(DEFAULT_GRID_ROWS);
   const [layoutItems, setLayoutItems] = useState<LayoutItem[]>([]);
   const [metaMap, setMetaMap] = useState<Record<string, DashboardElementMeta>>({});
 
   const { width, containerRef, mounted } = useContainerWidth();
-  const { rowHeight, canvasHeight, cellSize, activeCols } = useMemo(() => getSquareGridMetrics(width), [width]);
+  const { rowHeight, canvasHeight, cellSize } = useMemo(() => getSquareGridMetrics(width, gridRows), [width, gridRows]);
+
+  const layouts: ResponsiveLayouts = useMemo(
+    () => ({ lg: layoutItems, md: layoutItems, sm: layoutItems, xs: layoutItems, xxs: layoutItems }),
+    [layoutItems],
+  );
 
   useEffect(() => {
     if (!dashboardId) return;
@@ -60,6 +66,7 @@ export default function DashboardViewPage() {
     getDashboardConfig(dashboardId)
       .then((config) => {
         setDashboardName(config.name || "Dashboard");
+        setGridRows(config.gridRows ?? DEFAULT_GRID_ROWS);
 
         const items: LayoutItem[] = [];
         const meta: Record<string, DashboardElementMeta> = {};
@@ -151,19 +158,18 @@ export default function DashboardViewPage() {
               border: "1px solid var(--border)",
             }}
           >
-            <GridLayout
+            <Responsive
+              layouts={layouts}
+              breakpoints={breakpoints}
+              cols={cols}
               width={width}
-              layout={layoutItems}
-              gridConfig={{
-                cols: activeCols,
-                rowHeight,
-                margin: GRID_MARGIN,
-                maxRows: GRID_ROWS,
-                containerPadding: [0, 0],
-              }}
+              rowHeight={rowHeight}
+              margin={GRID_MARGIN}
+              containerPadding={[0, 0] as const}
+              maxRows={gridRows}
+              autoSize={false}
               dragConfig={{ enabled: false }}
               resizeConfig={{ enabled: false }}
-              autoSize={false}
               style={{ minHeight: canvasHeight }}
             >
               {layoutItems.map((item) => {
@@ -179,7 +185,7 @@ export default function DashboardViewPage() {
                   </div>
                 );
               })}
-            </GridLayout>
+            </Responsive>
           </div>
         )}
 

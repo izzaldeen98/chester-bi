@@ -139,18 +139,24 @@ export default function BarChart({
 
     const categories = data.map((row) => readCategoryLabel(row[xAxis]));
     const hasLegend = legendLabels.length > 1;
+    const hasTitle = Boolean(title?.value);
     const titleFontSize = title?.valueFontSize ?? 14;
-    const topPadding = title?.value ? titleFontSize + 28 : 16;
+    // Same formula as LineChart: account for ECharts title internal padding + lineHeight
+    const titleSpace = hasTitle ? Math.ceil(titleFontSize * 1.2 + 24) : 10;
+    const legendTop = hasTitle ? Math.ceil(titleFontSize * 1.2 + 16) : 6;
+    const gridTop = titleSpace + (hasLegend ? 28 : 0);
+    const rotateX = !horizontal && categories.length > 8;
 
     const categoryAxis = {
       type: "category" as const,
       data: categories,
-      axisLine: { lineStyle: { color: xAxisColor || borderColor } },
+      axisLine: { lineStyle: { color: xAxisColor || borderColor, width: 1 } },
       axisTick: { show: false },
       axisLabel: {
         color: textColor,
         fontSize: 10,
-        rotate: !horizontal && categories.length > 8 ? 35 : 0,
+        rotate: rotateX ? 35 : 0,
+        margin: rotateX ? 8 : 4,
         hideOverlap: true,
       },
     };
@@ -159,61 +165,98 @@ export default function BarChart({
       type: "value" as const,
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: textColor, fontSize: 10 },
-      splitLine: { lineStyle: { color: borderColor, type: "dashed" as const } },
+      axisLabel: { color: textColor, fontSize: 10, margin: 8 },
+      splitLine: {
+        lineStyle: { color: borderColor, type: "dashed" as const, width: 1, opacity: 0.7 },
+      },
     };
 
     return {
       backgroundColor: "transparent",
-      title: title?.value
+      animation: true,
+      animationDuration: 500,
+      animationEasing: "cubicOut" as const,
+
+      title: hasTitle
         ? {
-            text: title.value,
-            left: 8,
-            top: 4,
+            text: title!.value,
+            left: 10,
+            top: 6,
             textStyle: {
-              color: title.valueFontColor ?? textHColor,
+              color: title!.valueFontColor ?? textHColor,
               fontSize: titleFontSize,
-              fontWeight: 600,
+              fontWeight: 700,
             },
           }
         : undefined,
+
       tooltip: {
         trigger: "axis",
-        axisPointer: { type: "shadow" },
-        backgroundColor: getThemeColor("--bg-subtle", "#ffffff"),
-        borderColor,
+        axisPointer: {
+          type: "shadow",
+          shadowStyle: { color: "rgba(0,0,0,0.04)" },
+        },
+        backgroundColor: "#ffffff",
+        borderColor: "#e5e7eb",
+        borderWidth: 1,
+        borderRadius: 10,
+        padding: [8, 14],
         textStyle: { color: textHColor, fontSize: 12 },
+        extraCssText: "box-shadow: 0 4px 20px rgba(0,0,0,0.10); border-radius: 10px;",
       },
+
       legend: hasLegend
         ? {
             data: legendLabels,
-            bottom: 0,
+            top: legendTop,
+            left: "center",
+            orient: "horizontal",
             textStyle: { color: textColor, fontSize: 11 },
-            icon: "roundRect",
-            itemWidth: 10,
+            icon: "circle",
+            itemWidth: 8,
             itemHeight: 8,
+            itemGap: 16,
           }
         : undefined,
+
       grid: {
-        left: horizontal ? 80 : 40,
-        right: 16,
-        top: topPadding,
-        bottom: hasLegend ? 36 : 24,
-        containLabel: false,
+        left: horizontal ? 4 : 4,
+        right: 12,
+        top: gridTop,
+        bottom: hasLegend ? 8 : 4,
+        containLabel: true,
       },
+
       xAxis: horizontal ? valueAxis : { ...categoryAxis, boundaryGap: true },
-      yAxis: horizontal ? categoryAxis : valueAxis,
+      yAxis: horizontal ? { ...categoryAxis, inverse: true } : valueAxis,
+
       series: yFields.map((field, index) => ({
         name: legendLabels[index] || field,
         type: "bar",
         stack: useStack ? "total" : undefined,
-        barMaxWidth: 48,
+        barMaxWidth: horizontal ? 28 : 48,
+        barCategoryGap: "35%",
         itemStyle: {
           color: colors[index],
-          borderRadius: horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0],
+          borderRadius: horizontal ? [0, 6, 6, 0] : [6, 6, 0, 0],
+        },
+        label: {
+          show: useStack,
+          position: "inside" as const,
+          fontSize: 10,
+          color: "#ffffff",
+          formatter: (params: { value?: unknown }) => {
+            const v = readNumericValue(params.value);
+            return v != null && v !== 0 ? String(v) : "";
+          },
         },
         emphasis: {
-          focus: useStack ? "series" : undefined,
+          focus: "series" as const,
+          itemStyle: {
+            shadowBlur: 8,
+            shadowColor: `${colors[index]}40`,
+            shadowOffsetY: 2,
+          },
         },
         data: data.map((row) => readNumericValue(row[field])),
       })),
@@ -232,7 +275,7 @@ export default function BarChart({
   ]);
 
   return (
-    <div className="flex h-full w-full min-h-0 min-w-0 flex-col">
+    <div className="flex h-full w-full min-h-0 min-w-0 flex-col p-2">
       <div ref={ref} className="h-full w-full min-h-0 min-w-0 flex-1">
         {ready && (
           <ReactECharts

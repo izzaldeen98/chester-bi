@@ -4,6 +4,7 @@ import { getRowFieldValue, normalizeQueryRows } from "./queryResult";
 export interface WidgetQueryData {
   previewValue: number | null;
   previewRows: Record<string, unknown>[] | null;
+  compareValue?: number | null;
 }
 
 export interface WidgetMetaLike {
@@ -46,9 +47,13 @@ export async function fetchWidgetQueryData(meta: WidgetMetaLike): Promise<Widget
 
   if (meta.chartType === "card") {
     const valueField = meta.chartConfig.value?.trim();
+    const hasCompare =
+      meta.chartConfig.hasCompare === "true" || meta.chartConfig.hasCompare === "1";
+    const compareField = meta.chartConfig.compareField?.trim();
     return {
       previewValue: readNumericFromRows(rows, valueField ?? ""),
       previewRows: null,
+      compareValue: hasCompare && compareField ? readNumericFromRows(rows, compareField) : null,
     };
   }
 

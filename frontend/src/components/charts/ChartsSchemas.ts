@@ -84,6 +84,37 @@ export const CardSchema= {
             required : false,
             showWhen : "hasTarget",
         },
+        {
+            name: "hasCompare",
+            inputType: "switch",
+            label: "Show Comparison",
+            required: false,
+            defaultValue: "false",
+        },
+        {
+            name: "compareField",
+            inputType: "select",
+            label: "Compare Field",
+            placeholder: "Select field to compare against",
+            required: false,
+            showWhen: "hasCompare",
+        },
+        {
+            name: "compareLabel",
+            inputType: "text",
+            label: "Compare Label",
+            placeholder: "e.g. vs Last Period",
+            required: false,
+            showWhen: "hasCompare",
+        },
+        {
+            name: "compareFormat",
+            inputType: "select",
+            label: "Compare Format",
+            placeholder: "Select compare format",
+            required: false,
+            showWhen: "hasCompare",
+        },
     ]
 }
 
@@ -379,5 +410,66 @@ export const PieChartSchema = {
                 { value : "right", label: "Right" },
             ],
         }
+    ],
+};
+
+export const TableChartSchema = {
+    chartType: "table",
+    fields: [
+        {
+            name: "title",
+            inputType: "text",
+            label: "Title",
+            placeholder: "Enter title",
+            required: false,
+        },
+        {
+            name: "titleFontSize",
+            inputType: "number",
+            label: "Title Font Size",
+            placeholder: "14",
+            required: false,
+        },
+        {
+            name: "titleFontColor",
+            inputType: "color",
+            label: "Title Font Color",
+            required: false,
+        },
+        {
+            name: "columns",
+            inputType: "multi-select",
+            label: "Columns",
+            placeholder: "Select columns to display (all if empty)",
+            required: false,
+        },
+        {
+            name: "pageSize",
+            inputType: "select",
+            label: "Rows per page",
+            required: false,
+            defaultValue: "10",
+            options: [
+                { value: "5", label: "5" },
+                { value: "10", label: "10" },
+                { value: "20", label: "20" },
+                { value: "50", label: "50" },
+                { value: "100", label: "100" },
+            ],
+        },
+        {
+            name: "striped",
+            inputType: "switch",
+            label: "Striped rows",
+            defaultValue: "true",
+            required: false,
+        },
+        {
+            name: "showIndex",
+            inputType: "switch",
+            label: "Show row numbers",
+            defaultValue: "false",
+            required: false,
+        },
     ],
 };

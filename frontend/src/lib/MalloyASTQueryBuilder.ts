@@ -7,6 +7,14 @@ interface SortItem {
   dir: SortDir;
 }
 
+interface query {
+  groupBy: string[];
+  aggregate: string[];
+  orderBy: string[];
+  limit: number;
+  filters: RuleGroupType;
+}
+
 function isRule(filter: any): filter is RuleType {
   return filter && typeof filter === 'object' && 'field' in filter && 'operator' in filter;
 }
@@ -21,7 +29,44 @@ export class MalloyASTQueryBuilder {
 
   constructor(activeSchema: SourceInfo) {
     this.activeSchema = activeSchema;
-    console.log("ACTIVE SCHEMA:", this.activeSchema);
+  }
+
+  // public buildFromResponse(response: query) {
+  //   this.groupByFields = response.groupBy
+  //   for (const field of response.aggregate) {
+  //     for (const f of this.activeSchema.schema.fields) {
+  //       if (f.name === field) {
+  //         this.aggFields.push(f);
+  //       }
+  //     }
+  //   }
+  //   this.limit = response.limit;
+  //   this.filters = response.filters["filters"];
+  // }
+
+  public buildFromResponse(response: query) {
+    this.groupByFields = [...(response.groupBy ?? [])];
+
+    const allFields = this.activeSchema?.schema?.fields ?? [];
+
+    this.aggFields = (response.aggregate ?? []).reduce<FieldInfo[]>((acc, name) => {
+      const found = allFields.find((f: FieldInfo) => f.name === name);
+      if (found) acc.push(found);
+      return acc;
+    }, []);
+
+    this.sortMap = (response.orderBy ?? []).reduce<SortItem[]>((acc, entry) => {
+      const parts = String(entry).trim().split(/\s+/);
+      const fieldName = parts.slice(0, parts.length > 1 && ["asc", "desc"].includes(parts[parts.length - 1].toLowerCase()) ? -1 : undefined).join(" ");
+      const rawDir = parts[parts.length - 1]?.toLowerCase();
+      const dir: SortDir = rawDir === "desc" ? "desc" : "asc";
+      const found = allFields.find((f: FieldInfo) => f.name === fieldName);
+      if (found) acc.push({ field: found, dir });
+      return acc;
+    }, []);
+
+    this.limit = response.limit ?? this.limit;
+    this.filters = response.filters ?? null;
   }
 
   public addGroupBy(fieldName: string, granularity?: string) {

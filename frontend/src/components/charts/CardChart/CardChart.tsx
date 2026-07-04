@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import ReactECharts from "echarts-for-react";
-import type { EChartsOption } from "echarts";
+import { MdTrendingDown, MdTrendingFlat, MdTrendingUp } from "react-icons/md";
+
+type ValueFormat = "currency" | "percentage" | "number" | "decimal";
 
 interface DataField {
   label?: string;
@@ -12,48 +12,30 @@ interface DataField {
 interface CardChartProps {
   title?: DataField;
   value?: DataField;
-  target?: DataField;  
-  compare?: DataField; 
+  target?: DataField;
+  compare?: DataField;
+  compareLabel?: string;
+  compareFormat?: ValueFormat;
   targetBarColor?: string;
   valueFormat?: ValueFormat;
 }
 
-type ValueFormat = "currency" | "percentage" | "number" | "decimal";
-
-function valueFormatter(value: number | string | null | undefined, format: ValueFormat) {
-  if (value === null || value === undefined) return "—";
-  
-  const numericValue = typeof value === "number" ? value : parseFloat(String(value));
-  if (isNaN(numericValue)) return String(value);
-
-  if (format === "currency") return `$${numericValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  if (format === "percentage") return `${numericValue.toFixed(2)}%`;
-  if (format === "number") return numericValue.toFixed(0);
-  if (format === "decimal") return numericValue.toFixed(2);
-  
-  return String(value);
+function fmt(v: number | string | null | undefined, f: ValueFormat): string {
+  if (v === null || v === undefined) return "—";
+  const n = typeof v === "number" ? v : parseFloat(String(v));
+  if (!Number.isFinite(n)) return String(v);
+  if (f === "currency")
+    return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  if (f === "percentage") return `${(n * 100).toFixed(2)}%`;
+  if (f === "number") return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  if (f === "decimal") return n.toFixed(2);
+  return String(v);
 }
 
-function useContainerSize() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
-
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-
-    const update = () => {
-      const { width, height } = element.getBoundingClientRect();
-      setSize({ width: Math.floor(width), height: Math.floor(height) });
-    };
-
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-
-  return { ref, ...size };
+function toNum(v: number | string | null | undefined): number | null {
+  if (v === null || v === undefined) return null;
+  const n = typeof v === "number" ? v : parseFloat(String(v));
+  return Number.isFinite(n) ? n : null;
 }
 
 export default function CardChart({
@@ -61,191 +43,126 @@ export default function CardChart({
   value,
   target,
   compare,
+  compareLabel = "vs",
+  compareFormat = "number",
   targetBarColor = "#eab308",
   valueFormat = "number",
 }: CardChartProps) {
-  const { ref, width, height } = useContainerSize();
-  const ready = width > 0 && height > 0;
+  const valNum = toNum(value?.value);
+  const cmpNum = toNum(compare?.value);
+  const tgtNum = toNum(target?.value);
 
-  const option = useMemo<EChartsOption>(() => {
-    if (!ready) return { backgroundColor: "transparent" };
+  // delta % between main value and compare
+  const delta =
+    valNum !== null && cmpNum !== null && cmpNum !== 0
+      ? ((valNum - cmpNum) / Math.abs(cmpNum)) * 100
+      : null;
 
-    const graphics: NonNullable<EChartsOption["graphic"]> = [];
-    
-    // ENHANCEMENT 1: Determine safe proportional bounds using height & width scales
-    const scaleFactor = Math.min(width / 300, height / 180);
-    const elementGap = Math.max(4, Math.round(height * 0.04)); // Dynamic gap space (4% of canvas height)
-    
-    let startingTop = Math.max(2, Math.round(height * 0.02)); // Initial padding roof gap
+  // progress toward target
+  const progress =
+    valNum !== null && tgtNum !== null && tgtNum > 0
+      ? Math.min(100, (valNum / tgtNum) * 100)
+      : null;
 
-    if (title?.value) {
-      // Scale font based on screen dimensions, keeping boundaries safe
-      const computedTitleSize = title.valueFontSize ?? Math.round(Math.min(26, Math.max(12, 18 * scaleFactor)));
-
-      graphics.push({
-        type: "text",
-        left: 2,
-        top: startingTop,
-        style: {
-          text: title.value as string,
-          fontSize: computedTitleSize, 
-          fill: title.valueFontColor ?? "#111827", 
-          fontWeight: "bold",
-          textVerticalAlign: "top", 
-        }
-      });
-      startingTop += computedTitleSize + elementGap;
-    }
-
-    if (value) {
-      if (value.label) {
-        const computedLabelSize = Math.round(Math.min(16, Math.max(10, 12 * scaleFactor)));
-        graphics.push({
-          type: "text",
-          left: 2,
-          top: startingTop, 
-          style: {
-            text: value.label,
-            fontSize: computedLabelSize,
-            fill: "#6b7280",
-            textVerticalAlign: "top", 
-          }
-        });
-        startingTop += computedLabelSize + Math.round(elementGap * 0.5); 
-      }
-
-      if (value.value != null) {
-        const computedValueSize = value.valueFontSize ?? Math.round(Math.min(42, Math.max(16, 28 * scaleFactor)));
-        graphics.push({
-          type: "text",
-          left: 2,
-          top: startingTop, 
-          style: {
-            text: valueFormatter(value.value, valueFormat), 
-            fontSize: computedValueSize,
-            fontWeight: "bold",
-            fill: value.valueFontColor ?? "#111827",
-            textVerticalAlign: "top", 
-          }
-        });
-        startingTop += computedValueSize + elementGap;
-      }
-    }
-
-    if (target && target.value != null) {
-      const computedTargetSize = target.valueFontSize ?? Math.round(Math.min(18, Math.max(11, 13 * scaleFactor)));
-      
-      graphics.push({
-        type: "text",
-        left: 2,
-        top: startingTop,
-        style: {
-          text: `Target: ${valueFormatter(target.value, "currency")}`,
-          fontSize: computedTargetSize,
-          fill: target.valueFontColor ?? "#4b5563",
-          fontWeight: "600",
-          textVerticalAlign: "top", 
-        }
-      });
-
-      startingTop += computedTargetSize + Math.round(elementGap * 0.7);
-      
-      // ENHANCEMENT 2: Dynamic Progress Bar sizes calculated relative to element sizing constraints
-      const currentNum = typeof value?.value === "number" ? value.value : parseFloat(String(value?.value ?? 0));
-      const targetNum = typeof target.value === "number" ? target.value : parseFloat(String(target.value ?? 0));
-      const calculatedPct = targetNum > 0 ? (targetNum / currentNum) * 100 : 0;
-      const percentageString = calculatedPct.toFixed(1);
-      
-      const availableWidth = Math.max(0, width - 4);
-      const fillPercent = Math.min(Math.max(calculatedPct, 0), 100);
-      const filledWidth = (availableWidth * fillPercent) / 100;
-      
-      const barHeight = Math.min(12, Math.max(4, Math.round(height * 0.045))); // Height adjusts seamlessly to scaling changes
-      const borderRadius = barHeight / 2;
-
-      graphics.push(
-        {
-          type: "rect",
-          left: 2,
-          top: startingTop,
-          shape: {
-            width: availableWidth,
-            height: barHeight,
-            r: borderRadius
-          },
-          style: { fill: "#e5e7eb" }
-        },
-        {
-          type: "rect",
-          left: 2,
-          top: startingTop,
-          shape: {
-            width: filledWidth,
-            height: barHeight,
-            r: borderRadius
-          },
-          style: { fill: targetBarColor }
-        }
-      );
-
-      startingTop += barHeight + Math.round(elementGap * 0.5);
-
-      // ENHANCEMENT 3: Percentage tag follows the filled progress bar boundary line safely
-      const computedPctSize = Math.round(Math.min(14, Math.max(9, 10 * scaleFactor)));
-      const estimatedTextWidth = computedPctSize * 3.5;
-      let textLeftPosition = filledWidth - (estimatedTextWidth / 2);
-      if (textLeftPosition < 2) textLeftPosition = 2;
-      if (textLeftPosition + estimatedTextWidth > availableWidth) {
-        textLeftPosition = availableWidth - estimatedTextWidth;
-      }
-
-      graphics.push({
-        type: "text",
-        left: textLeftPosition,
-        top: startingTop,
-        style: {
-          text: `${percentageString}%`,
-          fontSize: computedPctSize,
-          fill: "#374151",
-          fontWeight: "bold",
-          textVerticalAlign: "top", 
-        }
-      });
-      startingTop += computedPctSize + elementGap;
-    }
-
-    if (compare && compare.value != null) {
-      const computedCompareSize = Math.round(Math.min(16, Math.max(10, 11 * scaleFactor)));
-      graphics.push({
-        type: "text",
-        left: 2,
-        top: startingTop,
-        style: {
-          text: `Compare: ${valueFormatter(compare.value, "currency")}`,
-          fontSize: computedCompareSize,
-          fill: "#6b7280",
-          textVerticalAlign: "top"
-        }
-      });
-    }
-
-    return {
-      backgroundColor: "transparent",
-      graphic: graphics,
-    };
-  }, [ready, width, height, title, value, target, compare, targetBarColor, valueFormat]);
+  const isUp = delta !== null && delta >= 0;
+  const trendColor = delta === null ? "#9ca3af" : isUp ? "#10b981" : "#ef4444";
+  const trendBg = delta === null ? "#f3f4f6" : isUp ? "#d1fae5" : "#fee2e2";
+  const TrendIcon = delta === null ? MdTrendingFlat : isUp ? MdTrendingUp : MdTrendingDown;
 
   return (
-    // The wrapper elements use full dimensions to instantly expand and conform to their grid parent containers
-    <div className="w-full h-full min-h-0 min-w-0 flex flex-col">
-      <div ref={ref} className="w-full h-full min-h-0 min-w-0 flex-1">
-        {ready && (
-          <ReactECharts
-            option={option}
-            style={{ width: "100%", height: "100%" }} 
-            notMerge
-            lazyUpdate
-          />
+    <div className="relative flex h-full w-full flex-col overflow-hidden">
+      {/* Accent strip */}
+      <div
+        className="absolute left-0 top-0 h-full w-1 rounded-l"
+        style={{ background: targetBarColor }}
+      />
+
+      <div className="flex h-full flex-col gap-3 py-4 pl-5 pr-4">
+        {/* ── Header ── */}
+        <div className="flex shrink-0 items-start justify-between gap-2">
+          {title?.value ? (
+            <p
+              className="truncate text-[11px] font-semibold uppercase tracking-widest"
+              style={{
+                color: title.valueFontColor ?? "#9ca3af",
+                fontSize: title.valueFontSize ? `${title.valueFontSize}px` : undefined,
+              }}
+            >
+              {String(title.value)}
+            </p>
+          ) : (
+            <span />
+          )}
+
+          {delta !== null && (
+            <div
+              className="flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold"
+              style={{ background: trendBg, color: trendColor }}
+            >
+              <TrendIcon size={12} />
+              {Math.abs(delta).toFixed(1)}%
+            </div>
+          )}
+        </div>
+
+        {/* ── Main value ── */}
+        <div className="flex flex-1 flex-col justify-center gap-1">
+          <p
+            className="font-bold leading-none tracking-tight tabular-nums"
+            style={{
+              color: value?.valueFontColor ?? "#111827",
+              fontSize: value?.valueFontSize
+                ? `${value.valueFontSize}px`
+                : "clamp(1.4rem, 5cqw, 2.25rem)",
+            }}
+          >
+            {fmt(value?.value, valueFormat)}
+          </p>
+
+          {/* Compare sub-row */}
+          {cmpNum !== null && (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span className="text-xs" style={{ color: "#6b7280" }}>
+                {compareLabel}
+              </span>
+              <span className="text-xs font-semibold tabular-nums" style={{ color: "#374151" }}>
+                {fmt(cmpNum, compareFormat)}
+              </span>
+              {delta !== null && (
+                <span
+                  className="rounded px-1 py-px text-[10px] font-bold"
+                  style={{ background: trendBg, color: trendColor }}
+                >
+                  {isUp ? "+" : ""}
+                  {delta.toFixed(1)}%
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── Target progress ── */}
+        {progress !== null && tgtNum !== null && (
+          <div className="shrink-0 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium" style={{ color: "#6b7280" }}>
+                Target · {fmt(tgtNum, valueFormat)}
+              </span>
+              <span className="text-[11px] font-bold tabular-nums" style={{ color: "#374151" }}>
+                {progress.toFixed(1)}%
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: "#e5e7eb" }}>
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${progress}%`,
+                  background: targetBarColor,
+                  transition: "width 0.6s cubic-bezier(.4,0,.2,1)",
+                }}
+              />
+            </div>
+          </div>
         )}
       </div>
     </div>

@@ -251,65 +251,91 @@ export default function LineChart({
     const hasLegend = legendLabels.length > 1;
     const hasTitle = Boolean(title?.value);
     const titleFontSize = title?.valueFontSize ?? 14;
-    const rotateLabels = categories.length > 8;
-    const gridTop = (hasTitle ? titleFontSize + 12 : 4) + (hasLegend ? 20 : 0);
+    const rotateLabels = categories.length > 12;
+    // ECharts title component: top=6, internal padding 5px top+bottom, lineHeight≈fontSize×1.2
+    // So title bottom ≈ 6 + 5 + fontSize×1.2 + 5 = fontSize×1.2 + 16
+    // Add 8px breathing room before the grid starts
+    const titleSpace = hasTitle ? Math.ceil(titleFontSize * 1.2 + 24) : 10;
+    const legendTop = hasTitle ? Math.ceil(titleFontSize * 1.2 + 16) : 6;
+    const gridTop = titleSpace + (hasLegend ? 28 : 0);
 
     return {
       backgroundColor: "transparent",
+      animation: true,
+      animationDuration: 600,
+      animationEasing: "cubicOut" as const,
+
       title: hasTitle
         ? {
             text: title?.value ?? "",
-            left: 8,
-            top: 4,
+            left: 10,
+            top: 6,
             textStyle: {
               color: title?.valueFontColor ?? textHColor,
               fontSize: titleFontSize,
-              fontWeight: 600,
+              fontWeight: 700,
             },
           }
         : undefined,
+
       tooltip: {
         trigger: "axis",
-        backgroundColor: getThemeColor("--bg-subtle", "#ffffff"),
-        borderColor,
+        axisPointer: {
+          type: "line",
+          lineStyle: { color: borderColor, type: "dashed", width: 1 },
+        },
+        backgroundColor: "#ffffff",
+        borderColor: "#e5e7eb",
+        borderWidth: 1,
+        borderRadius: 10,
+        padding: [8, 14],
         textStyle: { color: textHColor, fontSize: 12 },
+        extraCssText:
+          "box-shadow: 0 4px 20px rgba(0,0,0,0.10); border-radius: 10px;",
         valueFormatter: (value) => formatYAxisValue(value, yAxisFormat),
       },
+
       legend: hasLegend
         ? {
             data: legendLabels,
-            top: hasTitle ? titleFontSize + 10 : 4,
+            top: legendTop,
             left: "center",
             orient: "horizontal",
             textStyle: { color: textColor, fontSize: 11 },
             icon: "circle",
             itemWidth: 8,
             itemHeight: 8,
-            itemGap: 12,
+            itemGap: 16,
           }
         : undefined,
+
       grid: {
         left: 4,
-        right: 8,
+        right: 12,
         top: gridTop,
         bottom: 4,
         containLabel: true,
       },
+
       xAxis: {
         type: "category",
         data: categories,
         boundaryGap: false,
-        axisLine: { show: true, lineStyle: { color: xAxisColor || borderColor } },
-        axisTick: { show: true, alignWithLabel: true },
+        axisLine: {
+          show: true,
+          lineStyle: { color: xAxisColor || borderColor, width: 1 },
+        },
+        axisTick: { show: false },
         axisLabel: {
           show: true,
           color: textColor,
           fontSize: 10,
           rotate: rotateLabels ? 35 : 0,
           hideOverlap: true,
-          margin: rotateLabels ? 6 : 2,
+          margin: rotateLabels ? 8 : 4,
         },
       },
+
       yAxis: {
         type: "value",
         axisLine: { show: false },
@@ -317,36 +343,43 @@ export default function LineChart({
         axisLabel: {
           color: textColor,
           fontSize: 10,
+          margin: 8,
           formatter: (value: number) => formatYAxisValue(value, yAxisFormat),
         },
-        splitLine: { lineStyle: { color: borderColor, type: "dashed" } },
+        splitLine: {
+          lineStyle: { color: borderColor, type: "dashed", width: 1, opacity: 0.7 },
+        },
       },
+
       series: yFields.map((field, index) => ({
         name: legendLabels[index] || field,
         type: "line",
         smooth,
         symbol: "circle",
-        symbolSize: 6,
+        symbolSize: showSymbols ? 5 : 1,
         showSymbol: showSymbols,
         connectNulls: false,
-        itemStyle: { color: colors[index] },
-        lineStyle: { width: 2, color: colors[index] },
-        areaStyle:
-          yFields.length === 1
-            ? {
-                color: {
-                  type: "linear",
-                  x: 0,
-                  y: 0,
-                  x2: 0,
-                  y2: 1,
-                  colorStops: [
-                    { offset: 0, color: `${colors[index]}33` },
-                    { offset: 1, color: `${colors[index]}05` },
-                  ],
-                },
-              }
-            : undefined,
+        itemStyle: {
+          color: colors[index],
+          borderWidth: 2,
+          borderColor: "#ffffff",
+        },
+        lineStyle: { width: 2.5, color: colors[index] },
+        emphasis: {
+          focus: "series",
+          itemStyle: { symbolSize: 8, borderWidth: 3, borderColor: "#ffffff" },
+          lineStyle: { width: 3 },
+        },
+        areaStyle: {
+          color: {
+            type: "linear" as const,
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: `${colors[index]}${yFields.length === 1 ? "40" : "28"}` },
+              { offset: 1, color: `${colors[index]}00` },
+            ],
+          },
+        },
         data: sortedData.map((row) => readNumericValue(getRowFieldValue(row, field))),
       })),
     };

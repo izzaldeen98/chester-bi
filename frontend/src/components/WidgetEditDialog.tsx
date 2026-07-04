@@ -3,6 +3,8 @@ import {
   FaSearch,
   FaChartBar,
   FaChartLine,
+  FaChartPie,
+  FaTable,
   FaDatabase,
   FaCheck,
   FaPlus,
@@ -19,13 +21,15 @@ import CButton from "./CButton";
 import CardChart from "./charts/CardChart/CardChart";
 import LineChart from "./charts/LineChart";
 import BarChart from "./charts/BarChart";
-import { CardSchema, LineChartSchema, BarChartSchema } from "./charts/ChartsSchemas";
+import PieChart from "./charts/PieChart";
+import TableChart from "./charts/TableChart";
+import { CardSchema, LineChartSchema, BarChartSchema, PieChartSchema, TableChartSchema } from "./charts/ChartsSchemas";
 import { getQueries, getQuery, runQuery, getCompiledModel, type QueryPublicResponse, type QueryDetailedResponse, type SemanticModelSchema } from "../lib/Api";
 import { normalizeQueryRows } from "../lib/queryResult";
 import { isDateTimeTypeKind, resolveXAxisFieldType } from "../lib/fieldTypes";
 import { VscDebugRerun } from "react-icons/vsc";
 
-type ChartType = "card" | "line" | "bar";
+type ChartType = "card" | "line" | "bar" | "pie" | "table";
 
 export type { ChartType };
 
@@ -142,6 +146,20 @@ const CHART_OPTIONS: ChartOption[] = [
     description: "Compare values across groups",
     icon: <FaChartBar size={11} />,
     schema: { chartType: BarChartSchema.chartType, fields: normalizeFields(BarChartSchema.fields as Array<Record<string, unknown>>) },
+  },
+  {
+    type: "pie",
+    label: "Pie",
+    description: "Part-to-whole proportions",
+    icon: <FaChartPie size={11} />,
+    schema: { chartType: PieChartSchema.chartType, fields: normalizeFields(PieChartSchema.fields as Array<Record<string, unknown>>) },
+  },
+  {
+    type: "table",
+    label: "Table",
+    description: "Tabular data with sorting & pagination",
+    icon: <FaTable size={10} />,
+    schema: { chartType: TableChartSchema.chartType, fields: normalizeFields(TableChartSchema.fields as Array<Record<string, unknown>>) },
   },
 ];
 
@@ -657,13 +675,16 @@ export default function WidgetEditDialog({
 
   const chartYAxisFields = useMemo(() => parseConfigList(chartConfig.yAxis), [chartConfig.yAxis]);
   const isSeriesChart = selectedChart === "line" || selectedChart === "bar";
+  const isRowsChart = selectedChart === "pie" || selectedChart === "table";
 
   const canRun =
     selectedChart === "card"
       ? !!queryDetails && !!chartConfig.value?.trim()
       : isSeriesChart
         ? !!queryDetails && !!chartConfig.xAxis?.trim() && chartYAxisFields.length > 0
-        : false;
+        : isRowsChart
+          ? !!queryDetails
+          : false;
 
   async function runSeriesChart() {
     const xField = chartConfig.xAxis?.trim();
@@ -701,8 +722,35 @@ export default function WidgetEditDialog({
     }
   }
 
+  async function runPieChart() {
+    setRunning(true);
+    setRunError("");
+    try {
+      const result = await runQuery(queryDetails!.semantic_model.id, queryDetails!.malloy_query);
+      const rows = extractRows(result);
+      if (rows.length === 0) {
+        setRunError("Query returned no rows.");
+        setPreviewRows(null);
+        return;
+      }
+      setPreviewRows(rows);
+      setPreviewValue(null);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Query execution failed.";
+      setRunError(message);
+      setPreviewRows(null);
+    } finally {
+      setRunning(false);
+    }
+  }
+
   async function handleRun() {
     if (!queryDetails || !selected) return;
+
+    if (isRowsChart) {
+      await runPieChart();
+      return;
+    }
 
     if (isSeriesChart) {
       await runSeriesChart();
@@ -985,6 +1033,61 @@ export default function WidgetEditDialog({
                           );
                         }
 
+                        if (field.inputType === "multi-select" && field.name === "columns") {
+                          const selectedCols: string[] = (() => {
+                            try {
+                              const v = chartConfig.columns?.trim();
+                              if (!v) return [];
+                              return JSON.parse(v);
+                            } catch { return []; }
+                          })();
+                          function toggleCol(col: string) {
+                            const next = selectedCols.includes(col)
+                              ? selectedCols.filter((c) => c !== col)
+                              : [...selectedCols, col];
+                            updateConfig("columns", next.length ? JSON.stringify(next) : "");
+                          }
+                          return (
+                            <div key={field.name}>
+                              <label className="mb-1 block text-xs font-medium" style={{ color: "var(--text-h)" }}>
+                                {field.label}
+                              </label>
+                              {fieldOptions.length === 0 ? (
+                                <p className="text-[11px]" style={{ color: "var(--text)" }}>
+                                  Select a query to choose columns.
+                                </p>
+                              ) : (
+                                <div className="flex flex-col gap-1 rounded-xl border p-2" style={{ borderColor: "var(--border)" }}>
+                                  {fieldOptions.map((opt) => {
+                                    const checked = selectedCols.includes(opt.value);
+                                    return (
+                                      <label key={opt.value} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-[var(--bg-subtle)]">
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          onChange={() => toggleCol(opt.value)}
+                                          className="accent-[var(--accent)]"
+                                        />
+                                        <span className="text-xs" style={{ color: "var(--text-h)" }}>{opt.label}</span>
+                                      </label>
+                                    );
+                                  })}
+                                  {selectedCols.length > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => updateConfig("columns", "")}
+                                      className="mt-1 text-[10px] text-left"
+                                      style={{ color: "var(--accent)" }}
+                                    >
+                                      Clear selection (show all)
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        }
+
                         if (field.inputType === "multi-color" && field.name === "yAxisColor") {
                           return null;
                         }
@@ -1020,7 +1123,7 @@ export default function WidgetEditDialog({
                         );
                       })}
 
-                      {(selectedChart === "card" || isSeriesChart) && (
+                      {(selectedChart === "card" || isSeriesChart || isRowsChart) && (
                         <CButton
                           variant="outline"
                           fullWidth
@@ -1039,7 +1142,7 @@ export default function WidgetEditDialog({
                           Loaded value: <span className="font-semibold" style={{ color: "var(--text-h)" }}>{previewValue.toLocaleString()}</span>
                         </p>
                       )}
-                      {isSeriesChart && previewRows != null && (
+                      {(isSeriesChart || isRowsChart) && previewRows != null && (
                         <p className="text-[11px]" style={{ color: "var(--text)" }}>
                           Loaded <span className="font-semibold" style={{ color: "var(--text-h)" }}>{previewRows.length}</span> row{previewRows.length !== 1 ? "s" : ""}
                         </p>
@@ -1059,7 +1162,7 @@ export default function WidgetEditDialog({
               <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>
                 Preview
               </p>
-              {(selectedChart === "card" || isSeriesChart) && selected && (
+              {(selectedChart === "card" || isSeriesChart || isRowsChart) && selected && (
                 <CButton
                   variant="primary"
                   loading={running}
@@ -1073,7 +1176,7 @@ export default function WidgetEditDialog({
             </div>
 
             <div className="flex min-h-0 flex-1 flex-col items-center justify-start overflow-auto p-6 pt-5">
-              {runError && (selectedChart === "card" || isSeriesChart) && (
+              {runError && (selectedChart === "card" || isSeriesChart || isRowsChart) && (
                 <div className="mb-4 w-full max-w-md">
                   <CAlert variant="error" message={runError} />
                 </div>
@@ -1160,6 +1263,48 @@ export default function WidgetEditDialog({
                       data={previewRows ?? []}
                     />
                   </div>
+                </div>
+              ) : selectedChart === "pie" ? (
+                <div
+                  className="flex h-80 w-full max-w-md flex-col overflow-hidden rounded-2xl border shadow-sm"
+                  style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+                >
+                  <div className="h-full min-h-0 p-3">
+                    <PieChart
+                      title={{
+                        value: chartConfig.title || widgetTitle,
+                        valueFontSize: Number(chartConfig.titleFontSize) || undefined,
+                        valueFontColor: chartConfig.titleFontColor || undefined,
+                      }}
+                      category={chartConfig.category}
+                      value={chartConfig.value}
+                      sliceColor={chartConfig.sliceColor}
+                      legend={chartConfig.legend}
+                      radius={chartConfig.radius}
+                      showValue={chartConfig.showValue}
+                      showPercentage={chartConfig.showPercentage}
+                      valuePosition={chartConfig.valuePosition}
+                      data={previewRows ?? []}
+                    />
+                  </div>
+                </div>
+              ) : selectedChart === "table" ? (
+                <div
+                  className="flex h-96 w-full max-w-2xl flex-col overflow-hidden rounded-2xl border shadow-sm"
+                  style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+                >
+                  <TableChart
+                    title={{
+                      value: chartConfig.title || widgetTitle,
+                      valueFontSize: Number(chartConfig.titleFontSize) || undefined,
+                      valueFontColor: chartConfig.titleFontColor || undefined,
+                    }}
+                    columns={chartConfig.columns}
+                    pageSize={chartConfig.pageSize}
+                    striped={chartConfig.striped}
+                    showIndex={chartConfig.showIndex}
+                    data={previewRows ?? []}
+                  />
                 </div>
               ) : (
                 <div className="flex flex-col items-center text-center">

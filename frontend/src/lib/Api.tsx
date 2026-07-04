@@ -190,6 +190,7 @@ export interface DashboardElement {
 export interface DashboardConfig {
   version: string;
   name: string;
+  gridRows?: number;
   elements: DashboardElement[];
 }
 

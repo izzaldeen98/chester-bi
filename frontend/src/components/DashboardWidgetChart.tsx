@@ -3,6 +3,7 @@ import CardChart from "./charts/CardChart/CardChart";
 import LineChart from "./charts/LineChart";
 import BarChart from "./charts/BarChart";
 import PieChart from "./charts/PieChart";
+import TableChart from "./charts/TableChart";
 import CSpinner from "./CSpinner";
 import {
   fetchWidgetQueryData,
@@ -26,7 +27,10 @@ export function renderWidgetChart(
 
   if (meta.chartType === "card") {
     const hasTarget = isConfigTruthy(cfg.hasTarget);
+    const hasCompare = isConfigTruthy(cfg.hasCompare);
     const displayValue = previewValue ?? (cfg.value ? Number(cfg.value) : 0);
+    const compareValue = data?.compareValue ?? null;
+    const valueFormat = (cfg.valueFormat as "currency" | "percentage" | "number" | "decimal") || "currency";
 
     return (
       <CardChart
@@ -41,8 +45,11 @@ export function renderWidgetChart(
           valueFontColor: cfg.valueFontColor || undefined,
         }}
         target={hasTarget ? { value: Number(cfg.target) || 0 } : undefined}
-        targetBarColor={hasTarget ? cfg.targetBarColor : undefined}
-        valueFormat={(cfg.valueFormat as "currency" | "percentage" | "number" | "decimal") || "currency"}
+        targetBarColor={cfg.targetBarColor || "#eab308"}
+        compare={hasCompare && compareValue !== null ? { value: compareValue } : undefined}
+        compareLabel={cfg.compareLabel || "vs"}
+        compareFormat={(cfg.compareFormat as "currency" | "percentage" | "number" | "decimal") || valueFormat}
+        valueFormat={valueFormat}
       />
     );
   }
@@ -106,6 +113,23 @@ export function renderWidgetChart(
         showValue={cfg.showValue}
         showPercentage={cfg.showPercentage}
         valuePosition={cfg.valuePosition}
+        data={previewRows}
+      />
+    );
+  }
+
+  if (meta.chartType === "table") {
+    return (
+      <TableChart
+        title={{
+          value: cfg.title || meta.title,
+          valueFontSize: Number(cfg.titleFontSize) || undefined,
+          valueFontColor: cfg.titleFontColor || undefined,
+        }}
+        columns={cfg.columns}
+        pageSize={cfg.pageSize}
+        striped={cfg.striped}
+        showIndex={cfg.showIndex}
         data={previewRows}
       />
     );
