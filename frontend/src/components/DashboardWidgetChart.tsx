@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import type { FilterRule } from "./FilterEditDialog";
 import CardChart from "./charts/CardChart/CardChart";
 import LineChart from "./charts/LineChart";
 import BarChart from "./charts/BarChart";
@@ -140,13 +141,25 @@ export function renderWidgetChart(
 
 interface DashboardWidgetChartProps {
   meta: WidgetMetaLike;
+  /** Stable ID for this widget — used to match filter targets. */
+  widgetId?: string;
   /** Use in-session preview data when present (workspace editor). View mode always fetches live. */
   preferCachedPreview?: boolean;
+  /** Dashboard-level filter rules for slice-and-dice query injection. */
+  activeFilters?: FilterRule[];
 }
 
-export default function DashboardWidgetChart({ meta, preferCachedPreview = false }: DashboardWidgetChartProps) {
+export default function DashboardWidgetChart({
+  meta,
+  widgetId,
+  preferCachedPreview = false,
+  activeFilters = [],
+}: DashboardWidgetChartProps) {
   const hasCachedPreview =
     preferCachedPreview && (meta.previewRows != null || meta.previewValue != null);
+
+  // Serialize active filters so we can use them as a useEffect dep
+  const activeFiltersKey = JSON.stringify(activeFilters);
 
   const [liveData, setLiveData] = useState<WidgetQueryData | null>(null);
   const [loading, setLoading] = useState(!hasCachedPreview && Boolean(meta.queryId && meta.chartConfig));
@@ -162,7 +175,7 @@ export default function DashboardWidgetChart({ meta, preferCachedPreview = false
     setLoading(true);
     setError("");
 
-    fetchWidgetQueryData(meta)
+    fetchWidgetQueryData(meta, { widgetId, activeFilters })
       .then((data) => {
         if (!cancelled) setLiveData(data);
       })
@@ -179,7 +192,9 @@ export default function DashboardWidgetChart({ meta, preferCachedPreview = false
     return () => {
       cancelled = true;
     };
-  }, [hasCachedPreview, meta.queryId, meta.chartType, JSON.stringify(meta.chartConfig)]);
+  // activeFiltersKey triggers re-fetch when any filter value changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasCachedPreview, meta.queryId, meta.chartType, JSON.stringify(meta.chartConfig), activeFiltersKey]);
 
   if (loading) {
     return (

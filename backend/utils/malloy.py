@@ -470,14 +470,5 @@ class Malloy:
         return f"Malloy(envid={self.envid}, location={self.location}, resource={self.resource} , connections={self.connections} , packages={self.packages})"
 
 
-if __name__ == "__main__":
-    malloy = Malloy(envid="55cc0b65-59de-4dc9-97c5-07191d353f2b")
-    package = malloy.get_package_by_name("sales-analytics")
-    query = "run: ecommerce_orders -> { group_by: Order_Date.week aggregate: `order_count` limit: 1000 }"
-
-    model = package.get_model_by_path("sales.malloy")
-    print(model.query(query))
-
-
 
     

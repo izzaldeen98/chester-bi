@@ -179,6 +179,7 @@ export interface DashboardElementMeta {
   chartConfig?: Record<string, string>;
   previewValue?: number | null;
   previewRows?: Record<string, unknown>[] | null;
+  filterRule?: Record<string, unknown>;
 }
 
 export interface DashboardElement {

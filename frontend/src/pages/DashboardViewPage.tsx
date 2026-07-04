@@ -7,7 +7,9 @@ import CWidget from "../components/CWidget/CWidget";
 import CSpinner from "../components/CSpinner";
 import CAlert from "../components/CAlert";
 import DashboardWidgetChart from "../components/DashboardWidgetChart";
+import DashboardFilterWidget from "../components/DashboardFilterWidget";
 import { getDashboardConfig, type DashboardElementMeta } from "../lib/Api";
+import type { FilterRule } from "../components/FilterEditDialog";
 
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -15,7 +17,7 @@ import "../styles/dashboard-workspace.css";
 
 const breakpoints = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
 const cols = { lg: 32, md: 24, sm: 16, xs: 8, xxs: 4 };
-const DEFAULT_GRID_ROWS = 24;
+const DEFAULT_GRID_ROWS = 36;
 const GRID_MARGIN: [number, number] = [8, 8];
 
 function getActiveCols(containerWidth: number) {
@@ -48,6 +50,7 @@ export default function DashboardViewPage() {
   const [gridRows, setGridRows] = useState(DEFAULT_GRID_ROWS);
   const [layoutItems, setLayoutItems] = useState<LayoutItem[]>([]);
   const [metaMap, setMetaMap] = useState<Record<string, DashboardElementMeta>>({});
+  const [activeFilters, setActiveFilters] = useState<Record<string, FilterRule>>({});
 
   const { width, containerRef, mounted } = useContainerWidth();
   const { rowHeight, canvasHeight, cellSize } = useMemo(() => getSquareGridMetrics(width, gridRows), [width, gridRows]);
@@ -87,6 +90,15 @@ export default function DashboardViewPage() {
 
         setLayoutItems(items);
         setMetaMap(meta);
+
+        // Seed runtime filter values from saved config
+        const initFilters: Record<string, FilterRule> = {};
+        for (const el of config.elements ?? []) {
+          if (el.meta.filterRule) {
+            initFilters[el.id] = el.meta.filterRule as unknown as FilterRule;
+          }
+        }
+        setActiveFilters(initFilters);
       })
       .catch((e: Error) => setError(e.message ?? "Failed to load dashboard."))
       .finally(() => setLoading(false));
@@ -174,14 +186,33 @@ export default function DashboardViewPage() {
             >
               {layoutItems.map((item) => {
                 const meta = metaMap[item.i] ?? { title: "Widget" };
+                const filterRule = (meta.filterRule ?? activeFilters[item.i]) as FilterRule | undefined;
+                const activeFilterList = Object.values(activeFilters);
+
                 return (
-                  <div key={item.i}>
-                    <CWidget
-                      id={item.i}
-                      title={meta.title}
-                      chart={<DashboardWidgetChart meta={meta} />}
-                      readOnly
-                    />
+                  <div key={item.i} className="h-full">
+                    {filterRule ? (
+                      <DashboardFilterWidget
+                        rule={activeFilters[item.i] ?? filterRule}
+                        readOnly={false}
+                        onChange={(rule) =>
+                          setActiveFilters((prev) => ({ ...prev, [item.i]: rule }))
+                        }
+                      />
+                    ) : (
+                      <CWidget
+                        id={item.i}
+                        title={meta.title}
+                        chart={
+                          <DashboardWidgetChart
+                            widgetId={item.i}
+                            meta={meta as any}
+                            activeFilters={activeFilterList}
+                          />
+                        }
+                        readOnly
+                      />
+                    )}
                   </div>
                 );
               })}

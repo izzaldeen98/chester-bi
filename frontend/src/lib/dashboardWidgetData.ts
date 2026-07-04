@@ -1,5 +1,7 @@
 import { getQuery, runQuery, type DashboardElementMeta } from "./Api";
 import { getRowFieldValue, normalizeQueryRows } from "./queryResult";
+import type { FilterRule } from "../components/FilterEditDialog";
+import { buildMalloyFilterClause, injectFiltersIntoQuery } from "./filterInjection";
 
 export interface WidgetQueryData {
   previewValue: number | null;
@@ -15,6 +17,7 @@ export interface WidgetMetaLike {
   chartConfig?: Record<string, string>;
   previewValue?: number | null;
   previewRows?: Record<string, unknown>[] | null;
+  filterRule?: FilterRule;
 }
 
 function readNumericFromRows(rows: Record<string, unknown>[], fieldName: string): number | null {
@@ -33,16 +36,36 @@ export function toSavedWidgetMeta(meta: WidgetMetaLike): DashboardElementMeta {
     queryId: meta.queryId,
     chartType: meta.chartType,
     chartConfig: meta.chartConfig,
+    filterRule: meta.filterRule as Record<string, unknown> | undefined,
   };
 }
 
-export async function fetchWidgetQueryData(meta: WidgetMetaLike): Promise<WidgetQueryData> {
+export async function fetchWidgetQueryData(
+  meta: WidgetMetaLike,
+  options?: { widgetId?: string; activeFilters?: FilterRule[] },
+): Promise<WidgetQueryData> {
   if (!meta.queryId || !meta.chartConfig) {
     return { previewValue: null, previewRows: null };
   }
 
   const queryDetails = await getQuery(meta.queryId);
-  const result = await runQuery(queryDetails.semantic_model.id, queryDetails.malloy_query);
+  const modelId = queryDetails.semantic_model.id;
+
+  // Build extra where clauses from dashboard-level active filters
+  const { widgetId, activeFilters = [] } = options ?? {};
+  const filterClauses: string[] = [];
+  for (const rule of activeFilters) {
+    // Skip if filter targets specific widgets and this one is not included
+    if (rule.targetWidgetIds.length > 0 && widgetId && !rule.targetWidgetIds.includes(widgetId)) continue;
+    // Find the mapping for this model
+    const mapping = rule.mappings.find((m) => m.modelId === modelId);
+    if (!mapping) continue;
+    const clause = buildMalloyFilterClause(rule, mapping.fieldName);
+    if (clause) filterClauses.push(clause);
+  }
+
+  const malloyQuery = injectFiltersIntoQuery(queryDetails.malloy_query, filterClauses);
+  const result = await runQuery(modelId, malloyQuery);
   const rows = normalizeQueryRows(result);
 
   if (meta.chartType === "card") {

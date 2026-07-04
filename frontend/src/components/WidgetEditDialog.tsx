@@ -832,17 +832,6 @@ export default function WidgetEditDialog({
       saveLabel="Apply"
     >
       {/* Progress steps */}
-      <div
-        className="flex shrink-0 items-center gap-6 border-b px-6 py-3"
-        style={{ borderColor: "var(--border)", background: "var(--bg)" }}
-      >
-        <StepBadge step={1} label="Query" done={step1Done} active={!step1Done} />
-        <div className="h-px w-8" style={{ background: "var(--border)" }} />
-        <StepBadge step={2} label="Chart type" done={step2Done} active={step1Done && !step2Done} />
-        <div className="h-px w-8" style={{ background: "var(--border)" }} />
-        <StepBadge step={3} label="Configure" done={false} active={step1Done && step2Done} />
-      </div>
-
       <div className="flex h-full min-h-0 flex-1">
         {/* ── Left: queries ── */}
         <aside

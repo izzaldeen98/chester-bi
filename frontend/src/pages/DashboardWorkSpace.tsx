@@ -9,6 +9,8 @@ import CButton from "../components/CButton";
 import CWidget from "../components/CWidget/CWidget";
 import DashboardWidgetChart from "../components/DashboardWidgetChart";
 import type { WidgetChartConfig, WidgetSaveResult } from "../components/WidgetEditDialog";
+import { type FilterRule, type AvailableChart } from "../components/FilterEditDialog";
+import DashboardFilterWidget from "../components/DashboardFilterWidget";
 import {
   getDashboardConfig,
   saveDashboardConfig,
@@ -27,8 +29,8 @@ interface WidgetMeta {
   chartConfig?: Record<string, string>;
   previewValue?: number | null;
   previewRows?: Record<string, unknown>[] | null;
+  filterRule?: FilterRule;
 }
-
 function toWidgetConfig(meta: WidgetMeta): WidgetChartConfig | undefined {
   if (!meta.queryId && !meta.chartConfig) return undefined;
   return {
@@ -71,7 +73,14 @@ function getSquareGridMetrics(containerWidth: number, gridRows: number) {
 }
 
 function buildLayouts(items: LayoutItem[]): ResponsiveLayouts {
-  return { lg: items, md: items, sm: items, xs: items, xxs: items };
+  // Each breakpoint needs its OWN array so RGL can't mutate them across breakpoints
+  return {
+    lg: [...items],
+    md: [...items],
+    sm: [...items],
+    xs: [...items],
+    xxs: [...items],
+  };
 }
 
 function getNextY(items: LayoutItem[]) {
@@ -82,9 +91,12 @@ export default function DashboardWorkSpace() {
   const { dashboardId } = useParams<{ dashboardId: string }>();
   const dashboardNameRef = useRef("Dashboard Workspace");
 
-  const widgetCount = useRef(0);
   const [layouts, setLayouts] = useState<ResponsiveLayouts>(() => buildLayouts([]));
   const [widgetMeta, setWidgetMeta] = useState<Record<string, WidgetMeta>>({});
+  const [activeFilters, setActiveFilters] = useState<Record<string, FilterRule>>({});
+  // activeFilters drives slice-and-dice: runtime values of each filter widget
+  // passed to DashboardWidgetChart so queries re-execute when filters change
+  const activeFilterList = Object.values(activeFilters);
   const [gridRows, setGridRows] = useState(DEFAULT_GRID_ROWS);
   const [gridRowsInput, setGridRowsInput] = useState(String(DEFAULT_GRID_ROWS));
   const { width, containerRef, mounted } = useContainerWidth();
@@ -126,17 +138,19 @@ export default function DashboardWorkSpace() {
             queryId: el.meta.queryId,
             chartType: el.meta.chartType as WidgetChartConfig["chartType"],
             chartConfig: el.meta.chartConfig,
+            filterRule: el.meta.filterRule as FilterRule | undefined,
           };
-
-          const match = el.id.match(/^widget-(\d+)$/);
-          if (match) {
-            const n = parseInt(match[1], 10);
-            if (n > widgetCount.current) widgetCount.current = n;
-          }
         }
 
         setLayouts(buildLayouts(items));
         setWidgetMeta(meta);
+
+        // Restore active filter runtime values from saved meta
+        const initFilters: Record<string, FilterRule> = {};
+        for (const [id, m] of Object.entries(meta)) {
+          if (m.filterRule) initFilters[id] = m.filterRule;
+        }
+        setActiveFilters(initFilters);
       })
       .catch(() => {
         // Keep empty workspace on load failure; save still requires dashboardId
@@ -160,30 +174,60 @@ export default function DashboardWorkSpace() {
       delete next[id];
       return next;
     });
+    setActiveFilters((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   }, []);
 
-  const addWidget = useCallback(() => {
-    const current = (layouts.lg ?? []) as LayoutItem[];
-    widgetCount.current += 1;
-    const id = `widget-${widgetCount.current}`;
-    const y = getNextY(current);
-
-    const newItem: LayoutItem = {
-      i: id,
-      x: 0,
-      y,
-      w: 8,
-      h: 8,
-      minW: 2,
-      minH: 2,
-    };
-
-    setLayouts(buildLayouts([...current, newItem]));
+  const handleFilterChange = useCallback((id: string, rule: FilterRule) => {
+    setActiveFilters((prev) => ({ ...prev, [id]: rule }));
     setWidgetMeta((prev) => ({
       ...prev,
-      [id]: { title: `Widget ${widgetCount.current}` },
+      [id]: {
+        ...prev[id],
+        title: rule.label || `${rule.operator} filter`,
+        filterRule: rule,
+      },
     }));
-  }, [layouts.lg]);
+  }, []);
+
+  const addFilter = useCallback(() => {
+    const id = `filter-${crypto.randomUUID()}`;
+
+    const placeholder: FilterRule = {
+      label: "New Filter",
+      kind: "text",
+      operator: "equals",
+      value: "",
+      mappings: [],
+      targetWidgetIds: [],
+    };
+
+    setLayouts((prev) => {
+      const current = (prev.lg ?? []) as LayoutItem[];
+      const y = getNextY(current);
+      return buildLayouts([...current, { i: id, x: 0, y, w: 10, h: 2, minW: 4, minH: 1 }]);
+    });
+    setWidgetMeta((prev) => ({
+      ...prev,
+      [id]: { title: placeholder.label, filterRule: placeholder },
+    }));
+    setActiveFilters((prev) => ({ ...prev, [id]: placeholder }));
+  }, []);
+
+
+  const addWidget = useCallback(() => {
+    const id = `widget-${crypto.randomUUID()}`;
+
+    setLayouts((prev) => {
+      const current = (prev.lg ?? []) as LayoutItem[];
+      const y = getNextY(current);
+      return buildLayouts([...current, { i: id, x: 0, y, w: 8, h: 8, minW: 2, minH: 2 }]);
+    });
+    setWidgetMeta((prev) => ({ ...prev, [id]: { title: "New Chart" } }));
+  }, []);
 
   const handleConfigChange = useCallback((widgetId: string, result: WidgetSaveResult) => {
     setWidgetMeta((prev) => ({
@@ -268,7 +312,10 @@ export default function DashboardWorkSpace() {
         <div className="h-4 w-px" style={{ background: "var(--border)" }} />
 
         <CButton variant="outline" className="!px-3 !py-1.5 !text-xs" onClick={addWidget}>
-          <FaPlus size={11} /> Add Widget
+          <FaPlus size={11} /> Add Chart
+        </CButton>
+        <CButton variant="outline" className="!px-3 !py-1.5 !text-xs" onClick={addFilter}>
+          <FaPlus size={11} /> Add Filter
         </CButton>
         <CButton variant="primary" className="!px-3 !py-1.5 !text-xs" disabled={!dashboardId} onClick={handleSave}>
           <FaSave size={11} /> Save Layout
@@ -309,17 +356,40 @@ export default function DashboardWorkSpace() {
             >
               {layoutItems.map((item) => {
                 const meta = widgetMeta[item.i] ?? { title: "Widget" };
+                const isFilter = Boolean(meta.filterRule);
+
+                // Charts available for filter targeting (non-filter widgets with a query)
+                const availableCharts: AvailableChart[] = layoutItems
+                  .filter((li) => !widgetMeta[li.i]?.filterRule)
+                  .map((li) => ({ id: li.i, title: widgetMeta[li.i]?.title ?? li.i }));
+
                 return (
                   <div key={item.i} className="h-full">
-                    <CWidget
-                      id={item.i}
-                      title={meta.title}
-                      query={meta.query}
-                      config={toWidgetConfig(meta)}
-                      chart={<DashboardWidgetChart meta={meta} preferCachedPreview />}
-                      onConfigChange={(result) => handleConfigChange(item.i, result)}
-                      onDelete={() => handleDeleteWidget(item.i)}
-                    />
+                    {isFilter ? (
+                      <DashboardFilterWidget
+                        rule={meta.filterRule!}
+                        availableCharts={availableCharts}
+                        onChange={(rule) => handleFilterChange(item.i, rule)}
+                        onDelete={() => handleDeleteWidget(item.i)}
+                      />
+                    ) : (
+                      <CWidget
+                        id={item.i}
+                        title={meta.title}
+                        query={meta.query}
+                        config={toWidgetConfig(meta)}
+                        chart={
+                          <DashboardWidgetChart
+                            widgetId={item.i}
+                            meta={meta}
+                            preferCachedPreview
+                            activeFilters={activeFilterList}
+                          />
+                        }
+                        onConfigChange={(result) => handleConfigChange(item.i, result)}
+                        onDelete={() => handleDeleteWidget(item.i)}
+                      />
+                    )}
                   </div>
                 );
               })}
