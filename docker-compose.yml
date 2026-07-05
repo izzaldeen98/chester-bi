@@ -67,8 +67,11 @@ services:
         condition: service_healthy
     restart: unless-stopped
     volumes:
-      # Share the same data folder with the Malloy Publisher
-      - local_data:/app/.local
+      # Mount directly at the publisher_data sub-path so both services share
+      # the same volume root. The backend writes to /app/.local/publisher_data/…
+      # and the publisher reads from /publisher/publisher_data/… — both resolve
+      # to the same location on the shared volume with no extra nesting.
+      - local_data:/app/.local/publisher_data
 
   # ── PostgreSQL ─────────────────────────────────────────────────────────────
   postgres:

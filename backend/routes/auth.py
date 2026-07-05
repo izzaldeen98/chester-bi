@@ -11,6 +11,7 @@ from security import (
 from utils.init_database import get_db
 from models.account import Account
 from schema.account import OwnerCreate
+from utils.malloy import Malloy
 
 router = APIRouter(prefix="/api/v1/auth" , tags=["auth"])
 
@@ -89,6 +90,7 @@ def register_user(payload: OwnerCreate, db: Session = Depends(get_db)):
         created_by = None,
         updated_by = None
     )
+    Malloy().create_environment(name=str(new_account.public_key), description=f"Environment for {new_account.name}")
 
     db.add(superuser)
     db.commit()

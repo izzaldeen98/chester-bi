@@ -223,8 +223,21 @@ async def load_package(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Package not found",
         )
+    
+    try : 
 
-    malloy = Malloy(envid=current_user.account.public_key)
+       malloy = Malloy().create_environment(envid=current_user.account.public_key)
+    except Exception as e:
+        malloy = Malloy(envid=current_user.account.public_key)
+    
+    try:
+        malloy.create_package(name=package.name, description=package.description, location=f"/publisher/publisher_data/{current_user.account.public_key}/{package.name}")
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to load package: {str(e)}",
+        )
+    
     try:
         malloy.create_package(name=package.name, description=package.description, location=f"/publisher/publisher_data/{current_user.account.public_key}/{package.name}")
     except Exception as e:
