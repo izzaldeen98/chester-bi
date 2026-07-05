@@ -20,6 +20,7 @@ email-validator==2.3.0
 PyJWT==2.13.0
 bcrypt==5.0.0
 pwdlib==0.3.0
+pwdlib[argon2]
 cryptography==48.0.0
 
 # ── Configuration ──────────────────────────────────────────────────────────

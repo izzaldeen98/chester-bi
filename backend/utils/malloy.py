@@ -320,10 +320,10 @@ class Malloy:
         if response.status_code != 200:
             raise Exception(f"Failed to delete environment: {response.text}")
         return {"message": "Environment deleted successfully"}
-    def create_environment(self, name: str, description: str):
+    def create_environment(self, name: str, description: str = None):
         response = requests.post(
             f"{MALLOY_URL}/api/v0/environments",
-            json={"name": name, "description": description},
+            json={"name": name, "description": description if description else "No description"},
         )
         if response.status_code != 200:
             raise Exception(f"Failed to create environment: {response.text}")
