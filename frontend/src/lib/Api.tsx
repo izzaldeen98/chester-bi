@@ -296,13 +296,7 @@ export interface ConnectionCreate {
   name: string;
   type: string;
   description?: string;
-  connection_attributes: {
-    host: string;
-    port: number;
-    database: string;
-    username: string;
-    password: string;
-  };
+  connection_attributes: Record<string, string | number>;
 }
 
 export interface ConnectionUpdate {

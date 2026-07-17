@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  FaPlay, FaTable, FaLayerGroup, FaCalendarAlt, FaHashtag, FaDatabase, FaTerminal, FaCode, FaSave
+  FaPlay, FaTable, FaLayerGroup, FaCalendarAlt, FaHashtag, FaDatabase, FaTerminal, FaCode, FaSave, FaPlus
 } from "react-icons/fa";
 import { FaSortAmountDown } from "react-icons/fa";
 import { IoText } from "react-icons/io5";
@@ -54,6 +54,39 @@ type ResultView = "table" | "json"  | "malloy" | "sql";
 interface SortItem {
   field: FieldInfo;
   dir: SortDir;
+}
+
+
+
+function CalculatedColumnModal({ open, onClose }: { open: boolean, onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.22)" }}>
+      <div className="bg-white dark:bg-[#15121b] rounded-lg shadow-lg p-6 min-w-[320px] w-full max-w-md">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-base font-semibold" style={{ color: "var(--text)" }}>Add Calculated Column</h2>
+          <button className="text-lg font-bold p-1 hover:bg-[var(--bg-subtle)] rounded" onClick={onClose} title="Close">&times;</button>
+        </div>
+        {/* TODO: Calculated column form */}
+        <div>
+          <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-h)" }}>Expression</label>
+          <input
+            type="text"
+            className="w-full rounded border px-2 py-1 text-xs mb-3 outline-none"
+            placeholder="e.g. sales * 1.1"
+            style={{ background: "var(--bg)", color: "var(--text)", borderColor: "var(--border)" }}
+          />
+        </div>
+        <button
+          className="mt-2 flex items-center gap-2 rounded-xl px-4 py-1.5 text-xs font-bold transition-all cursor-pointer"
+          style={{ background: "var(--accent)", color: "var(--accent-fg)" }}
+          // TODO: wire up add calculated column logic
+        >
+          <span>Add</span>
+        </button>
+      </div>
+    </div>
+  );
 }
 
 
@@ -174,6 +207,9 @@ export default function QueryPage() {
 
   // Filters (react-querybuilder)
   const [filterQuery, setFilterQuery] = useState<RuleGroupType>(EMPTY_FILTER_QUERY);
+
+
+  const [calculatedColumnModalOpen, setCalculatedColumnModalOpen] = useState(false);
 
   // Results
   const [running, setRunning] = useState(false);
@@ -698,6 +734,15 @@ export default function QueryPage() {
               style={{ background: "var(--bg)", color: "var(--text-h)", borderColor: "var(--border)" }}
             />
           </div>
+          <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: "1px solid var(--border)" }}>
+            <span className="text-xs font-medium" style={{ color: "var(--text)" }}>Calculated Column</span>
+            <button className="flex items-center gap-2 rounded-xl px-4 py-1.5 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              style={{ background: "var(--accent)", color: "var(--accent-fg)" }}
+              onClick={() => setCalculatedColumnModalOpen(true)}
+            >
+              <FaPlus size={11} />
+            </button>
+          </div>
 
           {/* Selected chips */}
           {(groupByFields.length > 0 || aggFields.length > 0) && (
@@ -880,6 +925,8 @@ export default function QueryPage() {
       </div>
         </>
       )}
+
+      <CalculatedColumnModal open={calculatedColumnModalOpen} onClose={() => setCalculatedColumnModalOpen(false)} />
     </div>
   );
 }

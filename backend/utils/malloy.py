@@ -332,17 +332,7 @@ class Malloy:
         self.location = data["location"]
         self.resource = data["resource"]
 
-    def create_connection(
-        self,
-        name: str,
-        type: str,
-        host: str,
-        port: int,
-        databaseName: str,
-        userName: str,
-        password: str,
-        **kwargs,
-    ):
+    def _create_mysql_postgres_connection(self, name: str,type:str, **kwargs):
         payload = {
             "type": type,
             "name": name,
@@ -351,19 +341,94 @@ class Malloy:
                 "isPool": kwargs.get("isPool", True),
                 "canPersist": kwargs.get("canPersist", True),
                 "canStream": kwargs.get("canStream", True),
-            },
-            "postgresConnection": (
-                {
-                    "host": host,
-                    "port": port,
-                    "databaseName": databaseName,
-                    "userName": userName,
-                    "password": password,
-                }
-                if type == "postgres"
-                else None
-            ),
+            }
+         }
+        if type == "postgres":
+            payload["postgresConnection"] = {
+                "host": kwargs.get("host"),
+                "port": kwargs.get("port"),
+                "databaseName": kwargs.get("database"),
+                "userName": kwargs.get("username"),
+                "password": kwargs.get("password"),
+            }
+        elif type == "mysql":
+            payload["mysqlConnection"] = {
+                "host": kwargs.get("host"),
+                "port": kwargs.get("port"),
+                "database": kwargs.get("database"),
+                "user": kwargs.get("username"),
+                "password": kwargs.get("password"),
+            }
+        else:
+            raise Exception(f"Invalid database type: {type}")
+        return payload
+    
+
+    def _create_snowflake_connection(self, name: str, type: str, **kwargs):
+        password_connection = False
+        private_key_connection = False
+        if "password" in kwargs:
+            password_connection = True
+        if "private_key" in kwargs:
+            private_key_connection = True
+        if not password_connection and not private_key_connection:
+            raise Exception("Missing password or private key")
+        payload = {
+            "type": type,
+            "name": name,
+            "attributes": {
+                "dialectName": kwargs.get("dialectName", "default"),
+                "isPool": kwargs.get("isPool", True),
+                "canPersist": kwargs.get("canPersist", True),
+                "canStream": kwargs.get("canStream", True),
+            }
         }
+        snowflake_attributes = {
+            "warehouse" : kwargs.get("warehouse"),
+            "database" : kwargs.get("database"),
+            "schema" : kwargs.get("schema"),
+            "username" : kwargs.get("username"),
+        }
+        if password_connection:
+            snowflake_attributes["password"] = kwargs.get("password")
+        if private_key_connection:
+            snowflake_attributes["privateKey"] = kwargs.get("private_key")
+            snowflake_attributes["privateKeyPassphrase"] = kwargs.get("private_key_passphrase")
+        payload["snowflakeConnection"] = snowflake_attributes
+        return payload
+
+    def _create_bigquery_connection(self, name: str, type: str, **kwargs):
+        payload = {
+            "type": type,
+            "name": name,
+            "attributes": {
+                "dialectName": kwargs.get("dialectName", "default"),
+                "isPool": kwargs.get("isPool", True),
+                "canPersist": kwargs.get("canPersist", True),
+                "canStream": kwargs.get("canStream", True),
+            }
+        }
+        bigquery_attributes = {
+            "projectId" : kwargs.get("project_id"),
+            "serviceAccountJson" : kwargs.get("service_account_json"),
+        }
+        payload["bigqueryConnection"] = bigquery_attributes
+        return payload
+    def create_connection(
+        self,
+        name: str,
+        type: str,
+        **kwargs,
+    ):
+        payload = {}
+        if type == "postgres" or type == "mysql":
+            payload = self._create_mysql_postgres_connection(name, type, **kwargs)
+        elif type == "snowflake":
+            payload = self._create_snowflake_connection(name, type, **kwargs)
+        elif type == "bigquery":
+            payload = self._create_bigquery_connection(name, type, **kwargs)
+        else:
+            raise Exception(f"Invalid database type: {type}")
         test_connection = requests.post(
             f"{MALLOY_URL}/api/v0/connections/test", json=payload
         )
@@ -371,28 +436,7 @@ class Malloy:
             raise Exception(f"Failed to test connection: {test_connection.text}")
         response = requests.post(
             f"{MALLOY_URL}{self.resource}/connections/{name}",
-            json={
-                "type": type,
-                "name": name,
-                "resource": f"{self.resource}/connections/{name}",
-                "attributes": {
-                    "dialectName": kwargs.get("dialectName", "default"),
-                    "isPool": kwargs.get("isPool", True),
-                    "canPersist": kwargs.get("canPersist", True),
-                    "canStream": kwargs.get("canStream", True),
-                },
-                "postgresConnection": (
-                    {
-                        "host": host,
-                        "port": port,
-                        "databaseName": databaseName,
-                        "userName": userName,
-                        "password": password,
-                    }
-                    if type == "postgres"
-                    else None
-                ),
-            },
+            json=payload,
         )
         if response.status_code != 201:
             raise Exception(f"Failed to create connection: {response.text}")
@@ -406,13 +450,7 @@ class Malloy:
                 type=type,
                 resource=data["resource"],
                 attributes=data["attributes"],
-                connection_credentials={
-                    "host": host,
-                    "port": port,
-                    "databaseName": databaseName,
-                    "userName": userName,
-                    "password": "********",
-                },
+                connection_credentials={},
             )
         )
         return True
