@@ -296,13 +296,7 @@ export interface ConnectionCreate {
   name: string;
   type: string;
   description?: string;
-  connection_attributes: {
-    host: string;
-    port: number;
-    database: string;
-    username: string;
-    password: string;
-  };
+  connection_attributes: Record<string, string | number>;
 }
 
 export interface ConnectionUpdate {
@@ -527,6 +521,8 @@ export interface QueryUpdate {
   aggregation_fields?: string[];
   group_by_fields?: string[];
   filters?: Record<string, unknown>;
+  havings?: Record<string, unknown>;
+  calculated_fields?: unknown[];
   order_by_fields?: Record<string, string>;
   limit?: number;
   malloy_query?: string;
@@ -541,6 +537,8 @@ export interface QueryCreate {
   aggregation_fields: string[];
   group_by_fields?: string[];
   filters?: Record<string, unknown>;
+  havings?: Record<string, unknown>;
+  calculated_fields?: unknown[];
   order_by_fields?: Record<string, string>;
   limit?: number;
   malloy_query: string;
@@ -563,6 +561,8 @@ export interface QueryDetailedResponse {
   aggregation_fields: string[];
   group_by_fields: string[] | null;
   filters: unknown;
+  havings: unknown;
+  calculated_fields: unknown[] | null;
   order_by_fields: Record<string, string> | null;
   limit: number;
   malloy_query: string;

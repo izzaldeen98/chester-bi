@@ -7,12 +7,20 @@ interface SortItem {
   dir: SortDir;
 }
 
+interface CalculateItem {
+  name: string;
+  expression: string;
+  partitionBy: string[];
+  orderBy: { field: string; dir: SortDir }[];
+}
+
 interface query {
   groupBy: string[];
   aggregate: string[];
   orderBy: string[];
   limit: number;
   filters: RuleGroupType;
+  havings: RuleGroupType;
 }
 
 function isRule(filter: any): filter is RuleType {
@@ -23,10 +31,11 @@ export class MalloyASTQueryBuilder {
   private activeSchema: SourceInfo;
   private groupByFields: string[] = [];
   private aggFields: FieldInfo[] = [];
+  private calculateFields: CalculateItem[] = [];
   private limit: number = 1000;
   private sortMap: SortItem[] = [];
   private filters: RuleGroupType | null = null;
-
+  private havings: RuleGroupType | null = null;
   constructor(activeSchema: SourceInfo) {
     this.activeSchema = activeSchema;
   }
@@ -67,6 +76,11 @@ export class MalloyASTQueryBuilder {
 
     this.limit = response.limit ?? this.limit;
     this.filters = response.filters ?? null;
+    this.havings = response.havings ?? null;
+  }
+
+  public addHaving(having: RuleGroupType) {
+    this.havings = having;
   }
 
   public addGroupBy(fieldName: string, granularity?: string) {
@@ -75,6 +89,10 @@ export class MalloyASTQueryBuilder {
 
   public addAgg(field: FieldInfo) {
     this.aggFields.push(field);
+  }
+
+  public addCalculate(name: string, expression: string, partitionBy: string[], orderBy: { field: string; dir: SortDir }[]) {
+    this.calculateFields.push({ name: name.trim(), expression: expression.trim(), partitionBy, orderBy });
   }
 
   public setLimit(limit: number) {
@@ -110,6 +128,16 @@ export class MalloyASTQueryBuilder {
       this.aggFields.forEach((f: FieldInfo) => lines.push(`   \`${f.name}\``));
     }
 
+    // 3b. Map Calculated (window function) Columns
+    if (this.calculateFields && this.calculateFields.length > 0) {
+      this.calculateFields.forEach((c) => {
+        lines.push(`  calculate: ${c.name} is ${c.expression} {`);
+        if (c.partitionBy.length) lines.push(`    partition_by: ${c.partitionBy.join(", ")}`);
+        if (c.orderBy.length) lines.push(`    order_by: ${c.orderBy.map((o) => `${o.field} ${o.dir}`).join(", ")}`);
+        lines.push('  }');
+      });
+    }
+
     // 4. Map Sorting Ordering Layout
     if (this.sortMap && this.sortMap.length > 0) {
       lines.push('  order_by:');
@@ -131,8 +159,15 @@ export class MalloyASTQueryBuilder {
       }
     }
 
+    if (this.havings) {
+      const havingExpression = this.handleHaving();
+      if (havingExpression) {
+        lines.push(`  having: ${havingExpression}`);
+      }
+    }
+
     lines.push('}');
-    console.log("LINES:", lines);
+    console.log("MALLOY QUERY:", lines.join('\n'));
     return lines.join('\n');
   }
 
@@ -147,6 +182,12 @@ private handleFilter(): string {
     // 2. Return the string expression directly
     return fullMalloyFilterExpression;
   }
+
+  private handleHaving(): string {
+    if (!this.havings) return '';
+    return this.processRuleGroup(this.havings);
+  }
+
   /**
    * Recursively processes groups, mapping child rules and joining them with explicit combinators
    */
@@ -291,6 +332,8 @@ private handleFilter(): string {
   }
 
   private getFieldDataType(field: FieldInfo): string {
+    if (field.kind.toLowerCase() === "measure")
+      return "number_type";
     if (field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "timestamp_type")
       return "timestamp_type";
     if (field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "boolean_type")

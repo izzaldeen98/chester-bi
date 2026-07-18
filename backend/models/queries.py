@@ -19,6 +19,8 @@ class Query(Base):
     source = Column(String, nullable=False)
     
     filters = Column(JSON, nullable=True)
+    havings = Column(JSON, nullable=True)
+    calculated_fields = Column(JSON, nullable=True)
     order_by_fields = Column(JSON, nullable=True)
     limit = Column(Integer, nullable=True , default=1000)
     description = Column(String, nullable=True)

@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  FaPlay, FaTable, FaLayerGroup, FaCalendarAlt, FaHashtag, FaDatabase, FaTerminal, FaCode, FaSave
+  FaPlay, FaTable, FaLayerGroup, FaDatabase, FaTerminal, FaCode, FaSave, FaPlus
 } from "react-icons/fa";
-import { FaSortAmountDown } from "react-icons/fa";
-import { IoText } from "react-icons/io5";
-import { TbRulerMeasure2 } from "react-icons/tb";
 import { PiFileSqlFill } from "react-icons/pi";
+import CFieldTree from "../components/CFieldTree";
+import { TIME_GRANULARITIES, type Granularity, type SortItem } from "../lib/fieldTree";
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import { EditorView } from "@codemirror/view";
 import CSelect from "../components/CSelect";
@@ -33,8 +32,9 @@ import {
   wrapFilters,
   buildGroupByFields,
   buildOrderByFields,
+  partitionFilterQuery,
+  mergeFilterQuery,
 } from "../lib/querySerialize";
-import { IoIosSwitch } from "react-icons/io";
 import { MalloyASTQueryBuilder } from "../lib/MalloyASTQueryBuilder";
 import { normalizeQueryRows } from "../lib/queryResult";
 
@@ -46,21 +46,206 @@ import CButton from "../components/CButton";
 
 
 // ── Constants ──────────────────────────────────────────────────────────────
-const TIME_GRANULARITIES = ["year", "quarter", "month", "week", "day", "hour", "minute", "second"] as const;
-type Granularity = typeof TIME_GRANULARITIES[number];
-type SortDir = "asc" | "desc";
 type ResultView = "table" | "json"  | "malloy" | "sql";
 
-interface SortItem {
-  field: FieldInfo;
-  dir: SortDir;
+
+const WINDOW_FUNCTIONS: Record<string, { fn: string; delta?: boolean }> = {
+  Summation: { fn: "sum" },
+  Average: { fn: "avg" },
+  Max: { fn: "max" },
+  Min: { fn: "min" },
+  Count: { fn: "count" },
+  Lead: { fn: "lead", delta: true },
+  Lag: { fn: "lag", delta: true },
+  First: { fn: "first_value" },
+  Last: { fn: "last_value" },
+};
+
+function buildCalculatedColumnExpression(column: string, windowFn: string): string {
+  const spec = WINDOW_FUNCTIONS[windowFn];
+  if (!spec || !column) return "";
+  const call = `${spec.fn}(${column})`;
+  return spec.delta ? `${column} - ${call}` : call;
 }
 
-
-function isDateTime(field: FieldInfo) {
-  const dt = field.kind.toLowerCase() === "dimension" && 'type' in field && (field.type.kind.toLowerCase() === "timestamp_type" || field.type.kind.toLowerCase() === "date_type");
-  return dt;
+function buildCalculateBlock(name: string, expression: string, partitionBy: string[], orderBy: { field: string; dir: "asc" | "desc" }[]): string {
+  const lines = [`calculate: ${name} is ${expression} {`];
+  if (partitionBy.length) lines.push(`    partition_by: ${partitionBy.join(", ")}`);
+  if (orderBy.length) lines.push(`    order_by: ${orderBy.map((o) => `${o.field} ${o.dir}`).join(", ")}`);
+  lines.push(`  }`);
+  return lines.join("\n");
 }
+
+interface CalculatedColumnDef {
+  name: string;
+  expression: string;
+  partitionBy: string[];
+  orderBy: { field: string; dir: "asc" | "desc" }[];
+}
+
+function toCalcFieldInfo(c: CalculatedColumnDef): FieldInfo {
+  return { kind: "calculate", name: c.name, type: { kind: "number_type" } } as FieldInfo;
+}
+
+function CalculatedColumnModal({ open, onClose, onAdd, activeSchema, initial }: { open: boolean, onClose: () => void, onAdd: (def: CalculatedColumnDef, originalName?: string) => void, activeSchema: SourceInfo | null, initial?: CalculatedColumnDef | null }) {
+  const [columnName, setColumnName] = useState("");
+  const [orderBy, setOrderBy] = useState<{ field: string; dir: "asc" | "desc" }[]>([]);
+  const [partitionBy, setPartitionBy] = useState<string[]>([]);
+  const [windowFn, setWindowFn] = useState("Lag");
+  const [error, setError] = useState("");
+  const [expression, setExpression] = useState("");
+
+  const fields = activeSchema?.schema?.fields ?? [];
+  const isEditing = !!initial;
+
+  useEffect(() => {
+    if (!open) return;
+    setColumnName(initial?.name ?? "");
+    setExpression(initial?.expression ?? "");
+    setOrderBy(initial?.orderBy ?? []);
+    setPartitionBy(initial?.partitionBy ?? []);
+    setWindowFn("Lag");
+    setError("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial]);
+
+  if (!open) return null;
+
+  const preview = columnName && expression
+    ? buildCalculateBlock(columnName, expression, partitionBy, orderBy)
+    : "";
+
+  function handleAdd() {
+    if (!columnName.trim() || !expression) {
+      setError("Column name and column are required.");
+      return;
+    }
+    onAdd({ name: columnName.trim(), expression: expression.trim(), partitionBy, orderBy }, initial?.name);
+    onClose();
+  }
+
+  function addOrderByField(fieldName: string) {
+    if (!fieldName || orderBy.some((o) => o.field === fieldName)) return;
+    setOrderBy((prev) => [...prev, { field: fieldName, dir: "asc" }]);
+  }
+
+  function toggleOrderByDir(fieldName: string) {
+    setOrderBy((prev) => prev.map((o) => (o.field === fieldName ? { ...o, dir: o.dir === "asc" ? "desc" : "asc" } : o)));
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.22)" }}>
+      <div className="bg-white dark:bg-[#15121b] rounded-lg shadow-lg p-6 min-w-[320px] w-full max-w-md">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-base font-semibold" style={{ color: "var(--text)" }}>{isEditing ? "Edit" : "Add"} Calculated Column</h2>
+          <button className="text-lg font-bold p-1 hover:bg-[var(--bg-subtle)] rounded" onClick={onClose} title="Close">&times;</button>
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-h)" }}>Column Name</label>
+          <input
+            type="text"
+            value={columnName}
+            onChange={(e) => setColumnName(e.target.value)}
+            className="w-full rounded border px-2 py-1 text-xs mb-3 outline-none"
+            placeholder="e.g. year_change"
+            style={{ background: "var(--bg)", color: "var(--text)", borderColor: "var(--border)" }}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-h)" }}>Expression</label>
+          <textarea
+            rows={4}
+            value={expression}
+            onChange={(e) => setExpression(e.target.value)}
+            className="w-full rounded border px-2 py-1 text-xs mb-3 outline-none"
+            style={{ background: "var(--bg)", color: "var(--text)", borderColor: "var(--border)" }}
+          >
+            {expression}
+          </textarea>
+        </div>
+                <div>
+          <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-h)" }}>Partition By</label>
+          {partitionBy.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {partitionBy.map((f) => (
+                <span key={f} className="flex items-center gap-1 rounded px-2 py-0.5 text-[11px]"
+                  style={{ background: "var(--bg-subtle)", color: "var(--text-h)", border: "1px solid var(--border)" }}
+                >
+                  {f}
+                  <button type="button" className="cursor-pointer font-bold leading-none"
+                    onClick={() => setPartitionBy((prev) => prev.filter((x) => x !== f))}
+                  >&times;</button>
+                </span>
+              ))}
+            </div>
+          )}
+          <select
+            value=""
+            onChange={(e) => { const v = e.target.value; if (v) setPartitionBy((prev) => prev.includes(v) ? prev : [...prev, v]); }}
+            className="w-full rounded border px-2 py-1 text-xs mb-3 outline-none"
+            style={{ background: "var(--bg)", color: "var(--text)", borderColor: "var(--border)" }}
+          >
+            <option value="">Add field…</option>
+            {fields.filter((field) => !partitionBy.includes(field.name)).map((field) => (
+              <option key={field.name} value={field.name}>{field.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium mb-2" style={{ color: "var(--text-h)" }}>Order By</label>
+          {orderBy.length > 0 && (
+            <div className="flex flex-col gap-1 mb-2">
+              {orderBy.map((o) => (
+                <div key={o.field} className="flex items-center gap-2 rounded px-2 py-1 text-[11px]"
+                  style={{ background: "var(--bg-subtle)", color: "var(--text-h)", border: "1px solid var(--border)" }}
+                >
+                  <span className="flex-1">{o.field}</span>
+                  <button type="button" className="cursor-pointer font-semibold uppercase"
+                    onClick={() => toggleOrderByDir(o.field)}
+                  >{o.dir}</button>
+                  <button type="button" className="cursor-pointer font-bold leading-none"
+                    onClick={() => setOrderBy((prev) => prev.filter((x) => x.field !== o.field))}
+                  >&times;</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <select
+            value=""
+            onChange={(e) => addOrderByField(e.target.value)}
+            className="w-full rounded border px-2 py-1 text-xs mb-3 outline-none"
+            style={{ background: "var(--bg)", color: "var(--text)", borderColor: "var(--border)" }}
+          >
+            <option value="">Add field…</option>
+            {fields.filter((field) => !orderBy.some((o) => o.field === field.name)).map((field) => (
+              <option key={field.name} value={field.name}>{field.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {preview && (
+          <pre className="rounded border px-2 py-1.5 text-[11px] font-mono mb-3 overflow-auto"
+            style={{ background: "var(--bg-subtle)", color: "var(--text-h)", borderColor: "var(--border)" }}
+          >
+            {preview}
+          </pre>
+        )}
+
+        {error && <p className="text-xs mb-3" style={{ color: "#dc2626" }}>{error}</p>}
+
+        <button
+          className="mt-2 flex items-center gap-2 rounded-xl px-4 py-1.5 text-xs font-bold transition-all cursor-pointer"
+          style={{ background: "var(--accent)", color: "var(--accent-fg)" }}
+          onClick={handleAdd}
+        >
+          <span>{isEditing ? "Save" : "Add"}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -77,6 +262,8 @@ interface PendingHydration {
   groupBy: string[];
   agg: string[];
   filters: unknown;
+  havings: unknown;
+  calculatedColumns: CalculatedColumnDef[] | null;
   orderBy: Record<string, string> | null;
   malloyQuery: string;
 }
@@ -114,21 +301,6 @@ function parseGroupByEntry(entry: string): { name: string; granularity?: Granula
     return { name: base, granularity: gran as Granularity };
   }
   return { name: entry };
-}
-
-// ── Field icon ─────────────────────────────────────────────────────────────
-function FieldIcon({ field }: { field: FieldInfo }) {
-  if (field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "boolean_type")
-    return <IoIosSwitch size={13} style={{ color: "var(--text)", flexShrink: 0 }} />;
-  if (field.kind.toLowerCase() === "dimension" && 'type' in field && field.type.kind.toLowerCase() === "number_type")
-    return <FaHashtag size={13} style={{ color: "var(--text)", flexShrink: 0 }} />;
-  if (field.kind.toLowerCase() === "dimension" && 'type' in field && (field.type.kind.toLowerCase() === "timestamp_type" || field.type.kind.toLowerCase() === "date_type"))
-    return <FaCalendarAlt size={13} style={{ color: "var(--text)", flexShrink: 0 }} />;
-  if (field.kind.toLowerCase() === "measure")
-    return <TbRulerMeasure2 size={13} style={{ color: "#7c3aed", flexShrink: 0 }} />;
-  if (isDateTime(field))
-    return <FaCalendarAlt size={11} style={{ color: "var(--text)", flexShrink: 0 }} />;
-  return <IoText size={13} style={{ color: "var(--text)", flexShrink: 0 }} />;
 }
 
 // ── Page ───────────────────────────────────────────────────────────────────
@@ -174,6 +346,12 @@ export default function QueryPage() {
 
   // Filters (react-querybuilder)
   const [filterQuery, setFilterQuery] = useState<RuleGroupType>(EMPTY_FILTER_QUERY);
+
+
+  const [calculatedColumnModalOpen, setCalculatedColumnModalOpen] = useState(false);
+  const [editingCalculatedColumn, setEditingCalculatedColumn] = useState<CalculatedColumnDef | null>(null);
+  const [calculatedColumns, setCalculatedColumns] = useState<CalculatedColumnDef[]>([]);
+  const [calcFields, setCalcFields] = useState<FieldInfo[]>([]);
 
   // Results
   const [running, setRunning] = useState(false);
@@ -223,6 +401,8 @@ export default function QueryPage() {
           groupBy: saved.group_by_fields ?? [],
           agg: saved.aggregation_fields ?? [],
           filters: saved.filters,
+          havings: saved.havings,
+          calculatedColumns: (saved.calculated_fields as CalculatedColumnDef[] | undefined) ?? null,
           orderBy: saved.order_by_fields,
           malloyQuery: saved.malloy_query,
         });
@@ -273,6 +453,7 @@ export default function QueryPage() {
     if (!selectedModelId) return;
     setCompiledModel(null); setSchemaError(""); setActiveSource(null);
     setGroupByFields([]); setAggFields([]); setGranularityMap({}); setSortMap([]); setFilterQuery(EMPTY_FILTER_QUERY);
+    setCalculatedColumns([]); setCalcFields([]);
     setQueryResult(null); setQueryError("");
     setLoadingSchema(true);
     getCompiledModel(selectedModelId)
@@ -328,8 +509,14 @@ export default function QueryPage() {
     setSortMap(nextSort);
 
     const unwrappedFilters = unwrapFilters(pendingHydration.filters);
-    if (unwrappedFilters) {
-      setFilterQuery(unwrappedFilters);
+    const unwrappedHavings = unwrapFilters(pendingHydration.havings);
+    if (unwrappedFilters || unwrappedHavings) {
+      setFilterQuery(mergeFilterQuery(unwrappedFilters, unwrappedHavings));
+    }
+
+    if (pendingHydration.calculatedColumns?.length) {
+      setCalculatedColumns(pendingHydration.calculatedColumns);
+      setCalcFields(pendingHydration.calculatedColumns.map(toCalcFieldInfo));
     }
 
     setQuery(pendingHydration.malloyQuery);
@@ -345,6 +532,15 @@ export default function QueryPage() {
     }
   }, [pendingHydration, loadingSchema, schemaError, selectedModelId, activeSource]);
 
+
+  const calculatedFieldInfos = useMemo<FieldInfo[]>(
+    () => calculatedColumns.map(toCalcFieldInfo),
+    [calculatedColumns],
+  );
+  const calcColumnsByName = useMemo(
+    () => new Map(calculatedColumns.map((c) => [c.name, c])),
+    [calculatedColumns],
+  );
 
   const generatedQuery = useMemo(() => {
     if (!activeSchema) return null;
@@ -366,6 +562,14 @@ export default function QueryPage() {
         }
       }
   
+      // 2b. Add Selected Calculated (window function) Columns
+      if (calcFields.length > 0) {
+        for (const field of calcFields) {
+          const def = calcColumnsByName.get(field.name);
+          if (def) builder.addCalculate(def.name, def.expression, def.partitionBy, def.orderBy);
+        }
+      }
+
       // 3. Set Execution Record Maximum Window Limit
       if (limit > 0) {
         builder.setLimit(limit);
@@ -385,9 +589,11 @@ export default function QueryPage() {
         }
       }
   
-      // 5. Build and Apply Tree-Aware Filters
+      // 5. Build and Apply Tree-Aware Filters — measure-kind rules become `having`, the rest stay `where`
       if (filterQuery && filterQuery.rules && filterQuery.rules.length > 0) {
-        builder.addFilter(filterQuery);
+        const { where, having } = partitionFilterQuery(filterQuery, activeSchema.schema?.fields ?? []);
+        if (where) builder.addFilter(where);
+        if (having) builder.addHaving(having);
       }
   
       // Return the completed object directly from the memo calculation tree
@@ -398,7 +604,7 @@ export default function QueryPage() {
       console.error("Failed compiling Malloy AST target syntax query structures:", e);
       return null;
     }
-  }, [groupByFields, aggFields, limit, sortMap, filterQuery, granularityMap, activeSchema]);
+  }, [groupByFields, aggFields, calcFields, calcColumnsByName, limit, sortMap, filterQuery, granularityMap, activeSchema]);
   
   // 6. SAFE STATE SYNCHRONIZATION FLOW
   // Automatically pipes the pure calculation results straight to your engine's state manager 
@@ -410,23 +616,32 @@ export default function QueryPage() {
     // ── Toggle field ─────────────────────────────────────────────────────────
   function toggleField(field: FieldInfo) {
 
-    const isMeasure = field.kind.toLowerCase() === "measure";
-    if (isMeasure) {
-      setAggFields((prev) => prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field]);
+    const kind = field.kind.toLowerCase();
+    if (kind === "measure") {
+      setAggFields((prev) => prev.some((f) => f.name === field.name) ? prev.filter((f) => f.name !== field.name) : [...prev, field]);
+    } else if (kind === "calculate") {
+      setCalcFields((prev) => prev.some((f) => f.name === field.name) ? prev.filter((f) => f.name !== field.name) : [...prev, field]);
     } else {
       setGroupByFields((prev) => {
-        const next = prev.includes(field) ? prev.filter((f) => f !== field) : [...prev, field];
+        const next = prev.some((f) => f.name === field.name) ? prev.filter((f) => f.name !== field.name) : [...prev, field];
         // clear granularity if deselected
-        if (prev.includes(field)) setGranularityMap((g) => { const c = { ...g }; delete c[field.name]; return c; });
+        if (prev.some((f) => f.name === field.name)) setGranularityMap((g) => { const c = { ...g }; delete c[field.name]; return c; });
         return next;
       });
     }
     // clear sort if deselected
     setSortMap((prev) => {
-      const isSelected = isMeasure ? aggFields.includes(field) : groupByFields.includes(field);
+      const isSelected = kind === "measure" ? aggFields.some((f) => f.name === field.name) : kind === "calculate" ? calcFields.some((f) => f.name === field.name) : groupByFields.some((f) => f.name === field.name);
       if (isSelected) { return prev.filter((s) => s.field.name !== field.name); }
       return prev;
     });
+  }
+
+  // ── Remove calculated column ─────────────────────────────────────────────
+  function handleRemoveCalculatedColumn(name: string) {
+    setCalculatedColumns((prev) => prev.filter((c) => c.name !== name));
+    setCalcFields((prev) => prev.filter((f) => f.name !== name));
+    setSortMap((prev) => prev.filter((s) => s.field.name !== name));
   }
 
   // ── Toggle sort ───────────────────────────────────────────────────────────
@@ -470,7 +685,9 @@ export default function QueryPage() {
 
     const groupBy = buildGroupByFields(groupByFields, granularityMap);
     const orderBy = buildOrderByFields(sortMap);
-    const filters = wrapFilters(filterQuery);
+    const { where, having } = partitionFilterQuery(filterQuery, activeSchema.schema?.fields ?? []);
+    const filters = where ? wrapFilters(where) : undefined;
+    const havings = having ? wrapFilters(having) : undefined;
 
     return {
       name,
@@ -478,6 +695,8 @@ export default function QueryPage() {
       aggregation_fields: aggFields.map((field) => field.name),
       ...(groupBy.length ? { group_by_fields: groupBy } : {}),
       ...(filters ? { filters } : {}),
+      ...(havings ? { havings } : {}),
+      ...(calculatedColumns.length ? { calculated_fields: calculatedColumns } : {}),
       ...(orderBy ? { order_by_fields: orderBy } : {}),
       limit,
       malloy_query: query,
@@ -521,6 +740,22 @@ export default function QueryPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // ── Calculated column ────────────────────────────────────────────────────
+  function handleAddCalculatedColumn(def: CalculatedColumnDef, originalName?: string) {
+    setCalculatedColumns((prev) => [...prev.filter((c) => c.name !== def.name && c.name !== originalName), def]);
+    if (originalName && originalName !== def.name) {
+      setCalcFields((prev) => prev.map((f) => f.name === originalName ? { ...f, name: def.name } : f));
+      setSortMap((prev) => prev.map((s) => s.field.name === originalName ? { ...s, field: { ...s.field, name: def.name } } : s));
+    }
+  }
+
+  function handleEditCalculatedColumn(name: string) {
+    const def = calculatedColumns.find((c) => c.name === name);
+    if (!def) return;
+    setEditingCalculatedColumn(def);
+    setCalculatedColumnModalOpen(true);
   }
 
   // ── Run ───────────────────────────────────────────────────────────────────
@@ -698,33 +933,16 @@ export default function QueryPage() {
               style={{ background: "var(--bg)", color: "var(--text-h)", borderColor: "var(--border)" }}
             />
           </div>
+          <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: "1px solid var(--border)" }}>
+            <span className="text-xs font-medium" style={{ color: "var(--text)" }}>Calculated Column</span>
+            <button className="flex items-center gap-2 rounded-xl px-4 py-1.5 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              style={{ background: "var(--accent)", color: "var(--accent-fg)" }}
+              onClick={() => { setEditingCalculatedColumn(null); setCalculatedColumnModalOpen(true); }}
+            >
+              <FaPlus size={11} />
+            </button>
+          </div>
 
-          {/* Selected chips */}
-          {(groupByFields.length > 0 || aggFields.length > 0) && (
-            <div className="flex flex-col gap-1.5 p-3" style={{ borderBottom: "1px solid var(--border)" }}>
-              <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Selected</p>
-              <div className="flex flex-wrap gap-1">
-                {groupByFields.map((f) => (
-                  <button key={f.name} onClick={() => setGroupByFields((p) => p.filter((x) => x !== f))}
-                    className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium"
-                    style={{ background: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--accent-ring)" }}
-                    title="Click to remove"
-                  >
-                    <IoText size={8} /> {f.name}{granularityMap[f.name] ? `.${granularityMap[f.name]}` : ""} ×
-                  </button>
-                ))}
-                {aggFields.map((f) => (
-                  <button key={f.name} onClick={() => setAggFields((p) => p.filter((x) => x !== f))}
-                    className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium"
-                    style={{ background: "#ede9fe", color: "#7c3aed", border: "1px solid #c4b5fd" }}
-                    title="Click to remove"
-                  >
-                    <TbRulerMeasure2 size={9} /> {f.name} ×
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Schema browser */}
           <div className="flex-1 overflow-y-auto py-1">
@@ -736,7 +954,7 @@ export default function QueryPage() {
               return (
                 <div key={schema.name}>
                   {/* Source row */}
-                  <button type="button" onClick={() => { setActiveSchema(schema); setGroupByFields([]); setAggFields([]); setGranularityMap({}); setSortMap([]); setFilterQuery(EMPTY_FILTER_QUERY); }}
+                  <button type="button" onClick={() => { setActiveSchema(schema); setGroupByFields([]); setAggFields([]); setGranularityMap({}); setSortMap([]); setFilterQuery(EMPTY_FILTER_QUERY); setCalculatedColumns([]); setCalcFields([]); }}
                     className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors"
                     style={srcActive ? { background: "var(--accent-muted)", color: "var(--accent)" } : { color: "var(--text-h)" }}
                   >
@@ -745,71 +963,21 @@ export default function QueryPage() {
                     <span className="ml-auto text-[10px]" style={{ color: "var(--text)" }}>{schema.schema?.fields.length}</span>
                   </button>
 
-                  {/* Fields */}
-                  {srcActive && schema.schema.fields.map((field: FieldInfo) => {
-                    const isMeasure = field.kind.toLowerCase() === "measure";
-                    const inGroupBy = groupByFields.includes(field);
-                    const inAgg = aggFields.includes(field);
-                    const isSelected = inGroupBy || inAgg;
-                    const sortDir = sortMap.find((s) => s.field === field)?.dir ?? "";
-                    const gran = granularityMap[field.name];
-                    const isDatetime = isDateTime(field);
-
-                    return (
-                      <div key={field.name} className="flex flex-row items-center">
-                        {/* Field row */}
-                        <div className="flex flex-col gap-1 w-full" >
-                          <div
-                            className="flex w-full items-center gap-1.5 py-1.5 pl-6 pr-2 cursor-pointer transition-colors"
-                            style={isSelected
-                              ? { background: isMeasure ? "#ede9fe" : "var(--accent-muted)", color: isMeasure ? "#7c3aed" : "var(--accent)" }
-                              : { color: "var(--text-h)" }}
-                            onClick={() => toggleField(field)}
-                            onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "var(--border)"; }}
-                            onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = ""; }}
-                          >
-                            <FieldIcon field={field} />
-                            <span className="flex-1 truncate text-xs">{field.name}</span>
-
-                          </div>
-                          {isSelected && isDatetime && !isMeasure && (
-                            <div className="flex flex-col gap-1 pb-1.5 pl-10 pr-2"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {TIME_GRANULARITIES.map((g) => (
-                                <span
-                                  key={g}
-                                  className="px-1.5 py-0.5 text-[9px] font-semibold transition-colors cursor-pointer"
-                                  onClick={(e) => setGranularity(e, field.name, g)}
-                                  style={gran === g
-                                    ? { background: "var(--accent)", color: "var(--accent-fg)" }
-                                    : { background: "var(--border)", color: "var(--text)" }}
-                                >
-                                  {g}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        <div
-                          className="flex flex-row gap-1 transition-colors cursor-pointer items-center pl-2 pr-2 left-full"
-                          hidden={!isSelected}
-                          onClick={(e) => cycleSort(e, field)}
-                        >
-                          <FaSortAmountDown
-                            size={11}
-                            style={{ transform: sortDir === "asc" ? "scaleY(-1)" : undefined, color: sortDir ? "var(--accent)" : "var(--text)" }}
-                          />
-                          {/* <FaGear size={11} style={{ color: "var(--accent)" }} /> */}
-                          <span className="text-[9px] font-bold" style={{ color: "var(--accent)" }}>
-                            {sortDir.toUpperCase()}
-                          </span>
-
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {/* Field tree */}
+                  {srcActive && (
+                    <CFieldTree
+                      fields={[...schema.schema.fields, ...calculatedFieldInfos]}
+                      groupByFields={groupByFields}
+                      aggFields={[...aggFields, ...calcFields]}
+                      granularityMap={granularityMap}
+                      sortMap={sortMap}
+                      onToggleField={toggleField}
+                      onSetGranularity={setGranularity}
+                      onCycleSort={cycleSort}
+                      onRemoveCalculated={handleRemoveCalculatedColumn}
+                      onEditCalculated={handleEditCalculatedColumn}
+                    />
+                  )}
                 </div>
               );
             })}
@@ -880,6 +1048,14 @@ export default function QueryPage() {
       </div>
         </>
       )}
+
+      <CalculatedColumnModal
+        open={calculatedColumnModalOpen}
+        onClose={() => { setCalculatedColumnModalOpen(false); setEditingCalculatedColumn(null); }}
+        onAdd={handleAddCalculatedColumn}
+        activeSchema={activeSchema}
+        initial={editingCalculatedColumn}
+      />
     </div>
   );
 }

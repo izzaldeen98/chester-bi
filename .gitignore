@@ -3,3 +3,6 @@ chesterBI.db
 .local/*
 .tests/*
 .env
+.vscode/*
+.venv/*
+.test/*

@@ -1,0 +1,33 @@
+# Save this file as .github/release.yml in your repo.
+# Categorizes PRs into release notes based on their labels, matching
+# the categories used in ROADMAP.md.
+
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+    authors:
+      - dependabot
+
+  categories:
+    - title: 🔌 Connectivity
+      labels:
+        - connectivity
+    - title: 🧮 Modeling
+      labels:
+        - modeling
+    - title: 🌳 Explorer UI
+      labels:
+        - explorer-ui
+    - title: 📊 Visualization
+      labels:
+        - visualization
+    - title: 📦 Distribution
+      labels:
+        - distribution
+    - title: 🔒 Governance
+      labels:
+        - governance
+    - title: Other Changes
+      labels:
+        - "*"

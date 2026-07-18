@@ -28,6 +28,9 @@ type SidebarMode = "view" | "edit" | "create";
 // ── Connection type options ────────────────────────────────────────────────
 const CONNECTION_TYPES = [
   { label: "PostgreSQL", value: "postgres" },
+  { label: "MySQL", value: "mysql" },
+  { label: "Snowflake", value: "snowflake" },
+  { label: "BigQuery", value: "bigquery" },
 ];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -50,6 +53,7 @@ export default function ConnectionsPage() {
   const [loading, setLoading]         = useState(true);
   const [pageError, setPageError]     = useState("");
   const [search, setSearch]           = useState("");
+
 
   // Sidebar
   const [mode, setMode]                       = useState<SidebarMode>("view");
@@ -77,6 +81,13 @@ export default function ConnectionsPage() {
   const [cDatabase,    setCDatabase]    = useState("");
   const [cUsername,    setCUsername]    = useState("");
   const [cPassword,    setCPassword]    = useState("");
+  const [cAccount,     setCAccount]     = useState("");
+  const [cProjectId,   setCProjectId]   = useState("");
+  const [cCredentials, setCCredentials] = useState("");
+  const [cPrivateKey,  setCPrivateKey]  = useState("");
+  const [cPrivateKeyPassphrase, setCPrivateKeyPassphrase] = useState("");
+  const [cSchema,      setCSchema]      = useState("");
+  const [cWarehouse,   setCWarehouse]   = useState("");
 
   // Test connection
   const [testing,    setTesting]    = useState(false);
@@ -178,19 +189,31 @@ export default function ConnectionsPage() {
 
   // ── Save create ──────────────────────────────────────────────────────────
   async function saveCreate() {
-    if (!cName.trim() || !cType.trim() || !cHost.trim() || !cDatabase.trim() || !cUsername.trim()) {
-      setFormError("Name, type, host, database and username are required."); return;
-    }
     setSaving(true); setFormError("");
+    let connection_attributes: Record<string, string | number> = {};
     try {
+      if (cType === "postgres" || cType === "mysql") {
+        connection_attributes = {
+          host: cHost, port: Number(cPort) || 5432,
+          database: cDatabase, username: cUsername, password: cPassword,
+        };
+      }
+      if (cType === "snowflake") {
+        connection_attributes = {
+          account: cAccount, username: cUsername, password: cPassword, schema: cSchema, warehouse: cWarehouse, private_key: cPrivateKey, private_key_passphrase: cPrivateKeyPassphrase,
+        }
+      }
+      if (cType === "bigquery") {
+        connection_attributes = {
+          project_id: cProjectId, credentials: cCredentials,
+        };
+      }
       await createConnection({
         name: cName, type: cType,
         description: cDescription || undefined,
-        connection_attributes: {
-          host: cHost, port: Number(cPort) || 5432,
-          database: cDatabase, username: cUsername, password: cPassword,
-        },
+        connection_attributes: connection_attributes,
       });
+
       await fetchConnections();
       closePanel();
     } catch (e: any) {
@@ -236,15 +259,37 @@ export default function ConnectionsPage() {
             <CSelect label="Type" value={cType} onChange={setCType} options={CONNECTION_TYPES} placeholder="Select type…" required />
             <CTextInput label="Description" value={cDescription} onChange={setCDescription} placeholder="Optional" />
           </div>
-
-          <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
-            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Connection Attributes</p>
-            <CTextInput label="Host"     value={cHost}     onChange={setCHost}     placeholder="e.g. localhost" required />
-            <CTextInput label="Port"     value={cPort}     onChange={setCPort}     placeholder="e.g. 5432" type="number" />
-            <CTextInput label="Database" value={cDatabase} onChange={setCDatabase} placeholder="e.g. my_db" required />
-            <CTextInput label="Username" value={cUsername} onChange={setCUsername} placeholder="e.g. admin" required />
-            <CTextInput label="Password" value={cPassword} onChange={setCPassword} type="password" icon={<RiLockPasswordFill size={15} />} autoComplete="new-password" />
-          </div>
+          {(cType === "postgres" || cType === "mysql") && (
+            <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Connection Attributes</p>
+              <CTextInput label="Host"     value={cHost}     onChange={setCHost}     placeholder="e.g. localhost" required />
+              <CTextInput label="Port"     value={cPort}     onChange={setCPort}     placeholder="e.g. 5432" type="number" />
+              <CTextInput label="Database" value={cDatabase} onChange={setCDatabase} placeholder="e.g. my_db" required />
+              <CTextInput label="Username" value={cUsername} onChange={setCUsername} placeholder="e.g. admin" required />
+              <CTextInput label="Password" value={cPassword} onChange={setCPassword} type="password" icon={<RiLockPasswordFill size={15} />} autoComplete="new-password" />
+            </div>
+          )}
+          {cType === "snowflake" && (
+            <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Connection Attributes</p>
+              <CTextInput label="Account" value={cAccount} onChange={setCAccount} placeholder="e.g. my_account"  />
+              <CTextInput label="Username" value={cUsername} onChange={setCUsername} placeholder="e.g. admin"  />
+              <CTextInput label="Password" value={cPassword} onChange={setCPassword} type="password" icon={<RiLockPasswordFill size={15} />} autoComplete="new-password" />
+              <CTextInput label="Schema" value={cSchema} onChange={setCSchema} placeholder="e.g. my_schema"  />
+              <CTextInput label="Warehouse" value={cWarehouse} onChange={setCWarehouse} placeholder="e.g. my_warehouse" required />
+              <CTextInput label="Private Key" value={cPrivateKey} onChange={setCPrivateKey} type="text" placeholder="e.g. -----BEGIN PRIVATE KEY-----\nMIIEogIBAAKCAQEAwgwgwgSCAgEAAoIBAQCB0LDQu9C40L3QviAgMAwGCCqGSIb3DQEJ...
+              \n-----END PRIVATE KEY-----
+              " />
+              <CTextInput label="Private Key Passphrase" value={cPrivateKeyPassphrase} onChange={setCPrivateKeyPassphrase} type="text" placeholder="e.g. my_passphrase" />
+            </div>
+          )}
+          {cType === "bigquery" && (
+            <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Connection Attributes</p>
+              <CTextInput label="Project ID" value={cProjectId} onChange={setCProjectId} placeholder="e.g. my_project" required />
+              <CTextInput label="Credentials" value={cCredentials} onChange={setCCredentials} type="text" placeholder='{"type": "service_account", "project_id": "my_project"}' />
+            </div>
+          )}
         </div>
       );
     }
@@ -338,7 +383,7 @@ export default function ConnectionsPage() {
       return (
         <div className="flex gap-2">
           <CButton variant="primary" fullWidth loading={saving} onClick={saveCreate}
-            disabled={!cName.trim() || !cType.trim() || !cHost.trim() || !cDatabase.trim() || !cUsername.trim()}>
+            >
             Create Connection
           </CButton>
           <CButton variant="ghost" onClick={closePanel} disabled={saving}>Cancel</CButton>
