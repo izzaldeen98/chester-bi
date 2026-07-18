@@ -1,8 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/izzaldeen98/chester-bi/main/frontend/src/assets/logo.svg" alt="Chester BI" width="80" />
-
-# Chester BI
+<img src="https://raw.githubusercontent.com/izzaldeen98/chester-bi/main/assets/logo.png" alt="Chester BI" width="280" />
 
 **Self-hosted, open-source Business Intelligence platform**
 
@@ -29,7 +27,46 @@ Chester BI is a fully self-hosted business intelligence platform you run on your
 
 ## Screenshots
 
-> _Screenshots / GIFs coming soon. PRs welcome!_
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/izzaldeen98/chester-bi/main/assets/screenshot-dashboard.png" alt="Interactive dashboard" width="900" />
+
+_Interactive dashboards — KPI tiles, charts, and tables wired together with shared date/dimension filters_
+
+<table>
+<tr>
+<td width="50%">
+<img src="https://raw.githubusercontent.com/izzaldeen98/chester-bi/main/assets/screenshot-query-builder.png" alt="Query Builder" />
+<br/><sub><b>Query Builder</b> — drag-and-drop dimensions, measures, filters, and calculated (window function) columns, with live Malloy/SQL/JSON previews</sub>
+</td>
+<td width="50%">
+<img src="https://raw.githubusercontent.com/izzaldeen98/chester-bi/main/assets/screenshot-package-editor.png" alt="Package Editor" />
+<br/><sub><b>Package Editor</b> — edit Malloy semantic model files directly in the browser</sub>
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="https://raw.githubusercontent.com/izzaldeen98/chester-bi/main/assets/screenshot-dashboard-filter.png" alt="Dashboard filter configuration" />
+<br/><sub><b>Cross-filtering</b> — map one filter to model fields and apply it across multiple charts at once</sub>
+</td>
+<td width="50%">
+<img src="https://raw.githubusercontent.com/izzaldeen98/chester-bi/main/assets/screenshot-queries-list.png" alt="Queries list" />
+<br/><sub><b>Saved Queries</b> — reusable queries organized by package, model, and source</sub>
+</td>
+</tr>
+<tr>
+<td width="50%">
+<img src="https://raw.githubusercontent.com/izzaldeen98/chester-bi/main/assets/screenshot-files.png" alt="Files management" />
+<br/><sub><b>File Manager</b> — upload CSV/data files to back your semantic models</sub>
+</td>
+<td width="50%">
+<img src="https://raw.githubusercontent.com/izzaldeen98/chester-bi/main/assets/screenshot-users.png" alt="User permissions" />
+<br/><sub><b>Access Control</b> — fine-grained, per-resource permissions for every user</sub>
+</td>
+</tr>
+</table>
+
+</div>
 
 ---
 
