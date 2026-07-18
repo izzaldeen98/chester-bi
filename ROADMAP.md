@@ -1,12 +1,22 @@
-# Roadmap
+# Product Roadmap
 
-## RM-0001
-* Add MySQL , BigQuery , Snowflake Connections. [x]
-* Add filter on measures []
-* Add calculated columns []
-* Add Field Tree []
+**Status legend:** ✅ Done &nbsp;·&nbsp; 🔄 In Progress &nbsp;·&nbsp; 📋 Planned
 
-## RM-0002
-* Add Text and WaterFall Charts []
-* Add Embedding []
-* Add RLS [] 
+---
+
+## RM-0001 — Data Connectivity & Modeling
+
+| Feature | Category | Status |
+|---|---|---|
+| MySQL, BigQuery, and Snowflake connections | Connectivity | ✅ Done |
+| Filtering on measures | Modeling | ✅ Done |
+| Calculated columns | Modeling | ✅ Done |
+| Field tree (source/field browser) | Explorer UI | ✅ Done |
+
+## RM-0002 — Visualization & Governance
+
+| Feature | Category | Status |
+|---|---|---|
+| Text and waterfall charts | Visualization | 📋 Planned |
+| Embedding | Distribution | 📋 Planned |
+| Row-level security (RLS) | Governance | 📋 Planned |

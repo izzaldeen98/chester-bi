@@ -32,6 +32,8 @@ class QueryDetailedResponse(QueryBase):
     aggregation_fields: list[str]
     group_by_fields: list[str] | None = None
     filters: dict | None = None
+    havings: dict | None = None
+    calculated_fields: list | None = None
     order_by_fields: dict | None = None
     limit: int | None = 1000
     malloy_query: str
@@ -49,11 +51,13 @@ class QueryCreateRequest(BaseModel):
     aggregation_fields: list[str]
     group_by_fields: list[str] | None = None
     filters: dict | None = None
+    havings: dict | None = None
+    calculated_fields: list | None = None
     order_by_fields: dict | None = None
     limit: int | None = 1000
     malloy_query: str
     sql_query: str | None = None
-    
+
     class Config:
         from_attributes = True
 
@@ -64,6 +68,8 @@ class QueryUpdateRequest(BaseModel):
     aggregation_fields: list[str] | None = None
     group_by_fields: list[str] | None = None
     filters: dict | None = None
+    havings: dict | None = None
+    calculated_fields: list | None = None
     order_by_fields: dict | None = None
     limit: int | None = 1000
     malloy_query: str | None = None

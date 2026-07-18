@@ -582,7 +582,10 @@ export default function WidgetEditDialog({
     if (!queryDetails) return [];
     const dims = queryDetails.group_by_fields ?? [];
     const measures = queryDetails.aggregation_fields ?? [];
-    return [...dims, ...measures].map((f) => ({ value: f, label: f }));
+    const calculated = (queryDetails.calculated_fields ?? [])
+      .map((f) => (f as { name?: string })?.name)
+      .filter((name): name is string => !!name);
+    return [...dims, ...measures, ...calculated].map((f) => ({ value: f, label: f }));
   }, [queryDetails]);
 
   const querySource = useMemo(() => {

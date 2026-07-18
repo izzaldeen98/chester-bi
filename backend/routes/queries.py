@@ -42,6 +42,8 @@ async def create_query(
         aggregation_fields=query.aggregation_fields,
         group_by_fields=query.group_by_fields,
         filters=query.filters,
+        havings=query.havings,
+        calculated_fields=query.calculated_fields,
         order_by_fields=query.order_by_fields,
         limit=query.limit,
         malloy_query=query.malloy_query,
@@ -95,6 +97,8 @@ async def update_query(
     target_query.aggregation_fields = query.aggregation_fields if query.aggregation_fields else target_query.aggregation_fields
     target_query.group_by_fields = query.group_by_fields if query.group_by_fields else target_query.group_by_fields
     target_query.filters = query.filters if query.filters else target_query.filters
+    target_query.havings = query.havings if query.havings else target_query.havings
+    target_query.calculated_fields = query.calculated_fields if query.calculated_fields else target_query.calculated_fields
     target_query.order_by_fields = query.order_by_fields if query.order_by_fields else target_query.order_by_fields
     target_query.limit = query.limit if query.limit else target_query.limit
     target_query.malloy_query = query.malloy_query if query.malloy_query else target_query.malloy_query
