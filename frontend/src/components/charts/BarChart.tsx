@@ -238,7 +238,6 @@ export default function BarChart({
         barCategoryGap: "35%",
         itemStyle: {
           color: colors[index],
-          borderRadius: horizontal ? [0, 6, 6, 0] : [6, 6, 0, 0],
         },
         label: {
           show: useStack,

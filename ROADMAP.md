@@ -17,16 +17,19 @@
 
 | Feature | Category | Status |
 |---|---|---|
-| Step Create Account| modeling | 🔄 In Progress |
-| Load Examples | modeling | 📋 Planned |
-| Text and waterfall charts | Visualization | 📋 Planned |
+| Step Create Account| modeling | ✅ Done |
+| Load Examples | modeling | ✅ Done |
+| Text and waterfall charts | Visualization | ✅ Done |
+| Make Malloy an internal service | Visualization | 📋 Planned |
 
 
 ## RM-0003 — Governance
-| Embedding | Distribution | 📋 Planned |
+| Drop Down filter | Distribution | 📋 Planned |
 | Row-level security (RLS) | Governance | 📋 Planned |
 
 
 ## RM-0004
 | Model Wizard | modeling | 📋 Planned |
 | Metrics API | backend | 📋 Planned |
+| Embedding | Distribution | 📋 Planned |
+| Row-level security (RLS) | Governance | 📋 Planned |

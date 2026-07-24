@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
 import { getRowFieldValue } from "../../lib/queryResult";
+import { formatAxisValue, parseDateValue } from "../../lib/dateTimeFormat";
+
+export { formatAxisValue };
 
 interface TitleField {
   value: string;
@@ -33,12 +36,6 @@ const DEFAULT_SERIES_COLORS = [
   "#ec4899",
 ];
 
-const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const MONTHS_LONG = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
 function getThemeColor(variable: string, fallback: string) {
   if (typeof window === "undefined") return fallback;
   const value = getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
@@ -66,17 +63,6 @@ function isTruthy(value: string | boolean | undefined) {
   return value === "true" || value === "1" || value === "on";
 }
 
-function pad2(n: number) {
-  return String(n).padStart(2, "0");
-}
-
-function parseDateValue(value: unknown): Date | null {
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-  if (value == null) return null;
-  const date = new Date(String(value));
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
 function readCategoryLabel(value: unknown): string {
   if (value == null) return "";
   if (value instanceof Date) return value.toLocaleDateString();
@@ -87,51 +73,6 @@ function readNumericValue(value: unknown): number | null {
   if (value == null) return null;
   const num = typeof value === "number" ? value : parseFloat(String(value));
   return Number.isFinite(num) ? num : null;
-}
-
-export function formatAxisValue(value: unknown, format?: string): string {
-  if (!format?.trim()) return readCategoryLabel(value);
-
-  const date = parseDateValue(value);
-  if (!date) return readCategoryLabel(value);
-
-  const year = date.getFullYear();
-  const month = date.getMonth();
-  const day = date.getDate();
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-  const seconds = date.getSeconds();
-  const ymd = `${year}-${pad2(month + 1)}-${pad2(day)}`;
-  const dmy = `${pad2(day)}/${pad2(month + 1)}/${year}`;
-  const time = `${pad2(hours)}:${pad2(minutes)}`;
-  const timeSec = `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
-
-  switch (format) {
-    case "yyyy-mm-dd":
-      return ymd;
-    case "yyyy-mm-dd hh:mm:ss":
-      return `${ymd} ${timeSec}`;
-    case "yyyy-mm-dd hh:mm":
-      return `${ymd} ${time}`;
-    case "mmm day":
-      return `${MONTHS_SHORT[month]} ${day}`;
-    case "mmm day, yyyy":
-      return `${MONTHS_SHORT[month]} ${day}, ${year}`;
-    case "dd/mm/yyyy":
-      return dmy;
-    case "dd/mm/yyyy hh:mm:ss":
-      return `${dmy} ${timeSec}`;
-    case "dd/mm/yyyy hh:mm":
-      return `${dmy} ${time}`;
-    case "dd mmmm yyyy":
-      return `${pad2(day)} ${MONTHS_LONG[month]} ${year}`;
-    case "dd mmmm yyyy hh:mm:ss":
-      return `${pad2(day)} ${MONTHS_LONG[month]} ${year} ${timeSec}`;
-    case "dd mmmm yyyy hh:mm":
-      return `${pad2(day)} ${MONTHS_LONG[month]} ${year} ${time}`;
-    default:
-      return readCategoryLabel(value);
-  }
 }
 
 export function formatYAxisValue(value: unknown, format?: string): string {

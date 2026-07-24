@@ -5,6 +5,7 @@ import LineChart from "./charts/LineChart";
 import BarChart from "./charts/BarChart";
 import PieChart from "./charts/PieChart";
 import TableChart from "./charts/TableChart";
+import WaterfallChart from "./charts/WaterfallChart";
 import CSpinner from "./CSpinner";
 import {
   fetchWidgetQueryData,
@@ -114,6 +115,30 @@ export function renderWidgetChart(
         showValue={cfg.showValue}
         showPercentage={cfg.showPercentage}
         valuePosition={cfg.valuePosition}
+        data={previewRows}
+      />
+    );
+  }
+
+  if (meta.chartType === "waterfall") {
+    return (
+      <WaterfallChart
+        title={{
+          value: cfg.title || meta.title,
+          valueFontSize: Number(cfg.titleFontSize) || undefined,
+          valueFontColor: cfg.titleFontColor || undefined,
+        }}
+        xAxis={cfg.xAxis}
+        xAxisColor={cfg.xAxisColor}
+        format={cfg.format}
+        xAxisIsDateTime={cfg.xAxisIsDateTime === "true" || Boolean(cfg.format?.trim())}
+        value={cfg.value}
+        valueFormat={cfg.valueFormat}
+        increaseColor={cfg.increaseColor}
+        decreaseColor={cfg.decreaseColor}
+        showConnectors={cfg.showConnectors}
+        showValue={cfg.showValue}
+        legend={cfg.legend}
         data={previewRows}
       />
     );

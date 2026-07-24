@@ -9,6 +9,7 @@ import {
   FaCheck,
   FaPlus,
   FaTimes,
+  FaWater,
 } from "react-icons/fa";
 import { PiFileSqlFill } from "react-icons/pi";
 import { IoGridOutline } from "react-icons/io5";
@@ -23,13 +24,14 @@ import LineChart from "./charts/LineChart";
 import BarChart from "./charts/BarChart";
 import PieChart from "./charts/PieChart";
 import TableChart from "./charts/TableChart";
-import { CardSchema, LineChartSchema, BarChartSchema, PieChartSchema, TableChartSchema } from "./charts/ChartsSchemas";
+import WaterfallChart from "./charts/WaterfallChart";
+import { CardSchema, LineChartSchema, BarChartSchema, PieChartSchema, TableChartSchema, WaterFallChartSchema } from "./charts/ChartsSchemas";
 import { getQueries, getQuery, runQuery, getCompiledModel, type QueryPublicResponse, type QueryDetailedResponse, type SemanticModelSchema } from "../lib/Api";
 import { normalizeQueryRows } from "../lib/queryResult";
 import { isDateTimeTypeKind, resolveXAxisFieldType } from "../lib/fieldTypes";
 import { VscDebugRerun } from "react-icons/vsc";
 
-type ChartType = "card" | "line" | "bar" | "pie" | "table";
+type ChartType = "card" | "line" | "bar" | "pie" | "table" | "waterfall";
 
 export type { ChartType };
 
@@ -160,6 +162,13 @@ const CHART_OPTIONS: ChartOption[] = [
     description: "Tabular data with sorting & pagination",
     icon: <FaTable size={10} />,
     schema: { chartType: TableChartSchema.chartType, fields: normalizeFields(TableChartSchema.fields as Array<Record<string, unknown>>) },
+  },
+  {
+    type: "waterfall",
+    label: "Waterfall",
+    description: "Cumulative increases and decreases from a starting value",
+    icon: <FaWater size={11} />,
+    schema: { chartType: WaterFallChartSchema.chartType, fields: normalizeFields(WaterFallChartSchema.fields as Array<Record<string, unknown>>) },
   },
 ];
 
@@ -599,21 +608,22 @@ export default function WidgetEditDialog({
   );
 
   const isXAxisDateTime = isDateTimeTypeKind(xAxisTypeKind);
+  const isDateFormatChart = selectedChart === "line" || selectedChart === "waterfall";
 
   const visibleFields = useMemo(() => {
     if (!activeSchema) return [];
     return activeSchema.fields.filter((field) => {
       if (!shouldShowField(field, chartConfig)) return false;
-      if (selectedChart === "line" && field.name === "format" && !isXAxisDateTime) return false;
+      if (isDateFormatChart && field.name === "format" && !isXAxisDateTime) return false;
       return true;
     });
-  }, [activeSchema, chartConfig, selectedChart, isXAxisDateTime]);
+  }, [activeSchema, chartConfig, isDateFormatChart, isXAxisDateTime]);
 
   useEffect(() => {
-    if (selectedChart !== "line" || isXAxisDateTime || !chartConfig.format) return;
+    if (!isDateFormatChart || isXAxisDateTime || !chartConfig.format) return;
     if (isConfigTruthy(chartConfig.xAxisIsDateTime)) return;
     setChartConfig((prev) => ({ ...prev, format: "" }));
-  }, [selectedChart, isXAxisDateTime, chartConfig.format, chartConfig.xAxisIsDateTime]);
+  }, [isDateFormatChart, isXAxisDateTime, chartConfig.format, chartConfig.xAxisIsDateTime]);
 
   const step1Done = !!selected;
   const step2Done = !!selectedChart;
@@ -622,7 +632,7 @@ export default function WidgetEditDialog({
   function updateConfig(name: string, value: string) {
     setChartConfig((prev) => {
       const next = { ...prev, [name]: value };
-      if (name === "xAxis" && selectedChart === "line") {
+      if (name === "xAxis" && isDateFormatChart) {
         const source = compiledModel?.sources.find((item) => item.name === queryDetails?.source) ?? null;
         const typeKind = resolveXAxisFieldType(value, source);
         if (!isDateTimeTypeKind(typeKind)) {
@@ -678,7 +688,7 @@ export default function WidgetEditDialog({
 
   const chartYAxisFields = useMemo(() => parseConfigList(chartConfig.yAxis), [chartConfig.yAxis]);
   const isSeriesChart = selectedChart === "line" || selectedChart === "bar";
-  const isRowsChart = selectedChart === "pie" || selectedChart === "table";
+  const isRowsChart = selectedChart === "pie" || selectedChart === "table" || selectedChart === "waterfall";
 
   const canRun =
     selectedChart === "card"
@@ -810,7 +820,7 @@ export default function WidgetEditDialog({
         chartType: selectedChart,
         chartConfig: {
           ...chartConfig,
-          ...(selectedChart === "line"
+          ...(isDateFormatChart
             ? { xAxisIsDateTime: isXAxisDateTime ? "true" : "false" }
             : {}),
         },
@@ -1297,6 +1307,33 @@ export default function WidgetEditDialog({
                     showIndex={chartConfig.showIndex}
                     data={previewRows ?? []}
                   />
+                </div>
+              ) : selectedChart === "waterfall" ? (
+                <div
+                  className="flex h-80 w-full max-w-2xl flex-col overflow-hidden rounded-2xl border shadow-sm"
+                  style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+                >
+                  <div className="h-full min-h-0 p-3">
+                    <WaterfallChart
+                      title={{
+                        value: chartConfig.title || widgetTitle,
+                        valueFontSize: Number(chartConfig.titleFontSize) || undefined,
+                        valueFontColor: chartConfig.titleFontColor || undefined,
+                      }}
+                      xAxis={chartConfig.xAxis}
+                      xAxisColor={chartConfig.xAxisColor}
+                      format={chartConfig.format}
+                      xAxisIsDateTime={isXAxisDateTime}
+                      value={chartConfig.value}
+                      valueFormat={chartConfig.valueFormat}
+                      increaseColor={chartConfig.increaseColor}
+                      decreaseColor={chartConfig.decreaseColor}
+                      showConnectors={chartConfig.showConnectors}
+                      showValue={chartConfig.showValue}
+                      legend={chartConfig.legend}
+                      data={previewRows ?? []}
+                    />
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-col items-center text-center">
