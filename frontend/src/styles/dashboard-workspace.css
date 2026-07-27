@@ -1,3 +1,9 @@
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
 /* react-grid-layout theme overrides */
 .dashboard-workspace-grid {
   background-image:
@@ -84,4 +90,22 @@
 
 .dashboard-view-mode .react-grid-item {
   cursor: default !important;
+}
+
+/* Export as PDF: print just the dashboard canvas via the browser's print dialog */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .dashboard-view-mode,
+  .dashboard-view-mode * {
+    overflow: visible !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .dashboard-view-mode {
+    height: auto !important;
+  }
 }

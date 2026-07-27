@@ -6,6 +6,7 @@ import BarChart from "./charts/BarChart";
 import PieChart from "./charts/PieChart";
 import TableChart from "./charts/TableChart";
 import WaterfallChart from "./charts/WaterfallChart";
+import TreemapChart from "./charts/TreemapChart";
 import CSpinner from "./CSpinner";
 import {
   fetchWidgetQueryData,
@@ -139,6 +140,24 @@ export function renderWidgetChart(
         showConnectors={cfg.showConnectors}
         showValue={cfg.showValue}
         legend={cfg.legend}
+        data={previewRows}
+      />
+    );
+  }
+
+  if (meta.chartType === "treemap") {
+    return (
+      <TreemapChart
+        title={{
+          value: cfg.title || meta.title,
+          valueFontSize: Number(cfg.titleFontSize) || undefined,
+          valueFontColor: cfg.titleFontColor || undefined,
+        }}
+        category={cfg.category}
+        value={cfg.value}
+        valueFormat={cfg.valueFormat}
+        tileColor={cfg.tileColor}
+        showValue={cfg.showValue}
         data={previewRows}
       />
     );

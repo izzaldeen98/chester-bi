@@ -10,6 +10,7 @@ import {
   FaPlus,
   FaTimes,
   FaWater,
+  FaThLarge,
 } from "react-icons/fa";
 import { PiFileSqlFill } from "react-icons/pi";
 import { IoGridOutline } from "react-icons/io5";
@@ -25,13 +26,14 @@ import BarChart from "./charts/BarChart";
 import PieChart from "./charts/PieChart";
 import TableChart from "./charts/TableChart";
 import WaterfallChart from "./charts/WaterfallChart";
-import { CardSchema, LineChartSchema, BarChartSchema, PieChartSchema, TableChartSchema, WaterFallChartSchema } from "./charts/ChartsSchemas";
+import TreemapChart from "./charts/TreemapChart";
+import { CardSchema, LineChartSchema, BarChartSchema, PieChartSchema, TableChartSchema, WaterFallChartSchema, TreemapChartSchema } from "./charts/ChartsSchemas";
 import { getQueries, getQuery, runQuery, getCompiledModel, type QueryPublicResponse, type QueryDetailedResponse, type SemanticModelSchema } from "../lib/Api";
 import { normalizeQueryRows } from "../lib/queryResult";
 import { isDateTimeTypeKind, resolveXAxisFieldType } from "../lib/fieldTypes";
 import { VscDebugRerun } from "react-icons/vsc";
 
-type ChartType = "card" | "line" | "bar" | "pie" | "table" | "waterfall";
+type ChartType = "card" | "line" | "bar" | "pie" | "table" | "waterfall" | "treemap";
 
 export type { ChartType };
 
@@ -169,6 +171,13 @@ const CHART_OPTIONS: ChartOption[] = [
     description: "Cumulative increases and decreases from a starting value",
     icon: <FaWater size={11} />,
     schema: { chartType: WaterFallChartSchema.chartType, fields: normalizeFields(WaterFallChartSchema.fields as Array<Record<string, unknown>>) },
+  },
+  {
+    type: "treemap",
+    label: "Treemap",
+    description: "Part-to-whole comparison sized by value",
+    icon: <FaThLarge size={11} />,
+    schema: { chartType: TreemapChartSchema.chartType, fields: normalizeFields(TreemapChartSchema.fields as Array<Record<string, unknown>>) },
   },
 ];
 
@@ -688,7 +697,11 @@ export default function WidgetEditDialog({
 
   const chartYAxisFields = useMemo(() => parseConfigList(chartConfig.yAxis), [chartConfig.yAxis]);
   const isSeriesChart = selectedChart === "line" || selectedChart === "bar";
-  const isRowsChart = selectedChart === "pie" || selectedChart === "table" || selectedChart === "waterfall";
+  const isRowsChart =
+    selectedChart === "pie" ||
+    selectedChart === "table" ||
+    selectedChart === "waterfall" ||
+    selectedChart === "treemap";
 
   const canRun =
     selectedChart === "card"
@@ -1331,6 +1344,27 @@ export default function WidgetEditDialog({
                       showConnectors={chartConfig.showConnectors}
                       showValue={chartConfig.showValue}
                       legend={chartConfig.legend}
+                      data={previewRows ?? []}
+                    />
+                  </div>
+                </div>
+              ) : selectedChart === "treemap" ? (
+                <div
+                  className="flex h-80 w-full max-w-2xl flex-col overflow-hidden rounded-2xl border shadow-sm"
+                  style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+                >
+                  <div className="h-full min-h-0 p-3">
+                    <TreemapChart
+                      title={{
+                        value: chartConfig.title || widgetTitle,
+                        valueFontSize: Number(chartConfig.titleFontSize) || undefined,
+                        valueFontColor: chartConfig.titleFontColor || undefined,
+                      }}
+                      category={chartConfig.category}
+                      value={chartConfig.value}
+                      valueFormat={chartConfig.valueFormat}
+                      tileColor={chartConfig.tileColor}
+                      showValue={chartConfig.showValue}
                       data={previewRows ?? []}
                     />
                   </div>

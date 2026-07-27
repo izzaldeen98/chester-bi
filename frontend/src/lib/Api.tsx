@@ -225,6 +225,7 @@ export interface DashboardConfig {
   version: string;
   name: string;
   gridRows?: number;
+  backgroundColor?: string;
   elements: DashboardElement[];
 }
 

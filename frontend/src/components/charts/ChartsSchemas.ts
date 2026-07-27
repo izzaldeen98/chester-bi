@@ -569,3 +569,71 @@ export const WaterFallChartSchema = {
         },
     ],
 };
+
+export const TreemapChartSchema = {
+    chartType: "treemap",
+    fields: [
+        {
+            name: "title",
+            inputType: "text",
+            label: "Title",
+            placeholder: "Enter title",
+            required: false,
+        },
+        {
+            name: "titleFontSize",
+            inputType: "number",
+            label: "Title Font Size",
+            placeholder: "Enter title font size",
+            required: false,
+        },
+        {
+            name: "titleFontColor",
+            inputType: "color",
+            label: "Title Font Color",
+            placeholder: "Enter title font color",
+            required: false,
+        },
+        {
+            name: "category",
+            inputType: "select",
+            label: "Category",
+            placeholder: "Select category field",
+            required: true,
+        },
+        {
+            name: "value",
+            inputType: "select",
+            label: "Value",
+            placeholder: "Select value field",
+            required: true,
+        },
+        {
+            name: "valueFormat",
+            inputType: "select",
+            label: "Value Format",
+            placeholder: "Select value format",
+            required: false,
+            options: [
+                { value: "currency", label: "Currency" },
+                { value: "number", label: "Number" },
+                { value: "decimal", label: "Decimal" },
+            ],
+        },
+        {
+            name: "tileColor",
+            inputType: "multi-color",
+            label: "Tile Colors",
+            placeholder: "Enter tile colors",
+            required: false,
+        },
+        {
+            name: "showValue",
+            inputType: "switch",
+            label: "Show Value",
+            placeholder: "Show value under each tile's label",
+            required: false,
+            defaultValue: "true",
+        },
+    ],
+};
