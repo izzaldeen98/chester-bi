@@ -21,7 +21,7 @@
 | Load Examples | modeling | ✅ Done |
 | Text and waterfall charts | Visualization | ✅ Done |
 | Make Malloy an internal service | Visualization | ✅ Done|
-| Dashboard Settings | charts | 📋 Planned|
+| Dashboard Settings | charts | Done|
 
 
 ## RM-0003
