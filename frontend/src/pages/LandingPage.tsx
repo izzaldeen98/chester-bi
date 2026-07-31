@@ -119,6 +119,11 @@ function Navbar({ stars }: { stars: string | null }) {
         borderBottom: "1px solid var(--border)",
       }}
     >
+      <div
+        aria-hidden
+        className="h-[3px] w-full"
+        style={{ background: "linear-gradient(90deg, #d97706 0%, #eab308 45%, #facc15 100%)" }}
+      />
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         {/* Logo */}
         <div className="flex items-center gap-2">
@@ -178,6 +183,18 @@ function Hero({ stars }: { stars: string | null }) {
 
   return (
     <section className="relative overflow-hidden px-6 py-28 text-center">
+      {/* Dashboard-grid motif, echoing the product's own workspace canvas */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-20"
+        style={{
+          backgroundImage:
+            "radial-gradient(color-mix(in srgb, var(--accent) 45%, transparent) 1.5px, transparent 1.5px)",
+          backgroundSize: "28px 28px",
+          maskImage: "radial-gradient(ellipse 70% 55% at 50% 10%, black 0%, transparent 75%)",
+          WebkitMaskImage: "radial-gradient(ellipse 70% 55% at 50% 10%, black 0%, transparent 75%)",
+        }}
+      />
       {/* Radial glow */}
       <div
         aria-hidden
@@ -269,20 +286,15 @@ function Features() {
           {features.map((f) => (
             <div
               key={f.title}
-              className="rounded-2xl p-5 transition-all"
+              className="group rounded-2xl p-5 shadow-sm border-[var(--border)] transition-all duration-200 hover:-translate-y-1 hover:border-[var(--accent-ring)] hover:shadow-lg"
               style={{
                 background: "var(--bg-subtle)",
-                border: "1px solid var(--border)",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "var(--accent-ring)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "var(--border)";
+                borderWidth: 1,
+                borderStyle: "solid",
               }}
             >
               <div
-                className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl"
+                className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-110"
                 style={{
                   background: "var(--accent-muted)",
                   color: "var(--accent)",
@@ -341,19 +353,25 @@ function QuickStart() {
 
         {/* Code block */}
         <div
-          className="mt-12 overflow-x-auto rounded-2xl p-5 text-sm font-mono"
-          style={{
-            background: "var(--bg-subtle)",
-            border: "1px solid var(--border)",
-            color: "var(--text-h)",
-          }}
+          className="mt-12 overflow-hidden rounded-2xl"
+          style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)" }}
         >
-          <p><span style={{ color: "var(--accent)", opacity: 0.7 }}># 1. Clone the repo</span></p>
-          <p>git clone https://github.com/chester-bi/chester-bi.git && cd chester-bi</p>
-          <p className="mt-2"><span style={{ color: "var(--accent)", opacity: 0.7 }}># 2. Configure environment</span></p>
-          <p>cp .example.env .env  <span style={{ color: "var(--accent)", opacity: 0.5 }}># fill in SECRET_KEY & FERNET_KEY</span></p>
-          <p className="mt-2"><span style={{ color: "var(--accent)", opacity: 0.7 }}># 3. Launch everything</span></p>
-          <p>docker compose up --build</p>
+          <div
+            className="flex items-center gap-1.5 px-4 py-2.5"
+            style={{ borderBottom: "1px solid var(--border)" }}
+          >
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: "#ef4444" }} />
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: "#eab308" }} />
+            <span className="h-2.5 w-2.5 rounded-full" style={{ background: "#22c55e" }} />
+          </div>
+          <div className="overflow-x-auto p-5 text-sm font-mono" style={{ color: "var(--text-h)" }}>
+            <p><span style={{ color: "var(--accent)", opacity: 0.7 }}># 1. Clone the repo</span></p>
+            <p>git clone https://github.com/chester-bi/chester-bi.git && cd chester-bi</p>
+            <p className="mt-2"><span style={{ color: "var(--accent)", opacity: 0.7 }}># 2. Configure environment</span></p>
+            <p>cp .example.env .env  <span style={{ color: "var(--accent)", opacity: 0.5 }}># fill in SECRET_KEY & FERNET_KEY</span></p>
+            <p className="mt-2"><span style={{ color: "var(--accent)", opacity: 0.7 }}># 3. Launch everything</span></p>
+            <p>docker compose up --build</p>
+          </div>
         </div>
       </div>
     </section>
@@ -366,21 +384,29 @@ function CTABanner() {
   return (
     <section className="px-6 py-20" style={{ borderTop: "1px solid var(--border)" }}>
       <div
-        className="mx-auto max-w-4xl overflow-hidden rounded-3xl p-12 text-center"
+        className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl p-12 text-center shadow-2xl"
         style={{
           background:
             "linear-gradient(135deg, #d97706 0%, #eab308 45%, #facc15 100%)",
         }}
       >
-        <GiJesterHat size={44} className="mx-auto mb-4" style={{ color: "rgba(0,0,0,0.55)" }} />
-        <h2 className="mb-3 text-4xl font-extrabold tracking-tight text-black">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(circle 220px at 15% 15%, rgba(255,255,255,0.35) 0%, transparent 70%), radial-gradient(circle 260px at 90% 100%, rgba(0,0,0,0.18) 0%, transparent 70%)",
+          }}
+        />
+        <GiJesterHat size={44} className="relative mx-auto mb-4" style={{ color: "rgba(0,0,0,0.55)" }} />
+        <h2 className="relative mb-3 text-4xl font-extrabold tracking-tight text-black">
           Ready to own your data?
         </h2>
-        <p className="mx-auto mb-8 max-w-lg text-black/70">
+        <p className="relative mx-auto mb-8 max-w-lg text-black/70">
           Deploy Chester BI on your own server in minutes. No vendor lock-in,
           no per-seat pricing, no data leaving your infrastructure.
         </p>
-        <div className="flex flex-wrap items-center justify-center gap-4">
+        <div className="relative flex flex-wrap items-center justify-center gap-4">
           <CButton
             variant="primary"
             onClick={() => navigate("/register")}

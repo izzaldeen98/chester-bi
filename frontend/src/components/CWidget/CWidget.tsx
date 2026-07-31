@@ -72,7 +72,7 @@ export default function CWidget({
         </div>
       )}
 
-      <div className="widget-chart-area pointer-events-none relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-lg border border-dashed border-gray-200 bg-gray-50">
+      <div className="widget-chart-area pointer-events-none relative z-0 flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-lg bg-gray-50">
         {chart ? (
           <div className="flex min-h-0 flex-1 flex-col">{chart}</div>
         ) : (

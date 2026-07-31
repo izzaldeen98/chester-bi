@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Responsive, useContainerWidth, verticalCompactor } from "react-grid-layout";
+import { Responsive, verticalCompactor } from "react-grid-layout";
 import type { LayoutItem, ResponsiveLayouts } from "react-grid-layout";
 import { MdDashboard } from "react-icons/md";
 import { FaPlus, FaSave } from "react-icons/fa";
@@ -43,33 +43,26 @@ function toWidgetConfig(meta: WidgetMeta): WidgetChartConfig | undefined {
   };
 }
 
-const breakpoints = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
-const cols = { lg: 32, md: 24, sm: 16, xs: 8, xxs: 4 };
-const DEFAULT_GRID_ROWS = 24;
+// Fixed breakpoint AND fixed pixel cell size: widget x/y/w/h are saved once and must
+// render pixel-for-pixel the same everywhere. Sizing columns off each page's own
+// (possibly different) window width made the grid look denser/sparser between the
+// workspace and the view tab even at the same column count — so the canvas is a
+// constant size and the container scrolls horizontally on narrower windows instead.
+const GRID_COLS = 32;
+const CELL_SIZE = 37;
+const breakpoints = { lg: 0 };
+const cols = { lg: GRID_COLS };
+const DEFAULT_GRID_ROWS = 36;
 const MIN_GRID_ROWS = 8;
 const MAX_GRID_ROWS = 200;
 const GRID_MARGIN: [number, number] = [8, 8];
 
-function getActiveCols(containerWidth: number) {
-  if (containerWidth >= breakpoints.lg) return cols.lg;
-  if (containerWidth >= breakpoints.md) return cols.md;
-  if (containerWidth >= breakpoints.sm) return cols.sm;
-  if (containerWidth >= breakpoints.xs) return cols.xs;
-  return cols.xxs;
-}
-
-function getSquareGridMetrics(containerWidth: number, gridRows: number) {
-  if (containerWidth <= 0) {
-    return { rowHeight: 48, canvasHeight: gridRows * 48, cellSize: 48, activeCols: cols.lg };
-  }
-
-  const activeCols = getActiveCols(containerWidth);
+function getSquareGridMetrics(gridRows: number) {
   const [mx, my] = GRID_MARGIN;
-  const cellSize = Math.floor((containerWidth - mx * (activeCols - 1)) / activeCols);
-  const rowHeight = cellSize;
-  const canvasHeight = gridRows * cellSize + my * (gridRows - 1);
+  const canvasWidth = GRID_COLS * CELL_SIZE + mx * (GRID_COLS - 1);
+  const canvasHeight = gridRows * CELL_SIZE + my * (gridRows - 1);
 
-  return { rowHeight, canvasHeight, cellSize, activeCols };
+  return { rowHeight: CELL_SIZE, canvasWidth, canvasHeight, cellSize: CELL_SIZE };
 }
 
 function buildLayouts(items: LayoutItem[]): ResponsiveLayouts {
@@ -99,11 +92,11 @@ export default function DashboardWorkSpace() {
   const activeFilterList = Object.values(activeFilters);
   const [gridRows, setGridRows] = useState(DEFAULT_GRID_ROWS);
   const [gridRowsInput, setGridRowsInput] = useState(String(DEFAULT_GRID_ROWS));
-  const { width, containerRef, mounted } = useContainerWidth();
+  const [bgColor, setBgColor] = useState("");
 
-  const { rowHeight, canvasHeight, cellSize } = useMemo(
-    () => getSquareGridMetrics(width, gridRows),
-    [width, gridRows],
+  const { rowHeight, canvasWidth, canvasHeight, cellSize } = useMemo(
+    () => getSquareGridMetrics(gridRows),
+    [gridRows],
   );
 
   const layoutItems = (layouts.lg ?? []) as LayoutItem[];
@@ -118,6 +111,7 @@ export default function DashboardWorkSpace() {
         const loadedRows = config.gridRows ?? DEFAULT_GRID_ROWS;
         setGridRows(loadedRows);
         setGridRowsInput(String(loadedRows));
+        setBgColor(config.backgroundColor ?? "");
 
         const items: LayoutItem[] = [];
         const meta: Record<string, WidgetMeta> = {};
@@ -264,9 +258,10 @@ export default function DashboardWorkSpace() {
       version: "1.0.0",
       name: dashboardNameRef.current,
       gridRows,
+      backgroundColor: bgColor || undefined,
       elements,
     });
-  }, [dashboardId, layoutItems, widgetMeta]);
+  }, [dashboardId, layoutItems, widgetMeta, gridRows, bgColor]);
 
   return (
     <div className="flex h-full flex-1 flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
@@ -309,6 +304,29 @@ export default function DashboardWorkSpace() {
           />
         </div>
 
+        <div className="flex items-center gap-1.5">
+          <label className="text-[11px] font-medium" style={{ color: "var(--text)" }}>
+            Background
+          </label>
+          <input
+            type="color"
+            value={bgColor || "#0b0d12"}
+            onChange={(e) => setBgColor(e.target.value)}
+            className="h-6 w-8 cursor-pointer rounded border p-0"
+            style={{ borderColor: "var(--border)" }}
+          />
+          {bgColor && (
+            <button
+              type="button"
+              onClick={() => setBgColor("")}
+              className="text-[11px] underline"
+              style={{ color: "var(--text)" }}
+            >
+              reset
+            </button>
+          )}
+        </div>
+
         <div className="h-4 w-px" style={{ background: "var(--border)" }} />
 
         <CButton variant="outline" className="!px-3 !py-1.5 !text-xs" onClick={addWidget}>
@@ -323,14 +341,14 @@ export default function DashboardWorkSpace() {
       </header>
 
       <div
-        ref={containerRef}
         className="dashboard-workspace flex-1 overflow-auto p-2"
-        style={{ background: "var(--bg)" }}
+        style={{ background: bgColor || "var(--bg)" }}
       >
-        {mounted && layoutItems.length > 0 && (
+        {layoutItems.length > 0 && (
           <div
             className="dashboard-workspace-grid relative"
             style={{
+              width: canvasWidth,
               height: canvasHeight,
               minHeight: canvasHeight,
               ["--cell-size" as string]: `${cellSize + GRID_MARGIN[0]}px`,
@@ -342,7 +360,7 @@ export default function DashboardWorkSpace() {
               layouts={layouts}
               breakpoints={breakpoints}
               cols={cols}
-              width={width}
+              width={canvasWidth}
               rowHeight={rowHeight}
               margin={GRID_MARGIN}
               containerPadding={[0, 0] as const}
@@ -397,7 +415,7 @@ export default function DashboardWorkSpace() {
           </div>
         )}
 
-        {mounted && layoutItems.length === 0 && (
+        {layoutItems.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <IoBarChartSharp size={36} style={{ color: "var(--border)" }} />
             <p className="mt-3 text-sm" style={{ color: "var(--text)" }}>

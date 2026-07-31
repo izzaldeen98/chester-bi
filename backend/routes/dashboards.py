@@ -203,6 +203,10 @@ async def save_dashboard_config(
         file_content["name"] = config["name"]
     if "version" in config:
         file_content["version"] = config["version"]
+    if "gridRows" in config:
+        file_content["gridRows"] = config["gridRows"]
+    if "backgroundColor" in config:
+        file_content["backgroundColor"] = config["backgroundColor"]
     file_content["elements"] = config.get("elements", [])
     await storage.upload_file(BytesIO(dumps(file_content).encode('utf-8')), file_path , f"{dashboard.public_key}.json")
     return {"message": "Dashboard config saved successfully"}

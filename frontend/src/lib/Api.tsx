@@ -89,6 +89,7 @@ export interface RegisterPayload {
   password: string;
   first_name: string;
   last_name: string;
+  examples?: string[];
 }
 
 export async function register(payload: RegisterPayload): Promise<{ message: string }> {
@@ -224,6 +225,7 @@ export interface DashboardConfig {
   version: string;
   name: string;
   gridRows?: number;
+  backgroundColor?: string;
   elements: DashboardElement[];
 }
 

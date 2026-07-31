@@ -2,6 +2,7 @@ from pydantic import BaseModel , Field
 from datetime import datetime
 from uuid import UUID
 from pydantic import EmailStr
+from typing import List
 
 
 class AccountBase(BaseModel):
@@ -22,6 +23,7 @@ class OwnerCreate(AccountBase):
     last_name: str = Field(..., min_length=3, max_length=127)
     description: str = Field(..., min_length=3, max_length=127)
     name: str = Field(..., min_length=3, max_length=127)
+    examples: List[str] = []
 
 
 

@@ -12,6 +12,7 @@ from utils.init_database import get_db
 from models.account import Account
 from schema.account import OwnerCreate
 from utils.malloy import Malloy
+from utils.load_examples import load_account
 
 router = APIRouter(prefix="/api/v1/auth" , tags=["auth"])
 
@@ -57,7 +58,7 @@ async def login_for_access_token(
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-def register_user(payload: OwnerCreate, db: Session = Depends(get_db)):
+async def register_user(payload: OwnerCreate, db: Session = Depends(get_db)):
 
     user = (
         db.query(User)
@@ -71,6 +72,8 @@ def register_user(payload: OwnerCreate, db: Session = Depends(get_db)):
         )
 
     new_account = Account(name=payload.name, description=payload.description)
+
+    examples = payload.examples or []
 
     db.add(new_account)
     db.flush()
@@ -90,9 +93,12 @@ def register_user(payload: OwnerCreate, db: Session = Depends(get_db)):
         created_by = None,
         updated_by = None
     )
-    Malloy().create_environment(name=str(new_account.public_key), description=f"Environment for {new_account.name}")
-
     db.add(superuser)
+    db.flush()
+
+    Malloy().create_environment(name=str(new_account.public_key), description=f"Environment for {new_account.name}")
+    await load_account(account_id=new_account.id, user_id=superuser.id, examples=examples, db=db)
+
     db.commit()
     db.refresh(superuser)
 

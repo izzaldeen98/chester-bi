@@ -20,14 +20,18 @@ export interface BarChartProps {
   data?: Record<string, unknown>[];
 }
 
-const DEFAULT_SERIES_COLORS = [
-  "#eab308",
-  "#3b82f6",
-  "#10b981",
-  "#f97316",
-  "#8b5cf6",
-  "#ec4899",
+// Validated categorical palette (fixed hue order, CVD-checked) — see dataviz skill.
+const SERIES_COLORS_LIGHT = [
+  "#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948",
 ];
+const SERIES_COLORS_DARK = [
+  "#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767",
+];
+
+function isDarkMode() {
+  if (typeof document === "undefined") return false;
+  return document.documentElement.classList.contains("dark");
+}
 
 function getThemeColor(variable: string, fallback: string) {
   if (typeof window === "undefined") return fallback;
@@ -107,7 +111,8 @@ export default function BarChart({
   const yFields = useMemo(() => parseList(yAxis), [yAxis]);
   const colors = useMemo(() => {
     const parsed = parseList(yAxisColor);
-    return yFields.map((_, index) => parsed[index] || DEFAULT_SERIES_COLORS[index % DEFAULT_SERIES_COLORS.length]);
+    const palette = isDarkMode() ? SERIES_COLORS_DARK : SERIES_COLORS_LIGHT;
+    return yFields.map((_, index) => parsed[index] || palette[index % palette.length]);
   }, [yAxisColor, yFields]);
 
   const legendLabels = useMemo(() => {
@@ -167,7 +172,7 @@ export default function BarChart({
       axisTick: { show: false },
       axisLabel: { color: textColor, fontSize: 10, margin: 8 },
       splitLine: {
-        lineStyle: { color: borderColor, type: "dashed" as const, width: 1, opacity: 0.7 },
+        lineStyle: { color: borderColor, width: 1 },
       },
     };
 
@@ -234,11 +239,14 @@ export default function BarChart({
         name: legendLabels[index] || field,
         type: "bar",
         stack: useStack ? "total" : undefined,
-        barMaxWidth: horizontal ? 28 : 48,
-        barCategoryGap: "35%",
+        // Mark spec: bars stay thin (never fill the category slot) with visible
+        // air between them, and a small rounded data-end anchored to a square baseline.
+        barMaxWidth: horizontal ? 20 : 22,
+        barCategoryGap: "45%",
+        barGap: useStack ? undefined : "30%",
         itemStyle: {
           color: colors[index],
-          borderRadius: horizontal ? [0, 6, 6, 0] : [6, 6, 0, 0],
+          borderRadius: horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0],
         },
         label: {
           show: useStack,

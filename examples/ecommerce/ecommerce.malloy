@@ -1,0 +1,116 @@
+source: ecommerce_orders is duckdb.table('../files/ecommerce_orders_dataset.csv') extend {
+
+  // ==========================================================
+  // DIMENSIONS
+  // ==========================================================
+
+  // ---- Identifiers ----
+  dimension: order_id is `Order_ID`
+  dimension: customer_id is `Customer_ID`
+  dimension: product_id is `Product_ID`
+
+  // ---- Date / time ----
+  dimension: order_date is `Order_Date`
+  dimension: order_year is `Year`
+  dimension: order_month is `Month`
+  dimension: order_day is `Day`
+  dimension: order_day_of_week is `Day_Of_Week`
+  dimension: order_quarter is `Quarter`
+  dimension: season is `Season`
+  dimension: holiday_season is `Holiday_Season`
+
+  // ---- Customer attributes ----
+  dimension: customer_age is `Customer_Age`
+  dimension: customer_gender is `Customer_Gender`
+  dimension: country is `Country`
+  dimension: city is `City`
+  dimension: customer_segment is `Customer_Segment`
+  dimension: membership_status is `Membership_Status`
+  dimension: customer_lifetime_value is `Customer_Lifetime_Value`
+
+  // ---- Product attributes ----
+  dimension: product_category is `Product_Category`
+  dimension: product_subcategory is `Product_Subcategory`
+  dimension: brand is `Brand`
+  dimension: unit_price is `Unit_Price`
+
+  // ---- Order details ----
+  dimension: quantity is `Quantity`
+  dimension: discount_percent is `Discount_Percent`
+  dimension: discount_amount is `Discount_Amount`
+  dimension: coupon_used is `Coupon_Used`
+  dimension: shipping_cost is `Shipping_Cost`
+  dimension: tax_amount is `Tax_Amount`
+  dimension: order_amount is `Order_Amount`
+
+  // ---- Transaction / channel ----
+  dimension: payment_method is `Payment_Method`
+  dimension: device_type is `Device_Type`
+  dimension: traffic_source is `Traffic_Source`
+
+  // ---- Fulfilment ----
+  dimension: shipping_method is `Shipping_Method`
+  dimension: warehouse_region is `Warehouse_Region`
+  dimension: delivery_days is `Delivery_Days`
+  dimension: order_status is `Order_Status`
+  dimension: returned is `Returned`
+
+  // ---- Feedback / profitability ----
+  dimension: review_rating is `Review_Rating`
+  dimension: profit_margin_percent is `Profit_Margin_Percent`
+  dimension: profit_amount is `Profit_Amount`
+  dimension: high_value_order is `High_Value_Order`
+
+  // ---- Derived boolean flags ----
+  dimension: is_returned is returned = 'Yes'
+  dimension: is_high_value is high_value_order = 'Yes'
+  dimension: used_coupon is coupon_used = 'Yes'
+  dimension: is_holiday_order is holiday_season = 'Yes'
+
+  // ---- Derived numeric dimension ----
+  dimension: net_revenue is order_amount - discount_amount
+
+  // ==========================================================
+  // MEASURES
+  // ==========================================================
+
+  // ---- Volume ----
+  measure: order_count is count()
+  measure: customer_count is count(customer_id)
+  measure: product_count is count(product_id)
+  measure: total_quantity is sum(quantity)
+
+  // ---- Revenue / financial ----
+  measure: total_order_amount is sum(order_amount)
+  measure: average_order_value is avg(order_amount)
+  measure: total_discount_amount is sum(discount_amount)
+  measure: average_discount_percent is avg(discount_percent)
+  measure: total_shipping_cost is sum(shipping_cost)
+  measure: total_tax_amount is sum(tax_amount)
+  measure: total_net_revenue is sum(net_revenue)
+  measure: average_unit_price is avg(unit_price)
+
+  // ---- Profitability ----
+  measure: total_profit_amount is sum(profit_amount)
+  measure: average_profit_margin_percent is avg(profit_margin_percent)
+
+  // ---- Customer ----
+  measure: average_customer_age is avg(customer_age)
+  measure: average_customer_lifetime_value is avg(customer_lifetime_value)
+  measure: total_customer_lifetime_value is sum(customer_lifetime_value)
+
+  // ---- Delivery / fulfilment ----
+  measure: average_delivery_days is avg(delivery_days)
+
+  // ---- Satisfaction ----
+  measure: average_review_rating is avg(review_rating)
+
+  // ---- Behavioral rates ----
+  measure: returned_order_count is count() { where: is_returned }
+  measure: return_rate is returned_order_count / order_count
+  measure: coupon_used_count is count() { where: used_coupon }
+  measure: coupon_usage_rate is coupon_used_count / order_count
+  measure: high_value_order_count is count() { where: is_high_value }
+  measure: high_value_order_rate is high_value_order_count / order_count
+  measure: holiday_order_count is count() { where: is_holiday_order }
+}

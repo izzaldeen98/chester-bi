@@ -1,0 +1,316 @@
+{
+    "version": "1.0.0",
+    "name": "Sales Overview",
+    "description": "sdljsdlfjlsdjfl",
+    "elements": [
+        {
+            "id": "widget-9cb85163-57ac-4753-84ae-ade517ee00b8",
+            "layout": {
+                "x": 0,
+                "y": 5,
+                "w": 18,
+                "h": 6,
+                "minW": 2,
+                "minH": 2
+            },
+            "meta": {
+                "title": "Monthly Growth",
+                "query": "Monthly Growth",
+                "queryId": "81d8cd86-80f2-4800-bd81-b6bcf3f26a6f",
+                "chartType": "line",
+                "chartConfig": {
+                    "title": "Monthly Growth",
+                    "titleFontSize": "14",
+                    "titleFontColor": "#111827",
+                    "value": "128400",
+                    "valueFontSize": "32",
+                    "valueFontColor": "#111827",
+                    "valueFormat": "currency",
+                    "hasTarget": "false",
+                    "target": "150000",
+                    "targetFormat": "currency",
+                    "targetBarColor": "#eab308",
+                    "hasCompare": "false",
+                    "xAxis": "order_date.month",
+                    "yAxis": "[\"growth\"]",
+                    "yAxisColor": "[\"#eab308\"]",
+                    "format": "mmm day",
+                    "xAxisIsDateTime": "true",
+                    "showDataPoints": "true"
+                }
+            }
+        },
+        {
+            "id": "widget-aadcbb22-0756-4321-a659-daf407fc5356",
+            "layout": {
+                "x": 0,
+                "y": 11,
+                "w": 18,
+                "h": 6,
+                "minW": 2,
+                "minH": 2
+            },
+            "meta": {
+                "title": "Monthly Revenue",
+                "query": "Monthly Growth",
+                "queryId": "81d8cd86-80f2-4800-bd81-b6bcf3f26a6f",
+                "chartType": "line",
+                "chartConfig": {
+                    "title": "Monthly Revenue",
+                    "titleFontSize": "14",
+                    "titleFontColor": "#111827",
+                    "value": "128400",
+                    "valueFontSize": "32",
+                    "valueFontColor": "#111827",
+                    "valueFormat": "currency",
+                    "hasTarget": "false",
+                    "target": "150000",
+                    "targetFormat": "currency",
+                    "targetBarColor": "#eab308",
+                    "hasCompare": "false",
+                    "xAxis": "order_date.month",
+                    "format": "mmm day",
+                    "yAxis": "[\"total_profit_amount\"]",
+                    "yAxisColor": "[\"#0822e7\"]",
+                    "showDataPoints": "true",
+                    "xAxisIsDateTime": "true"
+                }
+            }
+        },
+        {
+            "id": "widget-f53234e7-460b-4a08-8d07-979c97996100",
+            "layout": {
+                "x": 0,
+                "y": 1,
+                "w": 7,
+                "h": 4,
+                "minW": 2,
+                "minH": 2
+            },
+            "meta": {
+                "title": "Today Revenue",
+                "query": "Revenue Compared",
+                "queryId": "4b220368-b646-421b-af93-042bf4bd4d15",
+                "chartType": "card",
+                "chartConfig": {
+                    "title": "Today Revenue",
+                    "titleFontSize": "18",
+                    "titleFontColor": "#111827",
+                    "value": "total_net_revenue",
+                    "valueFontSize": "32",
+                    "valueFontColor": "#111827",
+                    "valueFormat": "currency",
+                    "hasTarget": "false",
+                    "target": "150000",
+                    "targetFormat": "currency",
+                    "targetBarColor": "#eab308",
+                    "hasCompare": "true",
+                    "compareField": "yesterday_revenue",
+                    "compareFormat": "currency"
+                }
+            }
+        },
+        {
+            "id": "widget-5e63c213-bf46-42d4-953d-7bdeae55eb33",
+            "layout": {
+                "x": 7,
+                "y": 1,
+                "w": 7,
+                "h": 4,
+                "minW": 2,
+                "minH": 2
+            },
+            "meta": {
+                "title": "Total Orders",
+                "query": "All Metrics",
+                "queryId": "8ed416fb-879e-43b5-96f7-76f9dff28b16",
+                "chartType": "card",
+                "chartConfig": {
+                    "title": "Total Orders",
+                    "titleFontSize": "18",
+                    "titleFontColor": "#111827",
+                    "value": "order_count",
+                    "valueFontSize": "32",
+                    "valueFontColor": "#111827",
+                    "valueFormat": "number",
+                    "hasTarget": "true",
+                    "target": "33000",
+                    "targetFormat": "currency",
+                    "targetBarColor": "#1708e7",
+                    "hasCompare": "false"
+                }
+            }
+        },
+        {
+            "id": "widget-8bf87291-a078-49a4-b8f9-f66e3b577eb6",
+            "layout": {
+                "x": 14,
+                "y": 1,
+                "w": 7,
+                "h": 4,
+                "minW": 2,
+                "minH": 2
+            },
+            "meta": {
+                "title": "Net Profit",
+                "query": "All Metrics",
+                "queryId": "8ed416fb-879e-43b5-96f7-76f9dff28b16",
+                "chartType": "card",
+                "chartConfig": {
+                    "title": "Net Profit",
+                    "titleFontSize": "18",
+                    "titleFontColor": "#111827",
+                    "value": "total_profit_amount",
+                    "valueFontSize": "32",
+                    "valueFontColor": "#111827",
+                    "valueFormat": "currency",
+                    "hasTarget": "false",
+                    "target": "150000",
+                    "targetFormat": "currency",
+                    "targetBarColor": "#eab308",
+                    "hasCompare": "false"
+                }
+            }
+        },
+        {
+            "id": "widget-9c3eb9c3-b954-43f2-b372-3e2b7ac43415",
+            "layout": {
+                "x": 21,
+                "y": 1,
+                "w": 7,
+                "h": 4,
+                "minW": 2,
+                "minH": 2
+            },
+            "meta": {
+                "title": "Total customers",
+                "query": "All Metrics",
+                "queryId": "8ed416fb-879e-43b5-96f7-76f9dff28b16",
+                "chartType": "card",
+                "chartConfig": {
+                    "title": "Total customers",
+                    "titleFontSize": "18",
+                    "titleFontColor": "#111827",
+                    "value": "customer_count",
+                    "valueFontSize": "32",
+                    "valueFontColor": "#111827",
+                    "valueFormat": "number",
+                    "hasTarget": "false",
+                    "target": "150000",
+                    "targetFormat": "currency",
+                    "targetBarColor": "#08e4e7",
+                    "hasCompare": "false"
+                }
+            }
+        },
+        {
+            "id": "widget-7b7c4f7f-c87c-4e4f-8322-1e2db47c9f62",
+            "layout": {
+                "x": 18,
+                "y": 5,
+                "w": 14,
+                "h": 12,
+                "minW": 2,
+                "minH": 2
+            },
+            "meta": {
+                "title": "Revenue by Country %",
+                "query": "Country Metrics",
+                "queryId": "472efb4d-bbdc-4e9e-9838-6ab127aade07",
+                "chartType": "pie",
+                "chartConfig": {
+                    "title": "Revenue by Country %",
+                    "titleFontSize": "14",
+                    "titleFontColor": "#111827",
+                    "value": "total_net_revenue",
+                    "valueFontSize": "32",
+                    "valueFontColor": "#111827",
+                    "valueFormat": "currency",
+                    "hasTarget": "false",
+                    "target": "150000",
+                    "targetFormat": "currency",
+                    "targetBarColor": "#eab308",
+                    "hasCompare": "false",
+                    "category": "country",
+                    "radius": "050",
+                    "showValue": "false",
+                    "showPercentage": "true",
+                    "valuePosition": "outside"
+                }
+            }
+        },
+        {
+            "id": "filter-8386ece6-fb9b-4b1e-926b-69511f883c08",
+            "layout": {
+                "x": 0,
+                "y": 0,
+                "w": 31,
+                "h": 1,
+                "minW": 4,
+                "minH": 1
+            },
+            "meta": {
+                "title": "order_date",
+                "filterRule": {
+                    "label": "order_date",
+                    "kind": "date",
+                    "operator": "after",
+                    "value": "",
+                    "mappings": [
+                        {
+                            "modelId": "78eeefac-497a-461c-bcb4-7fd75d5ce7db",
+                            "modelName": "ecommerce",
+                            "packageId": "e4ed6fe7-7b8a-4efb-a401-0209ef3f381e",
+                            "packageName": "sales-analytics",
+                            "fieldName": "order_date",
+                            "sourceName": "ecommerce_orders"
+                        }
+                    ],
+                    "targetWidgetIds": [
+                        "widget-aadcbb22-0756-4321-a659-daf407fc5356",
+                        "widget-5e63c213-bf46-42d4-953d-7bdeae55eb33",
+                        "widget-8bf87291-a078-49a4-b8f9-f66e3b577eb6",
+                        "widget-9c3eb9c3-b954-43f2-b372-3e2b7ac43415",
+                        "widget-7b7c4f7f-c87c-4e4f-8322-1e2db47c9f62",
+                        "widget-d549d664-4b2a-4106-bff7-65e6b197df74"
+                    ]
+                }
+            }
+        },
+        {
+            "id": "widget-d549d664-4b2a-4106-bff7-65e6b197df74",
+            "layout": {
+                "x": 0,
+                "y": 17,
+                "w": 32,
+                "h": 7,
+                "minW": 2,
+                "minH": 2
+            },
+            "meta": {
+                "title": "Daily Metrics",
+                "query": "Daily Metrics",
+                "queryId": "43206b32-6ae3-44ff-85bf-3add147c4baa",
+                "chartType": "table",
+                "chartConfig": {
+                    "title": "Daily Metrics",
+                    "titleFontSize": "14",
+                    "titleFontColor": "#111827",
+                    "value": "128400",
+                    "valueFontSize": "32",
+                    "valueFontColor": "#111827",
+                    "valueFormat": "currency",
+                    "hasTarget": "false",
+                    "target": "150000",
+                    "targetFormat": "currency",
+                    "targetBarColor": "#eab308",
+                    "hasCompare": "false",
+                    "columns": "[\"order_date.day\",\"customer_count\",\"order_count\",\"return_rate\",\"total_discount_amount\",\"total_profit_amount\",\"returned_order_count\",\"total_quantity\"]",
+                    "striped": "true",
+                    "showIndex": "true",
+                    "pageSize": "100"
+                }
+            }
+        }
+    ]
+}

@@ -8,7 +8,7 @@ version: '3.8'
 #    backend    – FastAPI / Uvicorn               (port 8989, internal only)
 #    postgres   – PostgreSQL 16                   (port 5432)
 #    redis      – Redis 7 cache                   (port 6379, internal only)
-#    publisher  – Malloy Publisher (query engine) (port 4000)
+#    publisher  – Malloy Publisher (query engine) (internal only, backend-reachable)
 #
 #  Quick start:
 #    1. cp .example.env .env   and fill in the values
@@ -114,9 +114,12 @@ services:
     image: ms2data/malloy-publisher
     container_name: chester_publisher
     restart: unless-stopped
-    ports:
-      - "4000:4000"
-      - "4040:4040"   # MCP endpoint for AI agents
+    # Port is intentionally NOT exposed to the host — only the backend talks
+    # to it, over the internal compose network at http://publisher:4000.
+    # Uncomment if you need direct access during development:
+    # ports:
+    #   - "4000:4000"
+    #   - "4040:4040"   # MCP endpoint for AI agents
     volumes:
       - local_data:/publisher/publisher_data
     healthcheck:

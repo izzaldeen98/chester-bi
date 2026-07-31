@@ -67,8 +67,8 @@ class UserPublicResponse(UserBase):
     permissions: List[str] | None = None
     created_at: datetime
     updated_at: datetime
-    created_by: Optional[UUID] = Field(default=None, validation_alias=AliasPath("creator", "public_key"))
-    updated_by: Optional[UUID] = Field(default=None, validation_alias=AliasPath("updater", "public_key"))
+    created_by: Optional[str] = Field(default=None, validation_alias=AliasPath("creator", "username"))
+    updated_by: Optional[str] = Field(default=None, validation_alias=AliasPath("updater", "username"))
 
     class Config:
         from_attributes = True

@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Responsive, useContainerWidth } from "react-grid-layout";
+import { Responsive } from "react-grid-layout";
 import type { LayoutItem, ResponsiveLayouts } from "react-grid-layout";
 import { MdDashboard, MdArrowBack, MdEdit } from "react-icons/md";
+import { FaFilePdf } from "react-icons/fa";
 import CWidget from "../components/CWidget/CWidget";
 import CSpinner from "../components/CSpinner";
 import CAlert from "../components/CAlert";
+import CButton from "../components/CButton";
 import DashboardWidgetChart from "../components/DashboardWidgetChart";
 import DashboardFilterWidget from "../components/DashboardFilterWidget";
 import { getDashboardConfig, type DashboardElementMeta } from "../lib/Api";
@@ -15,29 +17,23 @@ import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import "../styles/dashboard-workspace.css";
 
-const breakpoints = { lg: 1200, md: 996, sm: 768, xs: 480, xxs: 0 };
-const cols = { lg: 32, md: 24, sm: 16, xs: 8, xxs: 4 };
+// Must match DashboardWorkSpace.tsx exactly: widget x/y/w/h are saved once and must
+// render pixel-for-pixel the same everywhere. Sizing columns off each page's own
+// (possibly different) window width made the grid look denser/sparser between the
+// workspace and this view tab even at the same column count — so the canvas is a
+// constant size and the container scrolls horizontally on narrower windows instead.
+const GRID_COLS = 32;
+const CELL_SIZE = 37;
+const breakpoints = { lg: 0 };
+const cols = { lg: GRID_COLS };
 const DEFAULT_GRID_ROWS = 36;
 const GRID_MARGIN: [number, number] = [8, 8];
 
-function getActiveCols(containerWidth: number) {
-  if (containerWidth >= breakpoints.lg) return cols.lg;
-  if (containerWidth >= breakpoints.md) return cols.md;
-  if (containerWidth >= breakpoints.sm) return cols.sm;
-  if (containerWidth >= breakpoints.xs) return cols.xs;
-  return cols.xxs;
-}
-
-function getSquareGridMetrics(containerWidth: number, gridRows: number) {
-  if (containerWidth <= 0) {
-    return { rowHeight: 48, canvasHeight: gridRows * 48, cellSize: 48 };
-  }
-  const activeCols = getActiveCols(containerWidth);
+function getSquareGridMetrics(gridRows: number) {
   const [mx, my] = GRID_MARGIN;
-  const cellSize = Math.floor((containerWidth - mx * (activeCols - 1)) / activeCols);
-  const rowHeight = cellSize;
-  const canvasHeight = gridRows * cellSize + my * (gridRows - 1);
-  return { rowHeight, canvasHeight, cellSize };
+  const canvasWidth = GRID_COLS * CELL_SIZE + mx * (GRID_COLS - 1);
+  const canvasHeight = gridRows * CELL_SIZE + my * (gridRows - 1);
+  return { rowHeight: CELL_SIZE, canvasWidth, canvasHeight, cellSize: CELL_SIZE };
 }
 
 export default function DashboardViewPage() {
@@ -48,19 +44,19 @@ export default function DashboardViewPage() {
   const [error, setError] = useState("");
   const [dashboardName, setDashboardName] = useState("Dashboard");
   const [gridRows, setGridRows] = useState(DEFAULT_GRID_ROWS);
+  const [bgColor, setBgColor] = useState("");
   const [layoutItems, setLayoutItems] = useState<LayoutItem[]>([]);
   const [metaMap, setMetaMap] = useState<Record<string, DashboardElementMeta>>({});
   const [activeFilters, setActiveFilters] = useState<Record<string, FilterRule>>({});
 
-  const { width, containerRef, mounted } = useContainerWidth();
-  const { rowHeight, canvasHeight, cellSize } = useMemo(() => getSquareGridMetrics(width, gridRows), [width, gridRows]);
+  const { rowHeight, canvasWidth, canvasHeight, cellSize } = useMemo(() => getSquareGridMetrics(gridRows), [gridRows]);
 
   const layouts: ResponsiveLayouts = useMemo(
     () => ({ lg: layoutItems, md: layoutItems, sm: layoutItems, xs: layoutItems, xxs: layoutItems }),
     [layoutItems],
   );
 
-  useEffect(() => {
+  const loadDashboard = useCallback(() => {
     if (!dashboardId) return;
 
     setLoading(true);
@@ -70,6 +66,7 @@ export default function DashboardViewPage() {
       .then((config) => {
         setDashboardName(config.name || "Dashboard");
         setGridRows(config.gridRows ?? DEFAULT_GRID_ROWS);
+        setBgColor(config.backgroundColor ?? "");
 
         const items: LayoutItem[] = [];
         const meta: Record<string, DashboardElementMeta> = {};
@@ -104,10 +101,17 @@ export default function DashboardViewPage() {
       .finally(() => setLoading(false));
   }, [dashboardId]);
 
+  useEffect(() => {
+    loadDashboard();
+  }, [loadDashboard]);
+
   if (loading) {
     return (
-      <div className="flex h-full flex-1 items-center justify-center" style={{ background: "var(--bg)" }}>
+      <div className="flex h-full flex-1 flex-col items-center justify-center gap-3" style={{ background: "var(--bg)" }}>
         <CSpinner size={28} />
+        <p className="text-xs" style={{ color: "var(--text)" }}>
+          Loading dashboard…
+        </p>
       </div>
     );
   }
@@ -115,15 +119,23 @@ export default function DashboardViewPage() {
   if (error) {
     return (
       <div className="flex h-full flex-1 flex-col items-center justify-center gap-4 p-8" style={{ background: "var(--bg)" }}>
-        <CAlert variant="error" message={error} />
+        <CAlert variant="error" message={error} className="max-w-md" />
+        <div className="flex items-center gap-2">
+          <CButton variant="outline" className="!px-3 !py-1.5 !text-xs" onClick={() => navigate(-1)}>
+            <MdArrowBack size={13} /> Back
+          </CButton>
+          <CButton variant="primary" className="!px-3 !py-1.5 !text-xs" onClick={loadDashboard}>
+            Try again
+          </CButton>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-1 flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
+    <div className="flex h-full flex-1 flex-col overflow-hidden animate-[fadeIn_0.15s_ease-out]" style={{ background: "var(--bg)" }}>
       <header
-        className="flex shrink-0 items-center gap-3 px-4 py-2.5"
+        className="no-print flex shrink-0 items-center gap-3 px-4 py-2.5"
         style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-subtle)" }}
       >
         <button
@@ -138,11 +150,25 @@ export default function DashboardViewPage() {
         <div className="h-4 w-px" style={{ background: "var(--border)" }} />
 
         <MdDashboard size={18} style={{ color: "var(--accent)" }} />
-        <p className="text-sm font-bold" style={{ color: "var(--text-h)" }}>
-          {dashboardName}
-        </p>
+        <div>
+          <p className="text-sm font-bold leading-tight" style={{ color: "var(--text-h)" }}>
+            {dashboardName}
+          </p>
+          <p className="text-[11px]" style={{ color: "var(--text)" }}>
+            {layoutItems.length} widget{layoutItems.length !== 1 ? "s" : ""}
+          </p>
+        </div>
 
         <div className="flex-1" />
+
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition hover:bg-[var(--bg)]"
+          style={{ borderColor: "var(--border)", color: "var(--text-h)" }}
+        >
+          <FaFilePdf size={13} /> Export PDF
+        </button>
 
         <button
           type="button"
@@ -155,14 +181,14 @@ export default function DashboardViewPage() {
       </header>
 
       <div
-        ref={containerRef}
         className="dashboard-workspace flex-1 overflow-auto p-2 dashboard-view-mode"
-        style={{ background: "var(--bg)" }}
+        style={{ background: bgColor || "var(--bg)" }}
       >
-        {mounted && layoutItems.length > 0 && (
+        {layoutItems.length > 0 && (
           <div
             className="dashboard-workspace-grid relative"
             style={{
+              width: canvasWidth,
               height: canvasHeight,
               minHeight: canvasHeight,
               ["--cell-size" as string]: `${cellSize + GRID_MARGIN[0]}px`,
@@ -174,7 +200,7 @@ export default function DashboardViewPage() {
               layouts={layouts}
               breakpoints={breakpoints}
               cols={cols}
-              width={width}
+              width={canvasWidth}
               rowHeight={rowHeight}
               margin={GRID_MARGIN}
               containerPadding={[0, 0] as const}
@@ -220,7 +246,7 @@ export default function DashboardViewPage() {
           </div>
         )}
 
-        {mounted && layoutItems.length === 0 && (
+        {layoutItems.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <MdDashboard size={36} style={{ color: "var(--border)" }} />
             <p className="mt-3 text-sm" style={{ color: "var(--text)" }}>

@@ -13,10 +13,34 @@
 | Calculated columns | Modeling | ✅ Done |
 | Field tree (source/field browser) | Explorer UI | ✅ Done |
 
-## RM-0002 — Visualization & Governance
+## RM-0002 — Visualization
 
 | Feature | Category | Status |
 |---|---|---|
-| Text and waterfall charts | Visualization | 📋 Planned |
+| Step Create Account| modeling | ✅ Done |
+| Load Examples | modeling | ✅ Done |
+| Text and waterfall charts | Visualization | ✅ Done |
+| Make Malloy an internal service | Visualization | ✅ Done|
+| Dashboard Settings | charts | 📋 Planned|
+
+
+## RM-0003
+
+
+| Feature | Category | Status |
+|---|---|---|
+| Vertical Filter Widget | Distribution | 📋 Planned |
+| Drop Down filter | Distribution | 📋 Planned |
+| Row-level security (RLS) | Governance | 📋 Planned |
+| Multipage Dashboard | Governance | 📋 Planned |
+| Dashboard Navigation Widget | Governance | 📋 Planned |
+
+
+
+## RM-0004
+| Feature | Category | Status |
+|---|---|---|
+| Model Wizard | modeling | 📋 Planned |
+| Metrics API | backend | 📋 Planned |
 | Embedding | Distribution | 📋 Planned |
 | Row-level security (RLS) | Governance | 📋 Planned |
