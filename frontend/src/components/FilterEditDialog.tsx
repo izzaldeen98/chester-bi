@@ -13,9 +13,13 @@ import { FieldInfo, SourceInfo } from "@malloydata/malloy-interfaces";
 import {
   listModels,
   getCompiledModel,
+  runQuery,
   type ModelPackage,
   type SemanticModelSchema,
 } from "../lib/Api";
+import { normalizeQueryRows, getRowFieldValue } from "../lib/queryResult";
+import { MalloyASTQueryBuilder } from "../lib/MalloyASTQueryBuilder";
+import { DateTimeFilterSchema, DateFilterSchema, NumberFilterSchema, TextFilterSchema } from "./filters/FiltersSchema";
 import CDialog from "./CDialog";
 import CSpinner from "./CSpinner";
 import CAlert from "./CAlert";
@@ -23,6 +27,7 @@ import CAlert from "./CAlert";
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export type FilterKind = "datetime" | "date" | "number" | "text";
+export type FilterUIType = "input" | "select" | "multiselect" | "slicer";
 
 export interface FilterMapping {
   modelId: string;
@@ -43,6 +48,12 @@ export interface FilterRule {
   mappings: FilterMapping[];
   /** Widget IDs this filter applies to; empty array means all charts */
   targetWidgetIds: string[];
+  /** Layout direction of the filter widget's controls; defaults to horizontal */
+  orientation?: "horizontal" | "vertical";
+  /** How the value is entered; defaults to a plain input */
+  uiType?: FilterUIType;
+  /** Presentation for uiType "multiselect"; defaults to a list */
+  multiSelectStyle?: "dropdown" | "list";
 }
 
 export interface AvailableChart {
@@ -58,56 +69,110 @@ interface FilterEditDialogProps {
   availableCharts?: AvailableChart[];
 }
 
-// ── Operator tables ────────────────────────────────────────────────────────
+// ── Operator tables (see filters/FiltersSchema.ts, mirrors charts/ChartsSchemas.ts) ─
 
-const DATETIME_OPS = [
-  { value: "after",       label: "After" },
-  { value: "before",      label: "Before" },
-  { value: "between",     label: "Between" },
-  { value: "not between", label: "Not Between" },
-  { value: "next",        label: "Next" },
-  { value: "last",        label: "Last" },
-  { value: "equals",      label: "Equals" },
-  { value: "not equals",  label: "Not Equals" },
-  { value: "is null",     label: "Is Null" },
-  { value: "is not null", label: "Is Not Null" },
-];
+// ── Distinct value fetch (text + equals autocomplete) ────────────────────
 
-const DATE_OPS = DATETIME_OPS;
+/** Fetches distinct values for a mapped field via a group-by-only Malloy query. */
+export function useDistinctFieldValues(mapping: FilterMapping | undefined, enabled: boolean) {
+  const [values, setValues] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-const NUMBER_OPS = [
-  { value: "equals",                   label: "Equals" },
-  { value: "not equals",               label: "Not Equals" },
-  { value: "greater than",             label: "Greater Than" },
-  { value: "greater than or equal to", label: "≥ Greater or Equal" },
-  { value: "less than",                label: "Less Than" },
-  { value: "less than or equal to",    label: "≤ Less or Equal" },
-  { value: "between",                  label: "Between" },
-  { value: "not between",              label: "Not Between" },
-  { value: "is null",                  label: "Is Null" },
-  { value: "is not null",              label: "Is Not Null" },
-];
+  useEffect(() => {
+    if (!enabled || !mapping) { setValues([]); setError(""); return; }
+    let cancelled = false;
+    setLoading(true);
+    setError("");
 
-const TEXT_OPS = [
-  { value: "equals",          label: "Equals" },
-  { value: "not equals",      label: "Not Equals" },
-  { value: "contains",        label: "Contains" },
-  { value: "not contains",    label: "Not Contains" },
-  { value: "starts with",     label: "Starts With" },
-  { value: "not starts with", label: "Not Starts With" },
-  { value: "ends with",       label: "Ends With" },
-  { value: "not ends with",   label: "Not Ends With" },
-  { value: "is empty",        label: "Is Empty" },
-  { value: "is not empty",    label: "Is Not Empty" },
-  { value: "is null",         label: "Is Null" },
-  { value: "is not null",     label: "Is Not Null" },
-];
+    getCompiledModel(mapping.modelId)
+      .then((schema) => {
+        const source = schema.sources.find((s) => s.name === mapping.sourceName);
+        if (!source) throw new Error("Source not found in model");
+        const builder = new MalloyASTQueryBuilder(source);
+        builder.addGroupBy(mapping.fieldName);
+        builder.setLimit(50);
+        return runQuery(mapping.modelId, builder.buildQuery());
+      })
+      .then((result) => {
+        if (cancelled) return;
+        const rows = normalizeQueryRows(result);
+        const distinct = Array.from(new Set(
+          rows
+            .map((r) => getRowFieldValue(r, mapping.fieldName))
+            .filter((v) => v !== null && v !== undefined)
+            .map((v) => String(v))
+        ));
+        setValues(distinct);
+      })
+      .catch((e: Error) => { if (!cancelled) setError(e.message ?? "Failed to load values"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [enabled, mapping?.modelId, mapping?.sourceName, mapping?.fieldName]);
+
+  return { values, loading, error };
+}
+
+// ── Field range fetch (slicer min/max) ─────────────────────────────────────
+
+/** Number for kind "number", epoch ms for "date"/"datetime" — a uniform numeric axis for a range slider. */
+function toSliderNumber(raw: unknown): number | null {
+  if (raw == null) return null;
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : null;
+  const d = new Date(String(raw));
+  if (!isNaN(d.getTime())) return d.getTime();
+  const n = parseFloat(String(raw));
+  return isNaN(n) ? null : n;
+}
+
+/** Fetches the min/max of a mapped field via a one-off aggregate Malloy query. */
+export function useFieldRange(mapping: FilterMapping | undefined, enabled: boolean) {
+  const [range, setRange] = useState<{ min: number; max: number } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!enabled || !mapping) { setRange(null); setError(""); return; }
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+
+    getCompiledModel(mapping.modelId)
+      .then((schema) => {
+        const source = schema.sources.find((s) => s.name === mapping.sourceName);
+        if (!source) throw new Error("Source not found in model");
+        const query =
+          `run: ${source.name} -> {\n` +
+          `  aggregate:\n` +
+          `    min_value is min(${mapping.fieldName})\n` +
+          `    max_value is max(${mapping.fieldName})\n` +
+          `}`;
+        return runQuery(mapping.modelId, query);
+      })
+      .then((result) => {
+        if (cancelled) return;
+        const rows = normalizeQueryRows(result);
+        const row = rows[0] ?? {};
+        const min = toSliderNumber(getRowFieldValue(row, "min_value"));
+        const max = toSliderNumber(getRowFieldValue(row, "max_value"));
+        if (min == null || max == null) throw new Error("No range available for this field");
+        setRange({ min, max });
+      })
+      .catch((e: Error) => { if (!cancelled) setError(e.message ?? "Failed to load range"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
+  }, [enabled, mapping?.modelId, mapping?.sourceName, mapping?.fieldName]);
+
+  return { range, loading, error };
+}
 
 export function opsForKind(kind: FilterKind) {
-  if (kind === "datetime") return DATETIME_OPS;
-  if (kind === "date")     return DATE_OPS;
-  if (kind === "number")   return NUMBER_OPS;
-  return TEXT_OPS;
+  if (kind === "datetime") return DateTimeFilterSchema.operators;
+  if (kind === "date")     return DateFilterSchema.operators;
+  if (kind === "number")   return NumberFilterSchema.operators;
+  return TextFilterSchema.operators;
 }
 
 export const NO_VALUE_OPS = ["is null", "is not null", "is empty", "is not empty", "true", "false"];
@@ -135,6 +200,171 @@ const inputStyle = {
   color: "var(--text-h)",
 };
 
+// ── Distinct value dropdown ────────────────────────────────────────────────
+
+function DistinctValueDropdown({
+  mapping,
+  value,
+  onChange,
+}: {
+  mapping: FilterMapping;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const { values, loading, error } = useDistinctFieldValues(mapping, true);
+
+  if (error) {
+    // Fall back to free text if the values couldn't be loaded
+    return (
+      <input value={value} onChange={(e) => onChange(e.target.value)}
+        placeholder="Value…" className={`${inputCls} w-full`} style={inputStyle} />
+    );
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      disabled={loading}
+      className={`${inputCls} w-full cursor-pointer`}
+      style={inputStyle}
+    >
+      <option value="">{loading ? "Loading values…" : "Select a value…"}</option>
+      {values.map((v) => <option key={v} value={v}>{v}</option>)}
+    </select>
+  );
+}
+
+// ── Multi-select value picker (list, or a collapsed dropdown around the same list) ─
+
+function MultiValuePicker({
+  mapping,
+  value,
+  onChange,
+  style,
+}: {
+  mapping: FilterMapping;
+  value: string;
+  onChange: (v: string) => void;
+  style: "dropdown" | "list";
+}) {
+  const { values, loading, error } = useDistinctFieldValues(mapping, true);
+  const [open, setOpen] = useState(false);
+  const selected = value ? value.split(",").map((v) => v.trim()).filter(Boolean) : [];
+
+  const toggle = (v: string) => {
+    const next = selected.includes(v) ? selected.filter((x) => x !== v) : [...selected, v];
+    onChange(next.join(","));
+  };
+
+  if (error) {
+    return (
+      <input value={value} onChange={(e) => onChange(e.target.value)}
+        placeholder="value1, value2, …" className={`${inputCls} w-full`} style={inputStyle} />
+    );
+  }
+
+  const list = (
+    <div className="flex max-h-40 flex-col gap-0.5 overflow-y-auto rounded-lg border p-1" style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
+      {loading && <div className="flex items-center justify-center py-3"><CSpinner size={14} /></div>}
+      {!loading && values.length === 0 && (
+        <p className="px-2 py-1 text-xs" style={{ color: "var(--text)" }}>No values found.</p>
+      )}
+      {!loading && values.map((v) => (
+        <label key={v} className="flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 transition-all hover:bg-[var(--border)]">
+          <input type="checkbox" checked={selected.includes(v)} onChange={() => toggle(v)} className="accent-[var(--accent)]" />
+          <span className="truncate text-xs" style={{ color: "var(--text-h)" }}>{v}</span>
+        </label>
+      ))}
+    </div>
+  );
+
+  if (style === "list") return list;
+
+  return (
+    <div className="relative" tabIndex={-1} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false); }}>
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        className={`${inputCls} flex w-full items-center justify-between gap-2 text-left`} style={inputStyle}>
+        <span className="truncate">{loading ? "Loading…" : selected.length ? `${selected.length} selected` : "Select values…"}</span>
+        <FaCheck size={9} style={{ opacity: open ? 1 : 0, color: "var(--accent)" }} />
+      </button>
+      {open && <div className="absolute z-20 mt-1 w-full shadow-lg" style={{ background: "var(--bg)" }}>{list}</div>}
+    </div>
+  );
+}
+
+// ── Slicer (range) value picker ────────────────────────────────────────────
+
+function sliderFromEpoch(ms: number, kind: FilterKind): string {
+  const d = new Date(ms);
+  const p = (n: number) => String(n).padStart(2, "0");
+  const dateStr = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  if (kind === "date") return dateStr;
+  return `${dateStr} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+function SlicerValuePicker({
+  mapping,
+  kind,
+  value,
+  onChange,
+}: {
+  mapping: FilterMapping;
+  kind: FilterKind;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const { range, loading, error } = useFieldRange(mapping, true);
+
+  if (error) {
+    return (
+      <input value={value} onChange={(e) => onChange(e.target.value)}
+        placeholder="min,max" className={`${inputCls} w-full`} style={inputStyle} />
+    );
+  }
+  if (loading || !range) {
+    return <div className="flex items-center justify-center py-3"><CSpinner size={14} /></div>;
+  }
+
+  const isDate = kind === "date" || kind === "datetime";
+  const toNum = (v: string): number | null => {
+    if (!v) return null;
+    if (isDate) { const d = new Date(v); return isNaN(d.getTime()) ? null : d.getTime(); }
+    const n = parseFloat(v);
+    return isNaN(n) ? null : n;
+  };
+  const fromNum = (n: number) => (isDate ? sliderFromEpoch(n, kind) : String(Math.round(n * 100) / 100));
+
+  const [rawA, rawB] = value ? value.split(",") : ["", ""];
+  const curMin = toNum(rawA) ?? range.min;
+  const curMax = toNum(rawB) ?? range.max;
+  const span = range.max - range.min;
+  const step = isDate ? 3600 * 1000 : (span > 0 ? span / 200 : 1);
+
+  const setMin = (n: number) => onChange(`${fromNum(Math.min(n, curMax))},${fromNum(curMax)}`);
+  const setMax = (n: number) => onChange(`${fromNum(curMin)},${fromNum(Math.max(n, curMin))}`);
+  const pct = (n: number) => (span > 0 ? ((n - range.min) / span) * 100 : 0);
+
+  return (
+    <div className="flex w-full min-w-0 flex-1 flex-col gap-2">
+      <div className="relative h-4 w-full">
+        <div className="absolute left-0 right-0 top-1/2 h-1 -translate-y-1/2 rounded-full" style={{ background: "var(--border)" }} />
+        <div className="absolute top-1/2 h-1 -translate-y-1/2 rounded-full" style={{ background: "var(--accent)", left: `${pct(curMin)}%`, right: `${100 - pct(curMax)}%` }} />
+        <input type="range" min={range.min} max={range.max} step={step} value={curMin}
+          onChange={(e) => setMin(Number(e.target.value))}
+          className="range-thumb absolute inset-0 w-full appearance-none bg-transparent" />
+        <input type="range" min={range.min} max={range.max} step={step} value={curMax}
+          onChange={(e) => setMax(Number(e.target.value))}
+          className="range-thumb absolute inset-0 w-full appearance-none bg-transparent" />
+      </div>
+      <div className="flex items-center justify-between text-[10px] font-medium" style={{ color: "var(--text)" }}>
+        <span>{fromNum(curMin)}</span>
+        <span>{fromNum(curMax)}</span>
+      </div>
+    </div>
+  );
+}
+
 // ── Value editor ──────────────────────────────────────────────────────────
 
 export function ValueEditor({
@@ -142,13 +372,30 @@ export function ValueEditor({
   operator,
   value,
   onChange,
+  mapping,
+  uiType = "input",
+  multiSelectStyle = "list",
 }: {
   kind: FilterKind;
   operator: string;
   value: string;
   onChange: (v: string) => void;
+  mapping?: FilterMapping;
+  uiType?: FilterUIType;
+  multiSelectStyle?: "dropdown" | "list";
 }) {
   if (NO_VALUE_OPS.includes(operator)) return null;
+
+  // Value input type (chosen in this dialog) overrides free typing with a picker
+  if (uiType === "slicer" && mapping && kind !== "text") {
+    return <SlicerValuePicker mapping={mapping} kind={kind} value={value} onChange={onChange} />;
+  }
+  if (uiType === "multiselect" && mapping) {
+    return <MultiValuePicker mapping={mapping} value={value} onChange={onChange} style={multiSelectStyle} />;
+  }
+  if (uiType === "select" && mapping) {
+    return <DistinctValueDropdown mapping={mapping} value={value} onChange={onChange} />;
+  }
 
   const isDateType = kind === "datetime" || kind === "date";
   const inputType  =
@@ -514,9 +761,12 @@ export default function FilterEditDialog({
   initialRule,
   availableCharts = [],
 }: FilterEditDialogProps) {
+  const [title,           setTitle]           = useState(initialRule?.label ?? "");
   const [kind,            setKind]            = useState<FilterKind>(initialRule?.kind ?? "text");
   const [operator,        setOperator]        = useState(initialRule?.operator ?? "");
   const [value,           setValue]           = useState(initialRule?.value ?? "");
+  const [uiType,          setUiType]          = useState<FilterUIType>(initialRule?.uiType ?? "input");
+  const [multiSelectStyle, setMultiSelectStyle] = useState<"dropdown" | "list">(initialRule?.multiSelectStyle ?? "list");
   const [mappings,        setMappings]        = useState<FilterMapping[]>(initialRule?.mappings ?? []);
   const [targetWidgetIds, setTargetWidgetIds] = useState<string[]>(initialRule?.targetWidgetIds ?? []);
 
@@ -543,11 +793,11 @@ export default function FilterEditDialog({
 
   const ops     = opsForKind(kind);
   const canSave = !!operator && mappings.length > 0;
-  const label   = mappings[0]?.fieldName ?? "";
+  const label   = title.trim() || mappings[0]?.fieldName || "";
 
   function handleSave() {
     if (!canSave) return;
-    onSave({ label, kind, operator, value, mappings, targetWidgetIds });
+    onSave({ label, kind, operator, value, mappings, targetWidgetIds, orientation: initialRule?.orientation, uiType, multiSelectStyle });
     onClose();
   }
 
@@ -566,6 +816,20 @@ export default function FilterEditDialog({
         {/* ── Left panel: type + operator + value ───────────────────────── */}
         <div className="flex w-72 shrink-0 flex-col gap-5 overflow-y-auto border-r p-5"
           style={{ borderColor: "var(--border)", background: "var(--bg)" }}>
+
+          {/* Title */}
+          <div>
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>
+              Title
+            </p>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={mappings[0]?.fieldName || "Filter"}
+              className={`${inputCls} w-full`}
+              style={inputStyle}
+            />
+          </div>
 
           {/* Filter kind */}
           <div>
@@ -594,31 +858,60 @@ export default function FilterEditDialog({
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>
               Operator
             </p>
-            <div className="flex flex-col gap-0.5">
-              {ops.map((op) => (
-                <button key={op.value} type="button"
-                  onClick={() => { setOperator(op.value); setValue(""); }}
-                  className="flex items-center gap-2 rounded-lg border px-3 py-1.5 text-left text-xs font-medium transition-all"
-                  style={{
-                    background: operator === op.value ? "var(--accent-muted)" : "transparent",
-                    borderColor: operator === op.value ? "var(--accent)" : "transparent",
-                    color: operator === op.value ? "var(--accent)" : "var(--text-h)",
-                  }}
-                >
-                  {operator === op.value && <FaCheck size={9} style={{ color: "var(--accent)" }} />}
-                  {op.label}
-                </button>
-              ))}
-            </div>
+            <select
+              value={operator}
+              onChange={(e) => { setOperator(e.target.value); setValue(""); }}
+              className={`${inputCls} w-full cursor-pointer`}
+              style={inputStyle}
+            >
+              {ops.map((op) => <option key={op.value} value={op.value}>{op.label}</option>)}
+            </select>
           </div>
 
           {/* Value */}
           {!NO_VALUE_OPS.includes(operator) && (
             <div>
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>
-                Value
-              </p>
-              <ValueEditor kind={kind} operator={operator} value={value} onChange={setValue} />
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>
+                  Value
+                </p>
+                <div className="flex gap-1">
+                  {(["input", "select", "multiselect", "slicer"] as FilterUIType[])
+                    .filter((t) => t !== "multiselect" || kind === "text" || kind === "number")
+                    .filter((t) => t !== "slicer" || kind !== "text")
+                    .map((t) => (
+                      <button key={t} type="button" onClick={() => setUiType(t)}
+                        title={t === "multiselect" ? "Multi-select" : t}
+                        className="rounded-md border px-1.5 py-0.5 text-[10px] font-medium capitalize transition-all"
+                        style={{
+                          background: uiType === t ? "var(--accent-muted)" : "transparent",
+                          borderColor: uiType === t ? "var(--accent)" : "var(--border)",
+                          color: uiType === t ? "var(--accent)" : "var(--text)",
+                        }}
+                      >{t === "multiselect" ? "Multi" : t}</button>
+                    ))}
+                </div>
+              </div>
+
+              {uiType === "multiselect" && (
+                <div className="mb-2 flex gap-1.5">
+                  {(["list", "dropdown"] as const).map((s) => (
+                    <button key={s} type="button" onClick={() => setMultiSelectStyle(s)}
+                      className="rounded-md border px-2 py-1 text-[10px] font-medium capitalize transition-all"
+                      style={{
+                        background: multiSelectStyle === s ? "var(--accent-muted)" : "var(--bg-subtle)",
+                        borderColor: multiSelectStyle === s ? "var(--accent)" : "var(--border)",
+                        color: multiSelectStyle === s ? "var(--accent)" : "var(--text-h)",
+                      }}
+                    >{s}</button>
+                  ))}
+                </div>
+              )}
+
+              <ValueEditor
+                kind={kind} operator={operator} value={value} onChange={setValue}
+                mapping={mappings[0]} uiType={uiType} multiSelectStyle={multiSelectStyle}
+              />
             </div>
           )}
         </div>

@@ -15,6 +15,7 @@ import {
 import { PiFileSqlFill } from "react-icons/pi";
 import { IoGridOutline } from "react-icons/io5";
 import { MdDashboard } from "react-icons/md";
+import { AiOutlineDotChart } from "react-icons/ai";
 import CDialog from "./CDialog";
 import CTextInput from "./CTextInput";
 import CAlert from "./CAlert";
@@ -27,13 +28,14 @@ import PieChart from "./charts/PieChart";
 import TableChart from "./charts/TableChart";
 import WaterfallChart from "./charts/WaterfallChart";
 import TreemapChart from "./charts/TreemapChart";
-import { CardSchema, LineChartSchema, BarChartSchema, PieChartSchema, TableChartSchema, WaterFallChartSchema, TreemapChartSchema } from "./charts/ChartsSchemas";
+import ScatterChart from "./charts/ScatterChart";
+import { CardSchema, LineChartSchema, BarChartSchema, PieChartSchema, TableChartSchema, WaterFallChartSchema, TreemapChartSchema, ScatterChartSchema } from "./charts/ChartsSchemas";
 import { getQueries, getQuery, runQuery, getCompiledModel, type QueryPublicResponse, type QueryDetailedResponse, type SemanticModelSchema } from "../lib/Api";
 import { normalizeQueryRows } from "../lib/queryResult";
 import { isDateTimeTypeKind, resolveXAxisFieldType } from "../lib/fieldTypes";
 import { VscDebugRerun } from "react-icons/vsc";
 
-type ChartType = "card" | "line" | "bar" | "pie" | "table" | "waterfall" | "treemap";
+type ChartType = "card" | "line" | "bar" | "pie" | "table" | "waterfall" | "treemap" | "scatter";
 
 export type { ChartType };
 
@@ -157,6 +159,13 @@ const CHART_OPTIONS: ChartOption[] = [
     description: "Part-to-whole proportions",
     icon: <FaChartPie size={11} />,
     schema: { chartType: PieChartSchema.chartType, fields: normalizeFields(PieChartSchema.fields as Array<Record<string, unknown>>) },
+  },
+  {
+    type: "scatter",
+    label: "Scatter",
+    description: "Correlation between two numeric fields",
+    icon: <AiOutlineDotChart size={12} />,
+    schema: { chartType: ScatterChartSchema.chartType, fields: normalizeFields(ScatterChartSchema.fields as Array<Record<string, unknown>>) },
   },
   {
     type: "table",
@@ -696,7 +705,7 @@ export default function WidgetEditDialog({
   }
 
   const chartYAxisFields = useMemo(() => parseConfigList(chartConfig.yAxis), [chartConfig.yAxis]);
-  const isSeriesChart = selectedChart === "line" || selectedChart === "bar";
+  const isSeriesChart = selectedChart === "line" || selectedChart === "bar" || selectedChart === "scatter";
   const isRowsChart =
     selectedChart === "pie" ||
     selectedChart === "table" ||
@@ -1275,6 +1284,29 @@ export default function WidgetEditDialog({
                       legend={chartConfig.legend}
                       barOrientation={chartConfig.barOrientation}
                       stacked={chartConfig.stacked}
+                      data={previewRows ?? []}
+                    />
+                  </div>
+                </div>
+              ) : selectedChart === "scatter" ? (
+                <div
+                  className="flex h-80 w-full max-w-2xl flex-col overflow-hidden rounded-2xl border shadow-sm"
+                  style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+                >
+                  <div className="h-full min-h-0 p-3">
+                    <ScatterChart
+                      title={{
+                        value: chartConfig.title || widgetTitle,
+                        valueFontSize: Number(chartConfig.titleFontSize) || undefined,
+                        valueFontColor: chartConfig.titleFontColor || undefined,
+                      }}
+                      xAxis={chartConfig.xAxis}
+                      xAxisColor={chartConfig.xAxisColor}
+                      yAxis={chartConfig.yAxis}
+                      yAxisColor={chartConfig.yAxisColor}
+                      legend={chartConfig.legend}
+                      pointSize={chartConfig.pointSize}
+                      yAxisFormat={chartConfig.yAxisFormat}
                       data={previewRows ?? []}
                     />
                   </div>

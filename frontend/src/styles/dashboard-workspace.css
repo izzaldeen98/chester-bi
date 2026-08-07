@@ -109,3 +109,37 @@
     height: auto !important;
   }
 }
+
+/* Slicer filter: two overlapping <input type="range"> form a dual-handle
+   slider. The track is transparent so only the thumbs are interactive. */
+.range-thumb {
+  pointer-events: none;
+}
+.range-thumb::-webkit-slider-runnable-track {
+  background: transparent;
+}
+.range-thumb::-moz-range-track {
+  background: transparent;
+}
+.range-thumb::-webkit-slider-thumb {
+  pointer-events: auto;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 2px solid var(--bg-card, var(--bg));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+.range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 2px solid var(--bg-card, var(--bg));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}

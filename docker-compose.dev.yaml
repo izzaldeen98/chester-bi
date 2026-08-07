@@ -40,9 +40,14 @@ services:
     image: ms2data/malloy-publisher
     container_name: chester_publisher
     restart: unless-stopped
+    environment:
+      PUBLISHER_MAX_QUERY_ROWS: 9999999
+      PUBLISHER_MAX_RESPONSE_BYTES: 10000000000
+    
     ports:
       - "4000:4000"
-      - "4040:4040"   # MCP endpoint for AI agents
+      - "4040:4040"
+
     volumes:
       - .local/publisher_data:/publisher/publisher_data
     healthcheck:

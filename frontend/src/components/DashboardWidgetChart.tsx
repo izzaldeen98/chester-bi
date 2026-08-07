@@ -7,6 +7,7 @@ import PieChart from "./charts/PieChart";
 import TableChart from "./charts/TableChart";
 import WaterfallChart from "./charts/WaterfallChart";
 import TreemapChart from "./charts/TreemapChart";
+import ScatterChart from "./charts/ScatterChart";
 import CSpinner from "./CSpinner";
 import {
   fetchWidgetQueryData,
@@ -95,6 +96,26 @@ export function renderWidgetChart(
         legend={cfg.legend}
         barOrientation={cfg.barOrientation}
         stacked={cfg.stacked}
+        data={previewRows}
+      />
+    );
+  }
+
+  if (meta.chartType === "scatter") {
+    return (
+      <ScatterChart
+        title={{
+          value: cfg.title || meta.title,
+          valueFontSize: Number(cfg.titleFontSize) || undefined,
+          valueFontColor: cfg.titleFontColor || undefined,
+        }}
+        xAxis={cfg.xAxis}
+        xAxisColor={cfg.xAxisColor}
+        yAxis={cfg.yAxis}
+        yAxisColor={cfg.yAxisColor}
+        legend={cfg.legend}
+        pointSize={cfg.pointSize}
+        yAxisFormat={cfg.yAxisFormat}
         data={previewRows}
       />
     );

@@ -448,8 +448,8 @@ class Malloy:
             MalloyConnection(
                 name=name,
                 type=type,
-                resource=data["resource"],
-                attributes=data["attributes"],
+                resource=data.get("resource", f"{self.resource}/connections/{name}"),
+                attributes=data.get("attributes", {}),
                 connection_credentials={},
             )
         )
@@ -506,6 +506,33 @@ class Malloy:
     
     def __repr__(self):
         return f"Malloy(envid={self.envid}, location={self.location}, resource={self.resource} , connections={self.connections} , packages={self.packages})"
+
+
+    def get_connection_schemas(self, connection: str):
+        uri = f"{MALLOY_URL}{self.resource}/connections/{connection}/schemas"
+        response = requests.get(uri)
+        if response.status_code != 200:
+            raise Exception(f"Failed to get connection schemas: {response.text}")
+        return response.json()
+
+    def get_schema_tables(self, connection: str, schema: str):
+        uri = f"{MALLOY_URL}{self.resource}/connections/{connection}/schemas/{schema}/tables"
+        response = requests.get(uri)
+        if response.status_code != 200:
+            raise Exception(f"Failed to get schema tables: {response.text}")
+        return response.json()
+
+
+
+if __name__ == "__main__":
+    malloy = Malloy(envid='eb71743a-c41b-4a3e-aef2-c771f8ce54e2')
+
+    schemas = malloy.get_connection_schemas("public_database3")
+    tables = malloy.get_schema_tables("public_database3" , "rnacen")
+
+    print("SCHEMAS: " , schemas)
+    print("TABLES: " , tables)
+
 
 
 

@@ -330,7 +330,7 @@ export default function WaterfallChart({
   ]);
 
   return (
-    <div className="flex h-full w-full min-h-0 min-w-0 flex-col p-2">
+    <div className="pointer-events-auto flex h-full w-full min-h-0 min-w-0 flex-col p-2">
       <div ref={ref} className="h-full w-full min-h-0 min-w-0 flex-1">
         {ready && (
           <ReactECharts

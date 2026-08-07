@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { Responsive, verticalCompactor } from "react-grid-layout";
 import type { LayoutItem, ResponsiveLayouts } from "react-grid-layout";
 import { MdDashboard } from "react-icons/md";
-import { FaPlus, FaSave } from "react-icons/fa";
+import { FaPlus, FaSave, FaEye } from "react-icons/fa";
 import { IoBarChartSharp } from "react-icons/io5";
 import CButton from "../components/CButton";
 import CWidget from "../components/CWidget/CWidget";
@@ -263,6 +263,12 @@ export default function DashboardWorkSpace() {
     });
   }, [dashboardId, layoutItems, widgetMeta, gridRows, bgColor]);
 
+  const handlePreview = useCallback(async () => {
+    if (!dashboardId) return;
+    await handleSave();
+    window.open(`/view/${dashboardId}`, "_blank", "noopener,noreferrer");
+  }, [dashboardId, handleSave]);
+
   return (
     <div className="flex h-full flex-1 flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
       <header
@@ -334,6 +340,9 @@ export default function DashboardWorkSpace() {
         </CButton>
         <CButton variant="outline" className="!px-3 !py-1.5 !text-xs" onClick={addFilter}>
           <FaPlus size={11} /> Add Filter
+        </CButton>
+        <CButton variant="outline" className="!px-3 !py-1.5 !text-xs" disabled={!dashboardId} onClick={handlePreview}>
+          <FaEye size={11} /> Preview
         </CButton>
         <CButton variant="primary" className="!px-3 !py-1.5 !text-xs" disabled={!dashboardId} onClick={handleSave}>
           <FaSave size={11} /> Save Layout

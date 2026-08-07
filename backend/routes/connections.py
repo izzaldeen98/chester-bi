@@ -175,17 +175,20 @@ async def create_connection(
     raw_password = connection.connection_attributes.get("password")
     encrypted_password = encrypt_password(raw_password)
     connection.connection_attributes["password"] = encrypted_password
-    new_connection = Connection(
-        type=connection.type,
-        name=connection.name,
-        description=connection.description,
-        connection_attributes=connection_handler.encrypt_secret_values().connection_config,
-        account_id=current_user.account_id,
-        created_by=current_user.id,
-        updated_by=current_user.id,
-    )
+    try:
+        new_connection = Connection(
+            type=connection.type,
+            name=connection.name,
+            description=connection.description,
+            connection_attributes=connection_handler.encrypt_secret_values().connection_config,
+            account_id=current_user.account_id,
+            created_by=current_user.id,
+            updated_by=current_user.id,
+        )
 
-    db.add(new_connection)
+        db.add(new_connection)
+    except Exception as e:
+        return HTTPException(500 , str(e))
     db.commit()
     db.refresh(new_connection)
     return {"message": "Connection created successfully"}

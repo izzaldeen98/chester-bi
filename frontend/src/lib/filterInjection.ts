@@ -25,7 +25,7 @@ function unitMs(unit: string, n: number): number {
  * Returns null if the rule is incomplete or the operator needs no clause.
  */
 export function buildMalloyFilterClause(rule: FilterRule, fieldName: string): string | null {
-  const { operator, value, kind } = rule;
+  const { operator, value, kind, uiType } = rule;
   const isDate = kind === "datetime" || kind === "date";
   const dk = kind as "datetime" | "date";
 
@@ -35,6 +35,38 @@ export function buildMalloyFilterClause(rule: FilterRule, fieldName: string): st
   if (operator === "is not empty") return `${fieldName} != ''`;
 
   if (!value) return null;
+
+  // Multi-select always means "any of these values" — regardless of which
+  // operator happens to be set, since the picker itself never exposes one.
+  if (uiType === "multiselect") {
+    const raw = value.split(",").map((v) => v.trim()).filter(Boolean);
+    if (!raw.length) return null;
+    if (kind === "number") {
+      const nums = raw.map(parseFloat).filter((n) => !isNaN(n));
+      if (!nums.length) return null;
+      return `(${nums.map((n) => `${fieldName} = ${n}`).join(" or ")})`;
+    }
+    const esc = raw.map((v) => v.replace(/\\/g, "\\\\").replace(/'/g, "\\'"));
+    return `(${esc.map((v) => `${fieldName} = '${v}'`).join(" or ")})`;
+  }
+
+  // A slicer always means "between these two values" — regardless of which
+  // operator happens to be set, same reasoning as multiselect above.
+  if (uiType === "slicer") {
+    const [a, b] = value.split(",");
+    if (!a || !b) return null;
+    if (kind === "number") {
+      const na = parseFloat(a), nb = parseFloat(b);
+      if (isNaN(na) || isNaN(nb)) return null;
+      return `${fieldName} >= ${na} and ${fieldName} <= ${nb}`;
+    }
+    if (isDate) {
+      const da = new Date(a), db = new Date(b);
+      if (isNaN(da.getTime()) || isNaN(db.getTime())) return null;
+      return `${fieldName} >= @${fmt(da, dk)} and ${fieldName} <= @${fmt(db, dk)}`;
+    }
+    return null;
+  }
 
   // ── Date / DateTime ─────────────────────────────────────────────────────
   if (isDate) {
@@ -93,6 +125,11 @@ export function buildMalloyFilterClause(rule: FilterRule, fieldName: string): st
       const clause = `${fieldName} >= ${a} and ${fieldName} <= ${b}`;
       return operator === "not between" ? `not (${clause})` : clause;
     }
+    if (operator === "is any of") {
+      const nums = value.split(",").map((v) => parseFloat(v.trim())).filter((v) => !isNaN(v));
+      if (!nums.length) return null;
+      return `(${nums.map((n) => `${fieldName} = ${n}`).join(" or ")})`;
+    }
   }
 
   // ── Text ─────────────────────────────────────────────────────────────────
@@ -108,7 +145,14 @@ export function buildMalloyFilterClause(rule: FilterRule, fieldName: string): st
       "ends with":       `${fieldName} ~ r'${esc}$'`,
       "not ends with":   `not ${fieldName} ~ r'${esc}$'`,
     };
-    return m[operator] ?? null;
+    if (m[operator]) return m[operator];
+    if (operator === "is any of") {
+      const vals = value.split(",").map((v) => v.trim()).filter(Boolean)
+        .map((v) => v.replace(/\\/g, "\\\\").replace(/'/g, "\\'"));
+      if (!vals.length) return null;
+      return `(${vals.map((v) => `${fieldName} = '${v}'`).join(" or ")})`;
+    }
+    return null;
   }
 
   return null;

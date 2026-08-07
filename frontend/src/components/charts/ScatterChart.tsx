@@ -2,9 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
 import { getRowFieldValue } from "../../lib/queryResult";
-import { formatAxisValue, parseDateValue } from "../../lib/dateTimeFormat";
-
-export { formatAxisValue };
 
 interface TitleField {
   value: string;
@@ -12,18 +9,15 @@ interface TitleField {
   valueFontColor?: string;
 }
 
-export interface LineChartProps {
+export interface ScatterChartProps {
   title?: TitleField;
   xAxis?: string;
   xAxisColor?: string;
   yAxis?: string | string[];
   yAxisColor?: string | string[];
   legend?: string | string[];
-  lineType?: string;
-  format?: string;
+  pointSize?: string | number;
   yAxisFormat?: string;
-  showDataPoints?: string | boolean;
-  xAxisIsDateTime?: boolean;
   data?: Record<string, unknown>[];
 }
 
@@ -58,24 +52,13 @@ function parseList(value: string | string[] | undefined): string[] {
   return trimmed.split(",").map((part) => part.trim()).filter(Boolean);
 }
 
-function isTruthy(value: string | boolean | undefined) {
-  if (typeof value === "boolean") return value;
-  return value === "true" || value === "1" || value === "on";
-}
-
-function readCategoryLabel(value: unknown): string {
-  if (value == null) return "";
-  if (value instanceof Date) return value.toLocaleDateString();
-  return String(value);
-}
-
 function readNumericValue(value: unknown): number | null {
   if (value == null) return null;
   const num = typeof value === "number" ? value : parseFloat(String(value));
   return Number.isFinite(num) ? num : null;
 }
 
-export function formatYAxisValue(value: unknown, format?: string): string {
+function formatAxisValue(value: unknown, format?: string): string {
   const num = readNumericValue(value);
   if (num == null) return "";
 
@@ -89,22 +72,6 @@ export function formatYAxisValue(value: unknown, format?: string): string {
     default:
       return num.toLocaleString();
   }
-}
-
-function sortRowsByXAxis(rows: Record<string, unknown>[], xField: string) {
-  return [...rows].sort((a, b) => {
-    const av = getRowFieldValue(a, xField);
-    const bv = getRowFieldValue(b, xField);
-    const ad = parseDateValue(av);
-    const bd = parseDateValue(bv);
-    if (ad && bd) return ad.getTime() - bd.getTime();
-
-    const an = readNumericValue(av);
-    const bn = readNumericValue(bv);
-    if (an != null && bn != null) return an - bn;
-
-    return readCategoryLabel(av).localeCompare(readCategoryLabel(bv), undefined, { numeric: true });
-  });
 }
 
 function useContainerSize() {
@@ -129,20 +96,17 @@ function useContainerSize() {
   return { ref, ...size };
 }
 
-export default function LineChart({
+export default function ScatterChart({
   title,
   xAxis,
   xAxisColor,
   yAxis,
   yAxisColor,
   legend,
-  lineType = "smooth",
-  format,
+  pointSize,
   yAxisFormat,
-  showDataPoints,
-  xAxisIsDateTime = false,
   data = [],
-}: LineChartProps) {
+}: ScatterChartProps) {
   const { ref, width, height } = useContainerSize();
   const ready = width > 0 && height > 0;
 
@@ -157,14 +121,7 @@ export default function LineChart({
     return yFields.map((field, index) => parsed[index] || field);
   }, [legend, yFields]);
 
-  const sortedData = useMemo(() => {
-    if (!xAxis || data.length === 0) return data;
-    return sortRowsByXAxis(data, xAxis);
-  }, [data, xAxis]);
-
-  const smooth = lineType !== "straight";
-  const showSymbols = isTruthy(showDataPoints) || sortedData.length <= 24;
-  const useDateFormat = xAxisIsDateTime && Boolean(format?.trim());
+  const symbolSize = Number(pointSize) > 0 ? Number(pointSize) : 8;
 
   const option = useMemo<EChartsOption>(() => {
     if (!ready) return { backgroundColor: "transparent" };
@@ -173,7 +130,7 @@ export default function LineChart({
     const textHColor = getThemeColor("--text-h", "#111827");
     const borderColor = getThemeColor("--border", "#e5e7eb");
 
-    if (!xAxis || yFields.length === 0 || sortedData.length === 0) {
+    if (!xAxis || yFields.length === 0 || data.length === 0) {
       return {
         backgroundColor: "transparent",
         title: {
@@ -185,20 +142,32 @@ export default function LineChart({
       };
     }
 
-    const categories = sortedData.map((row) => {
-      const raw = getRowFieldValue(row, xAxis);
-      return useDateFormat ? formatAxisValue(raw, format) : readCategoryLabel(raw);
-    });
     const hasLegend = legendLabels.length > 1;
     const hasTitle = Boolean(title?.value);
     const titleFontSize = title?.valueFontSize ?? 14;
-    const rotateLabels = categories.length > 12;
     // ECharts title component: top=6, internal padding 5px top+bottom, lineHeight≈fontSize×1.2
     // So title bottom ≈ 6 + 5 + fontSize×1.2 + 5 = fontSize×1.2 + 16
     // Add 8px breathing room before the grid starts
     const titleSpace = hasTitle ? Math.ceil(titleFontSize * 1.2 + 24) : 10;
     const legendTop = hasTitle ? Math.ceil(titleFontSize * 1.2 + 16) : 6;
     const gridTop = titleSpace + (hasLegend ? 28 : 0);
+
+    const series = yFields.map((field, index) => {
+      const points: [number, number][] = [];
+      for (const row of data) {
+        const x = readNumericValue(getRowFieldValue(row, xAxis));
+        const y = readNumericValue(getRowFieldValue(row, field));
+        if (x != null && y != null) points.push([x, y]);
+      }
+      return {
+        name: legendLabels[index] || field,
+        type: "scatter" as const,
+        symbolSize,
+        itemStyle: { color: colors[index], opacity: 0.85 },
+        emphasis: { itemStyle: { opacity: 1, borderWidth: 2, borderColor: "#ffffff" } },
+        data: points,
+      };
+    });
 
     return {
       backgroundColor: "transparent",
@@ -220,20 +189,16 @@ export default function LineChart({
         : undefined,
 
       tooltip: {
-        trigger: "axis",
-        axisPointer: {
-          type: "line",
-          lineStyle: { color: borderColor, type: "dashed", width: 1 },
-        },
+        trigger: "item",
         backgroundColor: "#ffffff",
         borderColor: "#e5e7eb",
         borderWidth: 1,
         borderRadius: 10,
         padding: [8, 14],
         textStyle: { color: textHColor, fontSize: 12 },
-        extraCssText:
-          "box-shadow: 0 4px 20px rgba(0,0,0,0.10); border-radius: 10px;",
-        valueFormatter: (value) => formatYAxisValue(value, yAxisFormat),
+        extraCssText: "box-shadow: 0 4px 20px rgba(0,0,0,0.10); border-radius: 10px;",
+        formatter: (p: any) =>
+          `${p.marker}${p.seriesName}<br/>${xAxis}: ${formatAxisValue(p.value[0])}<br/>${p.seriesName}: ${formatAxisValue(p.value[1], yAxisFormat)}`,
       },
 
       legend: hasLegend
@@ -259,22 +224,15 @@ export default function LineChart({
       },
 
       xAxis: {
-        type: "category",
-        data: categories,
-        boundaryGap: false,
-        axisLine: {
-          show: true,
-          lineStyle: { color: xAxisColor || borderColor, width: 1 },
-        },
+        type: "value",
+        name: xAxis,
+        nameGap: 24,
+        nameLocation: "middle",
+        nameTextStyle: { color: textColor, fontSize: 10 },
+        axisLine: { show: true, lineStyle: { color: xAxisColor || borderColor, width: 1 } },
         axisTick: { show: false },
-        axisLabel: {
-          show: true,
-          color: textColor,
-          fontSize: 10,
-          rotate: rotateLabels ? 35 : 0,
-          hideOverlap: true,
-          margin: rotateLabels ? 8 : 4,
-        },
+        axisLabel: { color: textColor, fontSize: 10 },
+        splitLine: { lineStyle: { color: borderColor, type: "dashed", width: 1, opacity: 0.7 } },
       },
 
       yAxis: {
@@ -285,60 +243,14 @@ export default function LineChart({
           color: textColor,
           fontSize: 10,
           margin: 8,
-          formatter: (value: number) => formatYAxisValue(value, yAxisFormat),
+          formatter: (value: number) => formatAxisValue(value, yAxisFormat),
         },
-        splitLine: {
-          lineStyle: { color: borderColor, type: "dashed", width: 1, opacity: 0.7 },
-        },
+        splitLine: { lineStyle: { color: borderColor, type: "dashed", width: 1, opacity: 0.7 } },
       },
 
-      series: yFields.map((field, index) => ({
-        name: legendLabels[index] || field,
-        type: "line",
-        smooth,
-        symbol: "circle",
-        symbolSize: showSymbols ? 5 : 1,
-        showSymbol: showSymbols,
-        connectNulls: false,
-        itemStyle: {
-          color: colors[index],
-          borderWidth: 2,
-          borderColor: "#ffffff",
-        },
-        lineStyle: { width: 2.5, color: colors[index] },
-        emphasis: {
-          focus: "series",
-          itemStyle: { symbolSize: 8, borderWidth: 3, borderColor: "#ffffff" },
-          lineStyle: { width: 3 },
-        },
-        areaStyle: {
-          color: {
-            type: "linear" as const,
-            x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [
-              { offset: 0, color: `${colors[index]}${yFields.length === 1 ? "40" : "28"}` },
-              { offset: 1, color: `${colors[index]}00` },
-            ],
-          },
-        },
-        data: sortedData.map((row) => readNumericValue(getRowFieldValue(row, field))),
-      })),
+      series,
     };
-  }, [
-    ready,
-    title,
-    xAxis,
-    xAxisColor,
-    yFields,
-    colors,
-    legendLabels,
-    sortedData,
-    format,
-    useDateFormat,
-    yAxisFormat,
-    smooth,
-    showSymbols,
-  ]);
+  }, [ready, title, xAxis, xAxisColor, yFields, colors, legendLabels, data, yAxisFormat, symbolSize]);
 
   return (
     <div className="pointer-events-auto flex h-full w-full min-h-0 min-w-0 flex-col p-2">

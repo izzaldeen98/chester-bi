@@ -1,5 +1,6 @@
 import os
 from abc import ABC, abstractmethod
+from typing import Optional
 import boto3
 from botocore.exceptions import ClientError
 import aiofiles
@@ -26,6 +27,21 @@ class BaseStorage(ABC):
     @abstractmethod
     async def get_file(self, path: str,file_name : str ) -> BytesIO:
         """Gets a file from storage"""
+        pass
+
+    @abstractmethod
+    async def get_file_range(
+        self, path: str, file_name: str, start: int = 0, length: Optional[int] = None
+    ) -> Optional[BytesIO]:
+        """
+        Reads a bounded byte range instead of the whole object — used for
+        schema-sniffing large files without downloading them in full.
+
+        start >= 0: read up to `length` bytes beginning at `start` (whole
+                    remaining file if `length` is None).
+        start < 0:  read the last `abs(start)` bytes (a suffix range,
+                    e.g. a Parquet footer); `length` is ignored.
+        """
         pass
 
     @abstractmethod
@@ -69,6 +85,22 @@ class S3Storage(BaseStorage):
         try:
             key = path + "/" + file_name
             response = self.s3_client.get_object(Bucket=self.bucket_name, Key=key)
+            return BytesIO(response['Body'].read())
+        except ClientError:
+            return None
+
+    async def get_file_range(
+        self, path: str, file_name: str, start: int = 0, length: Optional[int] = None
+    ) -> Optional[BytesIO]:
+        try:
+            key = path + "/" + file_name
+            if start < 0:
+                range_header = f"bytes={start}"  # suffix range: last abs(start) bytes
+            elif length is not None:
+                range_header = f"bytes={start}-{start + length - 1}"
+            else:
+                range_header = f"bytes={start}-"
+            response = self.s3_client.get_object(Bucket=self.bucket_name, Key=key, Range=range_header)
             return BytesIO(response['Body'].read())
         except ClientError:
             return None
@@ -127,6 +159,22 @@ class LocalStorage(BaseStorage):
                 content = await f.read()
             return BytesIO(content)
         return None
+
+    async def get_file_range(
+        self, path: str, file_name: str, start: int = 0, length: Optional[int] = None
+    ) -> Optional[BytesIO]:
+        file_path = os.path.join(self.base_dir, path + "/" + file_name)
+        if not os.path.exists(file_path):
+            return None
+        file_size = os.path.getsize(file_path)
+        async with aiofiles.open(file_path, "rb") as f:
+            if start < 0:
+                await f.seek(max(start, -file_size), os.SEEK_END)
+                content = await f.read()
+            else:
+                await f.seek(min(start, file_size))
+                content = await f.read(length) if length is not None else await f.read()
+        return BytesIO(content)
 
     async def rollback_file(self, path: str,file_name : str ) -> bool:
         file_path = os.path.join(self.base_dir, path + "/" + file_name)
