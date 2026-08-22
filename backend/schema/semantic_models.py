@@ -31,14 +31,22 @@ class SemanticModelFieldType(BaseModel):
     kind: str
     subtype: Optional[str] = None
 
-class SemanticModelField(BaseModel):    
+# New layer to map the nested JSON structure cleanly
+class SchemaContainer(BaseModel):
+    fields: list["SemanticModelField"]
+
+class SemanticModelField(BaseModel):
     name: str
     kind: Literal["dimension", "measure" , "join" , "view"]
     type: Optional[SemanticModelFieldType] = None
+    # Present only on kind="join" fields — the joined source's own nested fields,
+    # so joined-source columns can be surfaced/selected from the parent source.
+    field_schema: Optional[SchemaContainer] = Field(None, alias="schema")
 
-# New layer to map the nested JSON structure cleanly
-class SchemaContainer(BaseModel):
-    fields: list[SemanticModelField]
+    class Config:
+        populate_by_name = True
+
+SchemaContainer.model_rebuild()
 
 class SemanticModelSource(BaseModel):
     name: str

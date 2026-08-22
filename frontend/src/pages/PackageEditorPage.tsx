@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FaChevronLeft, FaFileAlt, FaFileCode, FaPlus, FaSave } from "react-icons/fa";
+import { FaChevronLeft, FaFileAlt, FaFileCode, FaFileDownload, FaFileUpload, FaPlus, FaSave } from "react-icons/fa";
 import { MdRefresh } from "react-icons/md";
 import { VscJson } from "react-icons/vsc";
 import { GoPackage } from "react-icons/go";
@@ -13,6 +13,7 @@ import CSpinner from "../components/CSpinner";
 import CAlert from "../components/CAlert";
 import CButton from "../components/CButton";
 import CTextInput from "../components/CTextInput";
+import MalloyModelWizard from "../components/MalloyModelWizard";
 import { useTheme } from "../lib/theme";
 import {
   listPackageFiles,
@@ -22,6 +23,8 @@ import {
   loadPackage,
   type PackageFile,
 } from "../lib/Api";
+
+type BuilderView = "code" | "wizard";
 
 // ── File icon ──────────────────────────────────────────────────────────────
 function FileIcon({ name, active }: { name: string; active: boolean }) {
@@ -156,6 +159,10 @@ export default function PackageEditorPage() {
   const [addSaving,  setAddSaving]  = useState(false);
   const [addError,   setAddError]   = useState("");
 
+  // Code <-> Wizard navigation, and import
+  const [builderView, setBuilderView] = useState<BuilderView>("code");
+  const importInputRef = useRef<HTMLInputElement | null>(null);
+
   const saveOkTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Fetch file list ──────────────────────────────────────────────────────
@@ -175,6 +182,7 @@ export default function PackageEditorPage() {
   async function openFile(f: PackageFile) {
     if (activeFile?.file === f.file) return;
     setActiveFile(f); setContent(""); setSavedContent(""); setContentError(""); setSaveError(""); setSaveOk(false);
+    setBuilderView("code");
     if (!f.model_id) return;
     setContentLoading(true);
     try {
@@ -182,6 +190,42 @@ export default function PackageEditorPage() {
       setContent(text); setSavedContent(text);
     } catch (e: any) { setContentError(e.message ?? "Failed to load file."); }
     finally { setContentLoading(false); }
+  }
+
+  // ── Wizard -> Code ────────────────────────────────────────────────────────
+  // The wizard is the source of truth while it's open — the Code tab just
+  // shows whatever it has generated so far, live.
+  function handleWizardChange(malloyCode: string) {
+    setContent(malloyCode);
+  }
+
+  // ── Export current file as .malloy ──────────────────────────────────────
+  function handleExport() {
+    if (!activeFile) return;
+    const filename = activeFile.file.endsWith(".malloy") ? activeFile.file : `${activeFile.file || "model"}.malloy`;
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Import a .malloy file into the current editor ───────────────────────
+  function handleImportFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file next time
+    if (!file) return;
+    if (isDirty && !window.confirm("This will replace your unsaved changes with the imported file's content. Continue?")) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setContent(String(reader.result ?? ""));
+      setBuilderView("code");
+    };
+    reader.readAsText(file);
   }
 
   // ── Save ─────────────────────────────────────────────────────────────────
@@ -370,7 +414,56 @@ export default function PackageEditorPage() {
                 <FileIcon name={activeFile.file} active={false} />
                 <span className="text-xs font-medium" style={{ color: "var(--text-h)" }}>{activeFile.file}</span>
                 {isDirty && <span className="text-xs" style={{ color: "var(--accent)" }}>● unsaved</span>}
+
+                {activeFile.model_id && (
+                  <div className="ml-2 flex items-center gap-0.5 rounded-lg border p-0.5" style={{ borderColor: "var(--border)" }}>
+                    {(["code", "wizard"] as BuilderView[]).map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setBuilderView(v)}
+                        className="rounded-md px-2.5 py-1 text-[11px] font-medium capitalize transition-all"
+                        style={builderView === v
+                          ? { background: "var(--accent)", color: "#fff" }
+                          : { color: "var(--text)" }}
+                      >
+                        {v === "wizard" ? "Visual Builder" : "Code"}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <span className="ml-auto text-xs truncate" style={{ color: "var(--text)" }}>{activeFile.location}</span>
+
+                {activeFile.model_id && (
+                  <>
+                    <input
+                      ref={importInputRef}
+                      type="file"
+                      accept=".malloy"
+                      className="hidden"
+                      onChange={handleImportFile}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => importInputRef.current?.click()}
+                      title="Import a .malloy file into this editor"
+                      className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--accent-muted)] hover:text-[var(--accent)]"
+                      style={{ color: "var(--text)" }}
+                    >
+                      <FaFileUpload size={11} /> Import
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExport}
+                      title="Export this model as a .malloy file"
+                      className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--accent-muted)] hover:text-[var(--accent)]"
+                      style={{ color: "var(--text)" }}
+                    >
+                      <FaFileDownload size={11} /> Export
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* Content */}
@@ -384,6 +477,8 @@ export default function PackageEditorPage() {
                     <VscJson size={32} style={{ color: "var(--border)" }} />
                     <p className="text-sm" style={{ color: "var(--text)" }}>Content preview is not available for this file.</p>
                   </div>
+                ) : builderView === "wizard" ? (
+                  <MalloyModelWizard initialCode={content} onChange={handleWizardChange} />
                 ) : (
                   <CodeMirror
                     value={content}

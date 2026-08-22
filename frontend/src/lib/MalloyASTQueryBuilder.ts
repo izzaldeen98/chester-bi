@@ -1,5 +1,6 @@
 import { RuleGroupType, RuleType } from 'react-querybuilder';
 import { FieldInfo, SourceInfo } from '@malloydata/malloy-interfaces';
+import { flattenFields } from './fieldTree';
 
 type SortDir = "asc" | "desc";
 interface SortItem {
@@ -27,8 +28,34 @@ function isRule(filter: any): filter is RuleType {
   return filter && typeof filter === 'object' && 'field' in filter && 'operator' in filter;
 }
 
+const TIME_GRANULARITIES = ["year", "quarter", "month", "week", "day", "hour", "minute", "second"];
+
+/**
+ * Backtick-quoting a Malloy identifier is always valid syntax, reserved word or not.
+ * Joined fields are qualified as "join.field" — quote each segment separately so the
+ * dot is preserved as Malloy's join-path separator rather than swallowed into one identifier.
+ */
+function quoteField(name: string): string {
+  return name.split(".").map((part) => `\`${part}\``).join(".");
+}
+
+/** `addGroupBy` stores time-truncated entries as "field.granularity" — only the
+ * field part gets quoted; the granularity suffix stays outside the backticks. */
+function formatGroupByEntry(entry: string): string {
+  const dot = entry.lastIndexOf(".");
+  if (dot !== -1) {
+    const base = entry.slice(0, dot);
+    const granularity = entry.slice(dot + 1);
+    if (TIME_GRANULARITIES.includes(granularity)) {
+      return `${quoteField(base)}.${granularity}`;
+    }
+  }
+  return quoteField(entry);
+}
+
 export class MalloyASTQueryBuilder {
   private activeSchema: SourceInfo;
+  private allFields: FieldInfo[];
   private groupByFields: string[] = [];
   private aggFields: FieldInfo[] = [];
   private calculateFields: CalculateItem[] = [];
@@ -38,6 +65,9 @@ export class MalloyASTQueryBuilder {
   private havings: RuleGroupType | null = null;
   constructor(activeSchema: SourceInfo) {
     this.activeSchema = activeSchema;
+    // Joined sources' fields are exposed as nested kind:"join" entries — flatten them
+    // to "join.field" qualified names so cross-source columns are selectable/lookup-able.
+    this.allFields = flattenFields(activeSchema?.schema?.fields ?? []);
   }
 
   // public buildFromResponse(response: query) {
@@ -56,7 +86,7 @@ export class MalloyASTQueryBuilder {
   public buildFromResponse(response: query) {
     this.groupByFields = [...(response.groupBy ?? [])];
 
-    const allFields = this.activeSchema?.schema?.fields ?? [];
+    const allFields = this.allFields;
 
     this.aggFields = (response.aggregate ?? []).reduce<FieldInfo[]>((acc, name) => {
       const found = allFields.find((f: FieldInfo) => f.name === name);
@@ -112,28 +142,28 @@ export class MalloyASTQueryBuilder {
    */
   public buildQuery(): string {
     const lines: string[] = [];
-    
+
     // 1. Root Source Definition Initialization
     lines.push(`run: ${this.activeSchema?.name ?? 'source_info'} -> {`);
 
     // 2. Map Dimensions (Replaces commas with clean newlines and indentation layouts)
     if (this.groupByFields && this.groupByFields.length > 0) {
       lines.push('  group_by:');
-      this.groupByFields.forEach((name) => lines.push(`    ${name}`));
+      this.groupByFields.forEach((name) => lines.push(`    ${formatGroupByEntry(name)}`));
     }
 
-    // 3. Map Measures Aggregations 
+    // 3. Map Measures Aggregations
     if (this.aggFields && this.aggFields.length > 0) {
       lines.push('  aggregate:');
-      this.aggFields.forEach((f: FieldInfo) => lines.push(`   \`${f.name}\``));
+      this.aggFields.forEach((f: FieldInfo) => lines.push(`   ${quoteField(f.name)}`));
     }
 
     // 3b. Map Calculated (window function) Columns
     if (this.calculateFields && this.calculateFields.length > 0) {
       this.calculateFields.forEach((c) => {
-        lines.push(`  calculate: ${c.name} is ${c.expression} {`);
-        if (c.partitionBy.length) lines.push(`    partition_by: ${c.partitionBy.join(", ")}`);
-        if (c.orderBy.length) lines.push(`    order_by: ${c.orderBy.map((o) => `${o.field} ${o.dir}`).join(", ")}`);
+        lines.push(`  calculate: ${quoteField(c.name)} is ${c.expression} {`);
+        if (c.partitionBy.length) lines.push(`    partition_by: ${c.partitionBy.map(quoteField).join(", ")}`);
+        if (c.orderBy.length) lines.push(`    order_by: ${c.orderBy.map((o) => `${quoteField(o.field)} ${o.dir}`).join(", ")}`);
         lines.push('  }');
       });
     }
@@ -142,7 +172,7 @@ export class MalloyASTQueryBuilder {
     if (this.sortMap && this.sortMap.length > 0) {
       lines.push('  order_by:');
       this.sortMap.forEach((sortItem: { field: FieldInfo; dir: SortDir }) => {
-        lines.push(`    ${sortItem.field.name} ${sortItem.dir}`);
+        lines.push(`    ${quoteField(sortItem.field.name)} ${sortItem.dir}`);
       });
     }
 
@@ -178,7 +208,7 @@ private handleFilter(): string {
     const fullMalloyFilterExpression = this.processRuleGroup(this.filters);
 
     console.log("FULL MALLOY FILTER EXPRESSION:", fullMalloyFilterExpression);
-    
+
     // 2. Return the string expression directly
     return fullMalloyFilterExpression;
   }
@@ -221,15 +251,15 @@ private handleFilter(): string {
    * Your exact business criteria mapping expressions encapsulated into standalone string returns
    */
   private compileSingleRuleString(filter: RuleType): string {
-    console.log("FILTER:", filter);
-    const targetField = this.activeSchema?.schema?.fields?.find((f: any) => f.name === filter.field);
+    const targetField = this.allFields.find((f: any) => f.name === filter.field);
     console.log("TARGET FIELD:", targetField);
     const filedDataType = this.getFieldDataType(targetField ?? {} as FieldInfo);
+    const qField = quoteField(filter.field);
 
     // 1. Generic Null Check
     if (["is null", "is not null"].includes(filter.operator)) {
-      if (filter.operator === "is null") return `${filter.field} = null`;
-      if (filter.operator === "is not null") return `${filter.field} != null`;
+      if (filter.operator === "is null") return `${qField} = null`;
+      if (filter.operator === "is not null") return `${qField} != null`;
       return '';
     }
 
@@ -239,22 +269,22 @@ private handleFilter(): string {
         const [addingType, unit, amount] = String(filter.value).split("|") || ['relative', 'days', '1'];
         const operatorSymbol = filter.operator === 'before' ? '-' : '+';
         const nowOrToday = filedDataType === "date_type" ? "now::date" : "now";
-        
+
         if (addingType === "relative") {
           if (filter.operator === "before") {
-            return `${filter.field} < ${nowOrToday} ${operatorSymbol} ${amount} ${unit}`;
+            return `${qField} < ${nowOrToday} ${operatorSymbol} ${amount} ${unit}`;
           }
           if (filter.operator === "after") {
-            return `${filter.field} > ${nowOrToday} ${operatorSymbol} ${amount} ${unit}`;
+            return `${qField} > ${nowOrToday} ${operatorSymbol} ${amount} ${unit}`;
           }
         }
         if (addingType === "absolute") {
           const [, dateValue] = String(filter.value).split("|") || ['absolute', ''];
           if (filter.operator === "before") {
-            return `${filter.field} < @${this.formatDate(dateValue , filedDataType)}`;
+            return `${qField} < @${this.formatDate(dateValue , filedDataType)}`;
           }
           if (filter.operator === "after") {
-            return `${filter.field} > @${this.formatDate(dateValue , filedDataType)}`;
+            return `${qField} > @${this.formatDate(dateValue , filedDataType)}`;
           }
         }
       }
@@ -263,10 +293,10 @@ private handleFilter(): string {
         if (startValue && endValue) {
           const rangeSyntax = `@${this.formatDate(startValue , filedDataType)} to @${this.formatDate(endValue , filedDataType)}`;
           if (filter.operator === "between") {
-            return `${filter.field} ? ${rangeSyntax}`;
+            return `${qField} ? ${rangeSyntax}`;
           }
           if (filter.operator === "not between") {
-            return `not (${filter.field} ? ${rangeSyntax})`;
+            return `not (${qField} ? ${rangeSyntax})`;
           }
         }
       }
@@ -274,41 +304,41 @@ private handleFilter(): string {
         const [amount, unit] = String(filter.value).split(":") || ['1', 'days'];
         const nowOrToday = filedDataType === "date_type" ? "now::date" : "now";
         if (filter.operator === "next") {
-          return `${filter.field} = ${nowOrToday} to ${nowOrToday} + ${amount} ${unit}`;
+          return `${qField} = ${nowOrToday} to ${nowOrToday} + ${amount} ${unit}`;
         }
         if (filter.operator === "last") {
-          return `${filter.field} = ${nowOrToday} - ${amount} ${unit} to ${nowOrToday}`;
+          return `${qField} = ${nowOrToday} - ${amount} ${unit} to ${nowOrToday}`;
         }
       }
       if (["equals", "not equals"].includes(filter.operator)) {
-        if (filter.operator === "equals") return `${filter.field} = @${this.formatDate(filter.value)}`;
-        if (filter.operator === "not equals") return `not (${filter.field} = @${this.formatDate(filter.value)})`;
+        if (filter.operator === "equals") return `${qField} = @${this.formatDate(filter.value)}`;
+        if (filter.operator === "not equals") return `not (${qField} = @${this.formatDate(filter.value)})`;
       }
       return '';
     }
 
     // 3. Number Handling Logic
     if (filedDataType === "number_type") {
-      if (filter.operator === "greater than") return `${filter.field} > ${filter.value}`;
-      if (filter.operator === "greater than or equal to") return `${filter.field} >= ${filter.value}`;
-      if (filter.operator === "less than") return `${filter.field}   < ${filter.value}`;
-      if (filter.operator === "less than or equal to") return `${filter.field} <= ${filter.value}`;
+      if (filter.operator === "greater than") return `${qField} > ${filter.value}`;
+      if (filter.operator === "greater than or equal to") return `${qField} >= ${filter.value}`;
+      if (filter.operator === "less than") return `${qField}   < ${filter.value}`;
+      if (filter.operator === "less than or equal to") return `${qField} <= ${filter.value}`;
       if (filter.operator === "between" || filter.operator === "not between") {
         const [startValue, endValue] = String(filter.value).split(",") || ['', ''];
         if (startValue && endValue) {
           const syntax = `[${startValue} to ${endValue}]`;
-          return filter.operator === "between" ? `${filter.field} = ${syntax}` : `not (${filter.field} = ${syntax})`;
+          return filter.operator === "between" ? `${qField} = ${syntax}` : `not (${qField} = ${syntax})`;
         }
       }
-      if (filter.operator === "equals") return `${filter.field} = ${filter.value}`;
-      if (filter.operator === "not equals") return `${filter.field} != ${filter.value}`;
+      if (filter.operator === "equals") return `${qField} = ${filter.value}`;
+      if (filter.operator === "not equals") return `${qField} != ${filter.value}`;
       return '';
     }
 
     // 4. Boolean Handling Logic
     if (filedDataType === "boolean_type") {
       if (filter.operator === "true" || filter.operator === "false") {
-        return `${filter.field} = ${filter.operator}`;
+        return `${qField} = ${filter.operator}`;
       }
       return '';
     }
@@ -316,16 +346,16 @@ private handleFilter(): string {
     // 5. String Handling Logic
     if (filedDataType === "string_type") {
       const escape = (v: any) => `${String(v).replace(/'/g, "\\'")}`;
-      if (filter.operator === "contains") return `${filter.field} ~ '%${escape(filter.value)}%'`;
-      if (filter.operator === "not contains") return `not (${filter.field} ~ '%${escape(filter.value)}%')`;
-      if (filter.operator === "starts with") return `${filter.field} ~ '${escape(filter.value)}%'`;
-      if (filter.operator === "not starts with") return `not (${filter.field} ~ '${escape(filter.value)}%')`;
-      if (filter.operator === "ends with") return `${filter.field} ~ '%${escape(filter.value)}'`;
-      if (filter.operator === "not ends with") return `not (${filter.field} ~ '%${escape(filter.value)}')`;
-      if (filter.operator === "equals") return `${filter.field} = '${escape(filter.value)}'`;
-      if (filter.operator === "not equals") return `${filter.field} != '${escape(filter.value)}'`;
-      if (filter.operator === "is empty") return `${filter.field} = ''`;
-      if (filter.operator === "is not empty") return `${filter.field} != ''`;
+      if (filter.operator === "contains") return `${qField} ~ '%${escape(filter.value)}%'`;
+      if (filter.operator === "not contains") return `not (${qField} ~ '%${escape(filter.value)}%')`;
+      if (filter.operator === "starts with") return `${qField} ~ '${escape(filter.value)}%'`;
+      if (filter.operator === "not starts with") return `not (${qField} ~ '${escape(filter.value)}%')`;
+      if (filter.operator === "ends with") return `${qField} ~ '%${escape(filter.value)}'`;
+      if (filter.operator === "not ends with") return `not (${qField} ~ '%${escape(filter.value)}')`;
+      if (filter.operator === "equals") return `${qField} = '${escape(filter.value)}'`;
+      if (filter.operator === "not equals") return `${qField} != '${escape(filter.value)}'`;
+      if (filter.operator === "is empty") return `${qField} = ''`;
+      if (filter.operator === "is not empty") return `${qField} != ''`;
     }
 
     return '';

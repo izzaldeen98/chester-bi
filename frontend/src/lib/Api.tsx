@@ -360,6 +360,24 @@ export async function testConnection(connectionId: string): Promise<void> {
   return handleResponse<void>(res);
 }
 
+// Raw pass-through — the Malloy publisher's exact schema/table item shape
+// (plain strings vs. `{name}` objects) isn't pinned down here; callers should
+// normalize defensively rather than assume one shape.
+export async function getConnectionSchemas(connectionId: string): Promise<unknown[]> {
+  const res = await fetch(`/api/v1/connections/schemas?connection_id=${connectionId}`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<unknown[]>(res);
+}
+
+export async function getSchemaTables(connectionId: string, schema: string): Promise<unknown[]> {
+  const res = await fetch(
+    `/api/v1/connections/schemas/tables?connection_id=${connectionId}&schema=${encodeURIComponent(schema)}`,
+    { headers: { ...authHeaders() } },
+  );
+  return handleResponse<unknown[]>(res);
+}
+
 // ── Packages ───────────────────────────────────────────────────────────────
 
 export interface PackageFile {
@@ -660,5 +678,23 @@ export async function deleteFile(fileId: string): Promise<void> {
     headers: { ...authHeaders() },
   });
   return handleResponse<void>(res);
+}
+
+export interface FileSchemaColumn {
+  name: string;
+  type: string;
+}
+
+export interface FileSchemaResponse {
+  format: string;
+  sample_row_count: number;
+  columns: FileSchemaColumn[];
+}
+
+export async function getFileSchema(fileId: string): Promise<FileSchemaResponse> {
+  const res = await fetch(`/api/v1/files/schema?file_id=${fileId}`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<FileSchemaResponse>(res);
 }
 

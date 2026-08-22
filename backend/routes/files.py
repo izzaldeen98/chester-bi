@@ -8,6 +8,7 @@ from security import check_permissions
 from uuid import UUID
 from models.files import File
 from utils.config_files import storage
+from utils.files_schema_handler import get_file_schema
 from io import BytesIO
 from typing import List
 from sqlalchemy import and_
@@ -113,6 +114,28 @@ async def list_files(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized : Insufficient permissions")
     files = db.query(File).filter(File.account_id == current_user.account_id).all()
     return files
+
+@router.get("/schema")
+async def get_file_schema_route(
+    file_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Infers a file's column schema from a small snippet, without reading it in full."""
+    permissions = ["*", "files:*", "files:list"]
+    if not check_permissions(current_user, *permissions):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Unauthorized : Insufficient permissions")
+    file = db.query(File).filter(and_(File.public_key == file_id, File.account_id == current_user.account_id)).first()
+    if not file:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
+    try:
+        schema = await get_file_schema(file.path, file.file_name, file.extension)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to get file schema: {str(e)}")
+    return schema.to_dict()
+
 
 @router.delete("/delete", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_file(

@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   FaPlay, FaTable, FaLayerGroup, FaDatabase, FaTerminal, FaCode, FaSave, FaPlus
 } from "react-icons/fa";
 import { PiFileSqlFill } from "react-icons/pi";
+import { MdRefresh } from "react-icons/md";
 import CFieldTree from "../components/CFieldTree";
-import { TIME_GRANULARITIES, type Granularity, type SortItem } from "../lib/fieldTree";
+import { TIME_GRANULARITIES, type Granularity, type SortItem, flattenFields } from "../lib/fieldTree";
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import { EditorView } from "@codemirror/view";
 import CSelect from "../components/CSelect";
@@ -17,6 +18,7 @@ import { useTheme } from "../lib/theme";
 import {
   listModels,
   getCompiledModel,
+  getModelFileContent,
   getQuery,
   getQueries,
   createQuery,
@@ -37,6 +39,7 @@ import {
 } from "../lib/querySerialize";
 import { MalloyASTQueryBuilder } from "../lib/MalloyASTQueryBuilder";
 import { normalizeQueryRows } from "../lib/queryResult";
+import { parseMalloyToComposites } from "../components/MalloyModelWizard";
 
 
 import { FieldInfo, SourceInfo } from "@malloydata/malloy-interfaces";
@@ -95,7 +98,7 @@ function CalculatedColumnModal({ open, onClose, onAdd, activeSchema, initial }: 
   const [error, setError] = useState("");
   const [expression, setExpression] = useState("");
 
-  const fields = activeSchema?.schema?.fields ?? [];
+  const fields = flattenFields(activeSchema?.schema?.fields ?? []);
   const isEditing = !!initial;
 
   useEffect(() => {
@@ -303,6 +306,43 @@ function parseGroupByEntry(entry: string): { name: string; granularity?: Granula
   return { name: entry };
 }
 
+/**
+ * For a composite source (`source: name is compose(a, b, ...)`), Malloy only
+ * accepts a query if a single member source defines every field the query
+ * references — mixing fields that live in different, non-overlapping members
+ * fails at query time. Builds a field-name → owning-member-names map so the UI
+ * can show provenance and catch that conflict before running.
+ */
+function buildFieldOrigins(compositeMembers: string[], allSources: SourceInfo[]): Record<string, string[]> {
+  const origins: Record<string, string[]> = {};
+  for (const memberName of compositeMembers) {
+    const member = allSources.find((s) => s.name === memberName);
+    if (!member) continue;
+    for (const f of member.schema?.fields ?? []) {
+      if (f.kind.toLowerCase() === "join") continue; // ignored by composite resolution per the docs
+      (origins[f.name] ??= []).push(memberName);
+    }
+  }
+  return origins;
+}
+
+/** A `-- from: a, b` comment appended to any query line that's just a single
+ * backtick-quoted field reference (group_by/aggregate/order_by entries) —
+ * shows provenance right in the generated Malloy text, not just the tree. */
+function annotateQueryWithOrigins(queryText: string, origins: Record<string, string[]>): string {
+  const fieldLineRe = /^(\s*)`([^`]+)`(\.\w+)?(\s+(asc|desc))?\s*$/;
+  return queryText
+    .split("\n")
+    .map((line) => {
+      const match = line.match(fieldLineRe);
+      if (!match) return line;
+      const owners = origins[match[2]];
+      if (!owners || owners.length === 0) return line;
+      return `${line}  -- from: ${owners.join(", ")}`;
+    })
+    .join("\n");
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function QueryPage() {
   const { queryId } = useParams<{ queryId?: string }>();
@@ -332,6 +372,9 @@ export default function QueryPage() {
   const [schemaError, setSchemaError] = useState("");
   const [activeSchema, setActiveSchema] = useState<SourceInfo | null>(null);
   const [activeSource, setActiveSource] = useState<Array<SourceInfo> | null>(null);
+  // Raw .malloy text — only fetched to detect `compose(...)` composite sources,
+  // which the compiled schema itself gives no indication of.
+  const [modelSource, setModelSource] = useState("");
 
   // Field selections
   const [groupByFields, setGroupByFields] = useState<FieldInfo[]>([]);
@@ -448,10 +491,10 @@ export default function QueryPage() {
     }
   }, [selectedPkgId]);
 
-  // ── Load schema ──────────────────────────────────────────────────────────
-  useEffect(() => {
+  // ── Load schema — also callable directly by the "Refresh Model" button ────
+  const loadSchema = useCallback(() => {
     if (!selectedModelId) return;
-    setCompiledModel(null); setSchemaError(""); setActiveSource(null);
+    setCompiledModel(null); setSchemaError(""); setActiveSource(null); setModelSource("");
     setGroupByFields([]); setAggFields([]); setGranularityMap({}); setSortMap([]); setFilterQuery(EMPTY_FILTER_QUERY);
     setCalculatedColumns([]); setCalcFields([]);
     setQueryResult(null); setQueryError("");
@@ -460,7 +503,11 @@ export default function QueryPage() {
       .then((s) => { setCompiledModel(s); if (s.sources.length > 0) setActiveSource(s.sources); })
       .catch((e: any) => setSchemaError(e.message ?? "Failed to load schema."))
       .finally(() => setLoadingSchema(false));
+    // Best-effort — composite-source origin labeling just doesn't show up if this fails.
+    getModelFileContent(selectedModelId).then(setModelSource).catch(() => {});
   }, [selectedModelId]);
+
+  useEffect(() => { loadSchema(); }, [loadSchema]);
 
 
   useEffect(() => {
@@ -476,7 +523,7 @@ export default function QueryPage() {
       activeSource.find((s) => s.name === pendingHydration.source) ?? activeSource[0];
     setActiveSchema(source);
 
-    const fields = source.schema?.fields ?? [];
+    const fields = flattenFields(source.schema?.fields ?? []);
     const findField = (name: string) => fields.find((f) => f.name === name);
 
     const nextGroupBy: FieldInfo[] = [];
@@ -542,12 +589,49 @@ export default function QueryPage() {
     [calculatedColumns],
   );
 
+  // Composite sources aren't flagged in the compiled schema itself — recover
+  // them by parsing the raw .malloy text for `compose(...)` blocks.
+  const compositesByName = useMemo(
+    () => new Map(parseMalloyToComposites(modelSource).map((c) => [c.name, c.members])),
+    [modelSource],
+  );
+
+  const activeCompositeMembers = activeSchema ? compositesByName.get(activeSchema.name) : undefined;
+
+  const fieldOrigins = useMemo(() => {
+    if (!activeCompositeMembers || !activeSource) return null;
+    return buildFieldOrigins(activeCompositeMembers, activeSource);
+  }, [activeCompositeMembers, activeSource]);
+
+  // Selected fields whose owning members share no common source — the exact
+  // condition Malloy itself rejects the query for, surfaced before Run instead of after.
+  const originConflict = useMemo(() => {
+    if (!fieldOrigins) return null;
+    const selected = [...groupByFields, ...aggFields];
+    let common: Set<string> | null = null;
+    const involved: string[] = [];
+    for (const f of selected) {
+      const owners = fieldOrigins[f.name];
+      if (!owners || owners.length === 0) continue;
+      involved.push(`${f.name} (${owners.join("/")})`);
+      const ownerSet = new Set(owners);
+      if (common === null) {
+        common = ownerSet;
+      } else {
+        const prev: Set<string> = common;
+        common = new Set(owners.filter((o) => prev.has(o)));
+      }
+    }
+    if (common !== null && common.size === 0) return involved;
+    return null;
+  }, [fieldOrigins, groupByFields, aggFields]);
+
   const generatedQuery = useMemo(() => {
     if (!activeSchema) return null;
-  
+
     try {
       const builder = new MalloyASTQueryBuilder(activeSchema);
-  
+
       // 1. Map over active Dimensions & Time Granularities
       if (groupByFields.length > 0) {
         for (const field of groupByFields) {
@@ -557,11 +641,11 @@ export default function QueryPage() {
       // 2. Add Aggregate Fields Measures
       if (aggFields.length > 0) {
         for (const field of aggFields) {
-          
+
           builder.addAgg(field );
         }
       }
-  
+
       // 2b. Add Selected Calculated (window function) Columns
       if (calcFields.length > 0) {
         for (const field of calcFields) {
@@ -574,12 +658,12 @@ export default function QueryPage() {
       if (limit > 0) {
         builder.setLimit(limit);
       }
-  
+
       // 4. FIXED: String-Based Field Verification Loop for Order Modifiers
       if (sortMap.length > 0) {
         // Create a flat array of active group-by string names for proper lookups
         const activeGroupNames = groupByFields.map((f: any) => f.name);
-  
+
         for (const sortItem of sortMap) {
           // Safe string-to-string comparative lookup mapping
           if (!activeGroupNames.includes(sortItem.field.name)) {
@@ -588,26 +672,27 @@ export default function QueryPage() {
           builder.addSort(sortItem.field, sortItem.dir === "asc" ? "asc" : "desc");
         }
       }
-  
+
       // 5. Build and Apply Tree-Aware Filters — measure-kind rules become `having`, the rest stay `where`
       if (filterQuery && filterQuery.rules && filterQuery.rules.length > 0) {
-        const { where, having } = partitionFilterQuery(filterQuery, activeSchema.schema?.fields ?? []);
+        const { where, having } = partitionFilterQuery(filterQuery, flattenFields(activeSchema.schema?.fields ?? []));
         if (where) builder.addFilter(where);
         if (having) builder.addHaving(having);
       }
-  
+
       // Return the completed object directly from the memo calculation tree
 
-      return builder.buildQuery();
-  
+      const built = builder.buildQuery();
+      return fieldOrigins ? annotateQueryWithOrigins(built, fieldOrigins) : built;
+
     } catch (e: any) {
       console.error("Failed compiling Malloy AST target syntax query structures:", e);
       return null;
     }
-  }, [groupByFields, aggFields, calcFields, calcColumnsByName, limit, sortMap, filterQuery, granularityMap, activeSchema]);
-  
+  }, [groupByFields, aggFields, calcFields, calcColumnsByName, limit, sortMap, filterQuery, granularityMap, activeSchema, fieldOrigins]);
+
   // 6. SAFE STATE SYNCHRONIZATION FLOW
-  // Automatically pipes the pure calculation results straight to your engine's state manager 
+  // Automatically pipes the pure calculation results straight to your engine's state manager
   useEffect(() => {
     if (generatedQuery && !suppressCodegen.current) {
       setQuery(generatedQuery);
@@ -685,7 +770,7 @@ export default function QueryPage() {
 
     const groupBy = buildGroupByFields(groupByFields, granularityMap);
     const orderBy = buildOrderByFields(sortMap);
-    const { where, having } = partitionFilterQuery(filterQuery, activeSchema.schema?.fields ?? []);
+    const { where, having } = partitionFilterQuery(filterQuery, flattenFields(activeSchema.schema?.fields ?? []));
     const filters = where ? wrapFilters(where) : undefined;
     const havings = having ? wrapFilters(having) : undefined;
 
@@ -767,7 +852,7 @@ export default function QueryPage() {
     setQueryResult(null);
     setQueryTime(null);
 
-    
+
       let result;
       try {
         result = await runQuery(selectedModelId, generatedQuery ?? "");
@@ -833,6 +918,15 @@ export default function QueryPage() {
         </div>
       )}
 
+      {originConflict && (
+        <div className="px-4 py-2">
+          <CAlert
+            variant="error"
+            message={`This is a composite source — no single underlying source has every selected field. Conflicting fields: ${originConflict.join(", ")}. Pick fields that all come from the same source.`}
+          />
+        </div>
+      )}
+
       {pageBusy ? (
         <div className="flex flex-1 items-center justify-center">
           <CSpinner size={32} />
@@ -874,7 +968,7 @@ export default function QueryPage() {
             {queryName ?? "New Query"}
           </span>
         )}
-  
+
         <div className="flex-1" />
 
         <CToggleButtons buttons={[
@@ -889,7 +983,7 @@ export default function QueryPage() {
         )}
 
         <button onClick={handleRun}
-          disabled={!query || running}
+          disabled={!query || running || !!originConflict}
           className="flex items-center gap-2 rounded-xl px-4 py-1.5 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           style={{ background: "var(--accent)", color: "var(--accent-fg)" }}
         >
@@ -921,6 +1015,16 @@ export default function QueryPage() {
               : <>
                 <CSelect label="Package" value={selectedPkgId} onChange={setSelectedPkgId} options={pkgOptions} placeholder="Select package…" />
                 <CSelect label="Model" value={selectedModelId} onChange={setSelectedModelId} options={modelOptions} placeholder="Select model…" />
+                <CButton
+                  variant="outline"
+                  fullWidth
+                  loading={loadingSchema}
+                  disabled={!selectedModelId}
+                  onClick={loadSchema}
+                  className="!text-xs"
+                >
+                  <MdRefresh size={13} /> Refresh Model
+                </CButton>
               </>
             }
           </div>
@@ -966,11 +1070,12 @@ export default function QueryPage() {
                   {/* Field tree */}
                   {srcActive && (
                     <CFieldTree
-                      fields={[...schema.schema.fields, ...calculatedFieldInfos]}
+                      fields={[...flattenFields(schema.schema.fields), ...calculatedFieldInfos]}
                       groupByFields={groupByFields}
                       aggFields={[...aggFields, ...calcFields]}
                       granularityMap={granularityMap}
                       sortMap={sortMap}
+                      fieldOrigins={fieldOrigins}
                       onToggleField={toggleField}
                       onSetGranularity={setGranularity}
                       onCycleSort={cycleSort}
@@ -988,7 +1093,7 @@ export default function QueryPage() {
         <main className="flex flex-1 flex-col overflow-hidden">
 
           <CQueryBuilder
-            fields={activeSchema?.schema?.fields}
+            fields={activeSchema ? flattenFields(activeSchema.schema?.fields ?? []) : undefined}
             query={filterQuery}
             onQueryChange={setFilterQuery}
           />

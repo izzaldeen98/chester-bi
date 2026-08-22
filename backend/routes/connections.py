@@ -381,3 +381,71 @@ async def test_connection(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to test connection"
         )
+
+
+def _get_owned_connection(db: Session, current_user: User, connection_id: UUID) -> Connection:
+    connection = (
+        db.query(Connection)
+        .filter(
+            and_(
+                Connection.account_id == current_user.account_id,
+                Connection.is_active == True,
+                Connection.public_key == connection_id,
+            )
+        )
+        .first()
+    )
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found"
+        )
+    return connection
+
+
+@router.get("/schemas")
+async def get_connection_schemas(
+    connection_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List the schemas (namespaces) available on a connection's database."""
+    permissions = ["*", "connections:*", "connections:list"]
+    if not check_permissions(current_user, *permissions):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized : Insufficient permissions",
+        )
+    connection = _get_owned_connection(db, current_user, connection_id)
+    malloy = Malloy(envid=current_user.account.public_key)
+    try:
+        return malloy.get_connection_schemas(connection.name)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get connection schemas: {str(e)}",
+        )
+
+
+@router.get("/schemas/tables")
+async def get_connection_schema_tables(
+    connection_id: UUID,
+    schema: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List the tables within a single schema of a connection's database."""
+    permissions = ["*", "connections:*", "connections:list"]
+    if not check_permissions(current_user, *permissions):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized : Insufficient permissions",
+        )
+    connection = _get_owned_connection(db, current_user, connection_id)
+    malloy = Malloy(envid=current_user.account.public_key)
+    try:
+        return malloy.get_schema_tables(connection.name, schema)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get schema tables: {str(e)}",
+        )
