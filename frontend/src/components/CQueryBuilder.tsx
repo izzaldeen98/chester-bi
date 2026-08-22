@@ -7,7 +7,8 @@ import {
     type Field,
     type RuleGroupType,
     type ValueEditorProps,
-} from "react-querybuilder"; import { FieldInfo } from "@malloydata/malloy-interfaces";
+} from "react-querybuilder";
+import { FieldInfo } from "../lib/cubeTypes";
 import "react-querybuilder/dist/query-builder.css";
 import "../styles/query-builder.css";
 

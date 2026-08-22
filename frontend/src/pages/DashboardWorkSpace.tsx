@@ -24,7 +24,7 @@ import "../styles/dashboard-workspace.css";
 interface WidgetMeta {
   title: string;
   query?: string;
-  queryId?: string;
+  datasetId?: string;
   chartType?: WidgetChartConfig["chartType"];
   chartConfig?: Record<string, string>;
   previewValue?: number | null;
@@ -32,10 +32,10 @@ interface WidgetMeta {
   filterRule?: FilterRule;
 }
 function toWidgetConfig(meta: WidgetMeta): WidgetChartConfig | undefined {
-  if (!meta.queryId && !meta.chartConfig) return undefined;
+  if (!meta.datasetId && !meta.chartConfig) return undefined;
   return {
-    queryId: meta.queryId,
-    queryName: meta.query,
+    datasetId: meta.datasetId,
+    datasetName: meta.query,
     chartType: meta.chartType,
     chartConfig: meta.chartConfig,
     previewValue: meta.previewValue ?? null,
@@ -129,7 +129,7 @@ export default function DashboardWorkSpace() {
           meta[el.id] = {
             title: el.meta.title,
             query: el.meta.query,
-            queryId: el.meta.queryId,
+            datasetId: el.meta.datasetId,
             chartType: el.meta.chartType as WidgetChartConfig["chartType"],
             chartConfig: el.meta.chartConfig,
             filterRule: el.meta.filterRule as FilterRule | undefined,
@@ -228,8 +228,8 @@ export default function DashboardWorkSpace() {
       ...prev,
       [widgetId]: {
         title: result.chartConfig.title || prev[widgetId]?.title || "Widget",
-        query: result.query.name,
-        queryId: result.query.id,
+        query: result.dataset.name,
+        datasetId: result.dataset.id,
         chartType: result.chartType,
         chartConfig: result.chartConfig,
         previewValue: result.previewValue,

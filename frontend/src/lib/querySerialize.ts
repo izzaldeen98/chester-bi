@@ -1,5 +1,5 @@
 import type { RuleGroupType, RuleType } from "react-querybuilder";
-import type { FieldInfo } from "@malloydata/malloy-interfaces";
+import type { FieldInfo } from "./cubeTypes";
 
 export const FILTER_WRAPPER_KEY = "filter";
 

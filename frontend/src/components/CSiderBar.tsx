@@ -19,10 +19,10 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Home",        path: "/home",        icon: <RiHomeLine size={18} /> },
   { label: "Dashboards",   path: "/dashboard",   icon: <MdDashboard size={18} /> },
-  { label: "Queries",       path: "/queries",       icon: <PiFileSqlFill size={18} /> },
+  { label: "Datasets",       path: "/datasets",       icon: <PiFileSqlFill size={18} /> },
   { label: "Files",       path: "/files",       icon: <FaFileAlt size={17} /> },
   { label: "Connections", path: "/connections", icon: <MdOutlineCloud size={18} /> },
-  { label: "Packages",    path: "/packages",    icon: <GoPackage size={18} /> },
+  { label: "Models",    path: "/models",    icon: <GoPackage size={18} /> },
   { label: "Users",       path: "/users",       icon: <FaUser size={16} /> },
 ];
 

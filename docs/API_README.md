@@ -1147,7 +1147,7 @@ No request body.
 | `filters` | `object` | No |  |
 | `order_by_fields` | `object` | No |  |
 | `limit` | `object` | No |  |
-| `malloy_query` | `string` | Yes |  |
+| `cube_query` | `object` | Yes |  |
 | `sql_query` | `object` | No |  |
 
 ### `QueryDetailedResponse`
@@ -1168,7 +1168,7 @@ No request body.
 | `filters` | `object` | No |  |
 | `order_by_fields` | `object` | No |  |
 | `limit` | `object` | No |  |
-| `malloy_query` | `string` | Yes |  |
+| `cube_query` | `object` | Yes |  |
 | `sql_query` | `object` | No |  |
 
 ### `QueryPackage`
@@ -1212,7 +1212,7 @@ No request body.
 | `filters` | `object` | No |  |
 | `order_by_fields` | `object` | No |  |
 | `limit` | `object` | No |  |
-| `malloy_query` | `object` | No |  |
+| `cube_query` | `object` | No |  |
 | `sql_query` | `object` | No |  |
 | `semantic_model_id` | `object` | No |  |
 
@@ -1235,16 +1235,11 @@ No request body.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `kind` | `string` | Yes |  |
-| `subtype` | `object` | No |  |
 
 ### `SemanticModelSchema`
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `type` | `string` | Yes |  |
-| `package_name` | `string` | Yes |  |
-| `model_path` | `object` | No |  |
-| `malloy_version` | `string` | Yes |  |
 | `sources` | `array[SemanticModelSource]` | Yes |  |
 
 ### `SemanticModelSource`
@@ -1252,9 +1247,7 @@ No request body.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `name` | `string` | Yes |  |
-| `kind` | `string` | Yes |  |
 | `schema` | `SchemaContainer` | Yes |  |
-| `annotations` | `array[N/A]` | No |  |
 
 ### `UserCreate`
 

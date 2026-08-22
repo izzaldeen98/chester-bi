@@ -1,4 +1,5 @@
 import type { FilterRule } from "../components/FilterEditDialog";
+import type { CubeFilterExpr, CubeQuery } from "./cubeTypes";
 
 // ── Date helpers ──────────────────────────────────────────────────────────
 
@@ -21,49 +22,44 @@ function unitMs(unit: string, n: number): number {
 // ── Clause builder ────────────────────────────────────────────────────────
 
 /**
- * Convert a FilterRule + a resolved field name into a Malloy `where:` expression.
- * Returns null if the rule is incomplete or the operator needs no clause.
+ * Convert a FilterRule + a resolved (source-qualified) field name into a
+ * Cube filter expression. Returns null if the rule is incomplete or the
+ * operator needs no clause.
  */
-export function buildMalloyFilterClause(rule: FilterRule, fieldName: string): string | null {
+export function buildCubeFilterExpr(rule: FilterRule, fieldName: string): CubeFilterExpr | null {
   const { operator, value, kind, uiType } = rule;
   const isDate = kind === "datetime" || kind === "date";
   const dk = kind as "datetime" | "date";
+  const member = fieldName;
 
-  if (operator === "is null")      return `${fieldName} = null`;
-  if (operator === "is not null")  return `${fieldName} != null`;
-  if (operator === "is empty")     return `${fieldName} = ''`;
-  if (operator === "is not empty") return `${fieldName} != ''`;
+  if (operator === "is null")      return { member, operator: "notSet" };
+  if (operator === "is not null")  return { member, operator: "set" };
+  if (operator === "is empty")     return { member, operator: "equals", values: [""] };
+  if (operator === "is not empty") return { member, operator: "notEquals", values: [""] };
 
   if (!value) return null;
 
-  // Multi-select always means "any of these values" — regardless of which
-  // operator happens to be set, since the picker itself never exposes one.
+  // Multi-select always means "any of these values" — Cube's `equals` with
+  // multiple values is an IN clause, regardless of which operator happens
+  // to be set (the picker itself never exposes one).
   if (uiType === "multiselect") {
     const raw = value.split(",").map((v) => v.trim()).filter(Boolean);
     if (!raw.length) return null;
-    if (kind === "number") {
-      const nums = raw.map(parseFloat).filter((n) => !isNaN(n));
-      if (!nums.length) return null;
-      return `(${nums.map((n) => `${fieldName} = ${n}`).join(" or ")})`;
-    }
-    const esc = raw.map((v) => v.replace(/\\/g, "\\\\").replace(/'/g, "\\'"));
-    return `(${esc.map((v) => `${fieldName} = '${v}'`).join(" or ")})`;
+    return { member, operator: "equals", values: raw };
   }
 
-  // A slicer always means "between these two values" — regardless of which
-  // operator happens to be set, same reasoning as multiselect above.
+  // A slicer always means "between these two values" — same reasoning as multiselect above.
   if (uiType === "slicer") {
     const [a, b] = value.split(",");
     if (!a || !b) return null;
     if (kind === "number") {
-      const na = parseFloat(a), nb = parseFloat(b);
-      if (isNaN(na) || isNaN(nb)) return null;
-      return `${fieldName} >= ${na} and ${fieldName} <= ${nb}`;
+      if (isNaN(parseFloat(a)) || isNaN(parseFloat(b))) return null;
+      return { and: [{ member, operator: "gte", values: [a] }, { member, operator: "lte", values: [b] }] };
     }
     if (isDate) {
       const da = new Date(a), db = new Date(b);
       if (isNaN(da.getTime()) || isNaN(db.getTime())) return null;
-      return `${fieldName} >= @${fmt(da, dk)} and ${fieldName} <= @${fmt(db, dk)}`;
+      return { member, operator: "inDateRange", values: [fmt(da, dk), fmt(db, dk)] };
     }
     return null;
   }
@@ -81,8 +77,7 @@ export function buildMalloyFilterClause(rule: FilterRule, fieldName: string): st
         date = new Date(value);
       }
       if (isNaN(date.getTime())) return null;
-      const ds = fmt(date, dk);
-      return operator === "after" ? `${fieldName} > @${ds}` : `${fieldName} < @${ds}`;
+      return { member, operator: operator === "after" ? "afterDate" : "beforeDate", values: [fmt(date, dk)] };
     }
 
     if (["last", "next"].includes(operator)) {
@@ -91,81 +86,69 @@ export function buildMalloyFilterClause(rule: FilterRule, fieldName: string): st
       const now = new Date();
       const other = new Date(operator === "last" ? now.getTime() - ms : now.getTime() + ms);
       const [a, b] = operator === "last" ? [other, now] : [now, other];
-      return `${fieldName} >= @${fmt(a, dk)} and ${fieldName} <= @${fmt(b, dk)}`;
+      return { member, operator: "inDateRange", values: [fmt(a, dk), fmt(b, dk)] };
     }
 
     if (["between", "not between"].includes(operator)) {
       const [a, b] = value.split(",");
       const da = new Date(a), db = new Date(b);
       if (isNaN(da.getTime()) || isNaN(db.getTime())) return null;
-      const clause = `${fieldName} >= @${fmt(da, dk)} and ${fieldName} <= @${fmt(db, dk)}`;
-      return operator === "not between" ? `not (${clause})` : clause;
+      return { member, operator: operator === "not between" ? "notInDateRange" : "inDateRange", values: [fmt(da, dk), fmt(db, dk)] };
     }
 
-    if (operator === "equals")     return `${fieldName} = @${value}`;
-    if (operator === "not equals") return `${fieldName} != @${value}`;
+    if (operator === "equals")     return { member, operator: "equals", values: [value] };
+    if (operator === "not equals") return { member, operator: "notEquals", values: [value] };
+    return null;
   }
 
   // ── Number ───────────────────────────────────────────────────────────────
   if (kind === "number") {
     const n = parseFloat(value);
-    if (isNaN(n)) return null;
-    const m: Record<string, string> = {
-      "equals":                   `${fieldName} = ${n}`,
-      "not equals":               `${fieldName} != ${n}`,
-      "greater than":             `${fieldName} > ${n}`,
-      "less than":                `${fieldName} < ${n}`,
-      "greater than or equal to": `${fieldName} >= ${n}`,
-      "less than or equal to":    `${fieldName} <= ${n}`,
+    const opMap: Record<string, string> = {
+      "equals": "equals", "not equals": "notEquals",
+      "greater than": "gt", "greater than or equal to": "gte",
+      "less than": "lt", "less than or equal to": "lte",
     };
-    if (m[operator]) return m[operator];
+    if (opMap[operator]) {
+      if (isNaN(n)) return null;
+      return { member, operator: opMap[operator], values: [value] };
+    }
     if (["between", "not between"].includes(operator)) {
-      const [a, b] = value.split(",").map(parseFloat);
-      if (isNaN(a) || isNaN(b)) return null;
-      const clause = `${fieldName} >= ${a} and ${fieldName} <= ${b}`;
-      return operator === "not between" ? `not (${clause})` : clause;
+      const [a, b] = value.split(",");
+      if (isNaN(parseFloat(a)) || isNaN(parseFloat(b))) return null;
+      return operator === "between"
+        ? { and: [{ member, operator: "gte", values: [a] }, { member, operator: "lte", values: [b] }] }
+        : { or: [{ member, operator: "lt", values: [a] }, { member, operator: "gt", values: [b] }] };
     }
     if (operator === "is any of") {
-      const nums = value.split(",").map((v) => parseFloat(v.trim())).filter((v) => !isNaN(v));
+      const nums = value.split(",").map((v) => v.trim()).filter((v) => !isNaN(parseFloat(v)));
       if (!nums.length) return null;
-      return `(${nums.map((n) => `${fieldName} = ${n}`).join(" or ")})`;
+      return { member, operator: "equals", values: nums };
     }
+    return null;
   }
 
   // ── Text ─────────────────────────────────────────────────────────────────
   if (kind === "text") {
-    const esc = value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-    const m: Record<string, string> = {
-      "equals":          `${fieldName} = '${esc}'`,
-      "not equals":      `${fieldName} != '${esc}'`,
-      "contains":        `${fieldName} ~ r'${esc}'`,
-      "not contains":    `not ${fieldName} ~ r'${esc}'`,
-      "starts with":     `${fieldName} ~ r'^${esc}'`,
-      "not starts with": `not ${fieldName} ~ r'^${esc}'`,
-      "ends with":       `${fieldName} ~ r'${esc}$'`,
-      "not ends with":   `not ${fieldName} ~ r'${esc}$'`,
+    const opMap: Record<string, string> = {
+      "equals": "equals", "not equals": "notEquals",
+      "contains": "contains", "not contains": "notContains",
+      "starts with": "startsWith", "not starts with": "notStartsWith",
+      "ends with": "endsWith", "not ends with": "notEndsWith",
     };
-    if (m[operator]) return m[operator];
+    if (opMap[operator]) return { member, operator: opMap[operator], values: [value] };
     if (operator === "is any of") {
-      const vals = value.split(",").map((v) => v.trim()).filter(Boolean)
-        .map((v) => v.replace(/\\/g, "\\\\").replace(/'/g, "\\'"));
+      const vals = value.split(",").map((v) => v.trim()).filter(Boolean);
       if (!vals.length) return null;
-      return `(${vals.map((v) => `${fieldName} = '${v}'`).join(" or ")})`;
+      return { member, operator: "equals", values: vals };
     }
-    return null;
   }
 
   return null;
 }
 
-/**
- * Append WHERE clauses to an existing Malloy `run:` query block.
- * Multiple `where:` lines are ANDed by Malloy implicitly.
- */
-export function injectFiltersIntoQuery(malloyQuery: string, clauses: string[]): string {
-  if (!clauses.length) return malloyQuery;
-  const lines = clauses.map((c) => `  where: ${c}`).join("\n");
-  const lastBrace = malloyQuery.lastIndexOf("}");
-  if (lastBrace === -1) return malloyQuery;
-  return malloyQuery.slice(0, lastBrace) + lines + "\n" + malloyQuery.slice(lastBrace);
+/** Merges extra filter expressions into a Cube query object's `filters` array. */
+export function injectFiltersIntoQuery(query: CubeQuery, filters: CubeFilterExpr[]): CubeQuery {
+  if (!filters.length) return query;
+  return { ...query, filters: [...(query.filters ?? []), ...filters] };
 }

@@ -37,8 +37,10 @@ async def create_file(
             detail="Unauthorized : Insufficient permissions"
         )
         
-    # Check uniqueness using the user-provided "name" field
-    existing_file = db.query(File).filter(File.name == name).first()
+    # Check uniqueness using the user-provided "name" field, scoped to this
+    # account — an unscoped check would collide with same-named files
+    # belonging to entirely different accounts.
+    existing_file = db.query(File).filter(and_(File.name == name, File.account_id == current_user.account_id)).first()
     if existing_file:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
@@ -62,7 +64,7 @@ async def create_file(
 
     # Extract extension and paths
     extension = uploaded_filename.split(".")[-1] if "." in uploaded_filename else ""
-    file_path = f"publisher_data/{current_user.account.public_key}/files"
+    file_path = f"cube_data/{current_user.account.public_key}/files"
     
     try:
         location = await storage.upload_file(

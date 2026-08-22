@@ -33,7 +33,7 @@ async def create_dashboard(
     if existing_dashboard:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Dashboard with this name already exists")
 
-    folder_path = f"publisher_data/{str(current_user.account.public_key)}/dashboards"
+    folder_path = f"cube_data/{str(current_user.account.public_key)}/dashboards"
 
     # Add dashboard to database first
     new_dashboard = Dashboard(

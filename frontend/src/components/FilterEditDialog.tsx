@@ -9,16 +9,16 @@ import {
 } from "react-icons/fa";
 import { MdSchedule } from "react-icons/md";
 import { IoBarChartSharp } from "react-icons/io5";
-import { FieldInfo, SourceInfo } from "@malloydata/malloy-interfaces";
+import { FieldInfo, SourceInfo } from "../lib/cubeTypes";
 import {
-  listModels,
-  getCompiledModel,
+  listModelsWithDefinitions,
+  getCompiledDefinition,
   runQuery,
-  type ModelPackage,
-  type SemanticModelSchema,
+  type Model,
+  type DefinitionSchema,
 } from "../lib/Api";
 import { normalizeQueryRows, getRowFieldValue } from "../lib/queryResult";
-import { MalloyASTQueryBuilder } from "../lib/MalloyASTQueryBuilder";
+import { CubeQueryBuilder } from "../lib/CubeQueryBuilder";
 import { DateTimeFilterSchema, DateFilterSchema, NumberFilterSchema, TextFilterSchema } from "./filters/FiltersSchema";
 import CDialog from "./CDialog";
 import CSpinner from "./CSpinner";
@@ -30,10 +30,10 @@ export type FilterKind = "datetime" | "date" | "number" | "text";
 export type FilterUIType = "input" | "select" | "multiselect" | "slicer";
 
 export interface FilterMapping {
+  definitionId: string;
+  definitionName: string;
   modelId: string;
   modelName: string;
-  packageId: string;
-  packageName: string;
   fieldName: string;
   sourceName: string;
 }
@@ -73,7 +73,7 @@ interface FilterEditDialogProps {
 
 // ── Distinct value fetch (text + equals autocomplete) ────────────────────
 
-/** Fetches distinct values for a mapped field via a group-by-only Malloy query. */
+/** Fetches distinct values for a mapped field via a group-by-only Cube query. */
 export function useDistinctFieldValues(mapping: FilterMapping | undefined, enabled: boolean) {
   const [values, setValues] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -85,14 +85,14 @@ export function useDistinctFieldValues(mapping: FilterMapping | undefined, enabl
     setLoading(true);
     setError("");
 
-    getCompiledModel(mapping.modelId)
+    getCompiledDefinition(mapping.definitionId)
       .then((schema) => {
         const source = schema.sources.find((s) => s.name === mapping.sourceName);
         if (!source) throw new Error("Source not found in model");
-        const builder = new MalloyASTQueryBuilder(source);
+        const builder = new CubeQueryBuilder(source);
         builder.addGroupBy(mapping.fieldName);
         builder.setLimit(50);
-        return runQuery(mapping.modelId, builder.buildQuery());
+        return runQuery(mapping.definitionId, builder.buildQuery());
       })
       .then((result) => {
         if (cancelled) return;
@@ -109,7 +109,7 @@ export function useDistinctFieldValues(mapping: FilterMapping | undefined, enabl
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [enabled, mapping?.modelId, mapping?.sourceName, mapping?.fieldName]);
+  }, [enabled, mapping?.definitionId, mapping?.sourceName, mapping?.fieldName]);
 
   return { values, loading, error };
 }
@@ -126,7 +126,17 @@ function toSliderNumber(raw: unknown): number | null {
   return isNaN(n) ? null : n;
 }
 
-/** Fetches the min/max of a mapped field via a one-off aggregate Malloy query. */
+const RANGE_SAMPLE_LIMIT = 10000;
+
+/**
+ * Fetches the min/max of a mapped field. Cube's query API can only
+ * reference measures already declared in the schema — there's no ad-hoc
+ * `min(field)`/`max(field)` at query time the way Malloy allowed, and the
+ * model wizard doesn't auto-declare a min/max measure per dimension. As a
+ * pragmatic stand-in, this pulls a bounded sample of the raw field values
+ * and reduces min/max client-side — exact for tables under the sample size,
+ * an approximation (bounded by the sample) for larger ones.
+ */
 export function useFieldRange(mapping: FilterMapping | undefined, enabled: boolean) {
   const [range, setRange] = useState<{ min: number; max: number } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -138,32 +148,29 @@ export function useFieldRange(mapping: FilterMapping | undefined, enabled: boole
     setLoading(true);
     setError("");
 
-    getCompiledModel(mapping.modelId)
+    getCompiledDefinition(mapping.definitionId)
       .then((schema) => {
         const source = schema.sources.find((s) => s.name === mapping.sourceName);
         if (!source) throw new Error("Source not found in model");
-        const query =
-          `run: ${source.name} -> {\n` +
-          `  aggregate:\n` +
-          `    min_value is min(${mapping.fieldName})\n` +
-          `    max_value is max(${mapping.fieldName})\n` +
-          `}`;
-        return runQuery(mapping.modelId, query);
+        const builder = new CubeQueryBuilder(source);
+        builder.addGroupBy(mapping.fieldName);
+        builder.setLimit(RANGE_SAMPLE_LIMIT);
+        return runQuery(mapping.definitionId, builder.buildQuery());
       })
       .then((result) => {
         if (cancelled) return;
         const rows = normalizeQueryRows(result);
-        const row = rows[0] ?? {};
-        const min = toSliderNumber(getRowFieldValue(row, "min_value"));
-        const max = toSliderNumber(getRowFieldValue(row, "max_value"));
-        if (min == null || max == null) throw new Error("No range available for this field");
-        setRange({ min, max });
+        const values = rows
+          .map((r) => toSliderNumber(getRowFieldValue(r, mapping.fieldName)))
+          .filter((v): v is number => v != null);
+        if (!values.length) throw new Error("No range available for this field");
+        setRange({ min: Math.min(...values), max: Math.max(...values) });
       })
       .catch((e: Error) => { if (!cancelled) setError(e.message ?? "Failed to load range"); })
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, [enabled, mapping?.modelId, mapping?.sourceName, mapping?.fieldName]);
+  }, [enabled, mapping?.definitionId, mapping?.sourceName, mapping?.fieldName]);
 
   return { range, loading, error };
 }
@@ -511,44 +518,44 @@ interface MultiModelPickerProps {
   kind: FilterKind;
   mappings: FilterMapping[];
   onAdd: (mapping: FilterMapping) => void;
-  onRemove: (modelId: string) => void;
+  onRemove: (definitionId: string) => void;
 }
 
 function MultiModelPicker({ kind, mappings, onAdd, onRemove }: MultiModelPickerProps) {
-  const [packages, setPackages]       = useState<ModelPackage[]>([]);
-  const [pkgId, setPkgId]             = useState("");
+  const [models, setModels]           = useState<Model[]>([]);
   const [modelId, setModelId]         = useState("");
-  const [schema, setSchema]           = useState<SemanticModelSchema | null>(null);
+  const [definitionId, setDefinitionId] = useState("");
+  const [schema, setSchema]           = useState<DefinitionSchema | null>(null);
   const [sourceIdx, setSourceIdx]     = useState(0);
-  const [loadingPkgs, setLoadingPkgs] = useState(true);
-  const [loadingModel, setLoadingModel] = useState(false);
+  const [loadingModels, setLoadingModels] = useState(true);
+  const [loadingDefinition, setLoadingDefinition] = useState(false);
   const [error, setError]             = useState("");
 
   useEffect(() => {
-    setLoadingPkgs(true);
-    listModels()
-      .then((pkgs) => { setPackages(pkgs); if (pkgs.length) setPkgId(pkgs[0].id); })
+    setLoadingModels(true);
+    listModelsWithDefinitions()
+      .then((mods) => { setModels(mods); if (mods.length) setModelId(mods[0].id); })
       .catch((e: Error) => setError(e.message))
-      .finally(() => setLoadingPkgs(false));
+      .finally(() => setLoadingModels(false));
   }, []);
 
-  const selectedPkg = packages.find((p) => p.id === pkgId);
+  const selectedModel = models.find((m) => m.id === modelId);
 
   useEffect(() => {
-    if (!pkgId) { setModelId(""); setSchema(null); return; }
-    const pkg = packages.find((p) => p.id === pkgId);
-    if (pkg?.models.length) setModelId(pkg.models[0].id);
-  }, [pkgId, packages]);
+    if (!modelId) { setDefinitionId(""); setSchema(null); return; }
+    const model = models.find((m) => m.id === modelId);
+    if (model?.definitions.length) setDefinitionId(model.definitions[0].id);
+  }, [modelId, models]);
 
   useEffect(() => {
-    if (!modelId) { setSchema(null); return; }
-    setLoadingModel(true);
+    if (!definitionId) { setSchema(null); return; }
+    setLoadingDefinition(true);
     setSchema(null);
-    getCompiledModel(modelId)
+    getCompiledDefinition(definitionId)
       .then((s) => { setSchema(s); setSourceIdx(0); })
       .catch((e: Error) => setError(e.message))
-      .finally(() => setLoadingModel(false));
-  }, [modelId]);
+      .finally(() => setLoadingDefinition(false));
+  }, [definitionId]);
 
   const activeSource: SourceInfo | undefined = schema?.sources[sourceIdx];
 
@@ -557,30 +564,30 @@ function MultiModelPicker({ kind, mappings, onAdd, onRemove }: MultiModelPickerP
     [activeSource, kind],
   );
 
-  const isMappedInCurrentModel = (fieldName: string) =>
-    mappings.some((m) => m.modelId === modelId && m.fieldName === fieldName);
+  const isMappedInCurrentDefinition = (fieldName: string) =>
+    mappings.some((m) => m.definitionId === definitionId && m.fieldName === fieldName);
 
   function toggleField(fieldName: string) {
-    if (isMappedInCurrentModel(fieldName)) {
-      // If this model already has a mapping, remove the one for this model
-      // (could be a different field — remove by modelId)
-      onRemove(modelId);
+    if (isMappedInCurrentDefinition(fieldName)) {
+      // If this definition already has a mapping, remove the one for it
+      // (could be a different field — remove by definitionId)
+      onRemove(definitionId);
       return;
     }
-    const pkg  = packages.find((p) => p.id === pkgId);
-    const mod  = pkg?.models.find((m) => m.id === modelId);
-    if (!pkg || !mod || !activeSource) return;
+    const model = models.find((m) => m.id === modelId);
+    const def   = model?.definitions.find((d) => d.id === definitionId);
+    if (!model || !def || !activeSource) return;
     onAdd({
-      modelId,
-      modelName: mod.name,
-      packageId: pkg.id,
-      packageName: pkg.name,
+      definitionId,
+      definitionName: def.name,
+      modelId: model.id,
+      modelName: model.name,
       fieldName,
       sourceName: activeSource.name,
     });
   }
 
-  if (loadingPkgs) return <div className="flex items-center justify-center py-6"><CSpinner size={18} /></div>;
+  if (loadingModels) return <div className="flex items-center justify-center py-6"><CSpinner size={18} /></div>;
   if (error) return <CAlert variant="error" message={error} />;
 
   return (
@@ -589,14 +596,14 @@ function MultiModelPicker({ kind, mappings, onAdd, onRemove }: MultiModelPickerP
       {mappings.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {mappings.map((m) => (
-            <span key={m.modelId}
+            <span key={m.definitionId}
               className="flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-medium"
               style={{ borderColor: "var(--accent-ring)", background: "var(--accent-muted)", color: "var(--accent)" }}
             >
               <FaCheck size={8} />
               {m.fieldName}
-              <span style={{ opacity: 0.6 }}>@ {m.modelName}</span>
-              <button type="button" onClick={() => onRemove(m.modelId)}
+              <span style={{ opacity: 0.6 }}>@ {m.definitionName}</span>
+              <button type="button" onClick={() => onRemove(m.definitionId)}
                 className="ml-0.5 rounded-full transition-opacity hover:opacity-60">
                 <FaTimes size={8} />
               </button>
@@ -605,41 +612,41 @@ function MultiModelPicker({ kind, mappings, onAdd, onRemove }: MultiModelPickerP
         </div>
       )}
 
-      {/* Package selector */}
+      {/* Model selector */}
       <div>
-        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Package</p>
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Model</p>
         <div className="flex flex-wrap gap-1">
-          {packages.map((p) => (
-            <button key={p.id} type="button" onClick={() => setPkgId(p.id)}
+          {models.map((m) => (
+            <button key={m.id} type="button" onClick={() => setModelId(m.id)}
               className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-all"
               style={{
-                background: pkgId === p.id ? "var(--accent-muted)" : "var(--bg-subtle)",
-                borderColor: pkgId === p.id ? "var(--accent)" : "var(--border)",
-                color: pkgId === p.id ? "var(--accent)" : "var(--text-h)",
+                background: modelId === m.id ? "var(--accent-muted)" : "var(--bg-subtle)",
+                borderColor: modelId === m.id ? "var(--accent)" : "var(--border)",
+                color: modelId === m.id ? "var(--accent)" : "var(--text-h)",
               }}
-            >{p.name}</button>
+            >{m.name}</button>
           ))}
         </div>
       </div>
 
-      {/* Model selector */}
-      {selectedPkg && (
+      {/* Definition selector */}
+      {selectedModel && (
         <div>
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Model</p>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Definition</p>
           <div className="flex flex-wrap gap-1">
-            {selectedPkg.models.map((m) => {
-              const hasMapped = mappings.some((mp) => mp.modelId === m.id);
+            {selectedModel.definitions.map((d) => {
+              const hasMapped = mappings.some((mp) => mp.definitionId === d.id);
               return (
-                <button key={m.id} type="button" onClick={() => setModelId(m.id)}
+                <button key={d.id} type="button" onClick={() => setDefinitionId(d.id)}
                   className="flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium transition-all"
                   style={{
-                    background: modelId === m.id ? "var(--accent-muted)" : "var(--bg-subtle)",
-                    borderColor: modelId === m.id ? "var(--accent)" : "var(--border)",
-                    color: modelId === m.id ? "var(--accent)" : "var(--text-h)",
+                    background: definitionId === d.id ? "var(--accent-muted)" : "var(--bg-subtle)",
+                    borderColor: definitionId === d.id ? "var(--accent)" : "var(--border)",
+                    color: definitionId === d.id ? "var(--accent)" : "var(--text-h)",
                   }}
                 >
                   {hasMapped && <FaCheck size={8} style={{ color: "var(--accent)" }} />}
-                  {m.name}
+                  {d.name}
                 </button>
               );
             })}
@@ -647,7 +654,7 @@ function MultiModelPicker({ kind, mappings, onAdd, onRemove }: MultiModelPickerP
         </div>
       )}
 
-      {loadingModel && <div className="flex items-center justify-center py-3"><CSpinner size={14} /></div>}
+      {loadingDefinition && <div className="flex items-center justify-center py-3"><CSpinner size={14} /></div>}
 
       {/* Source selector */}
       {schema && schema.sources.length > 1 && (
@@ -680,7 +687,7 @@ function MultiModelPicker({ kind, mappings, onAdd, onRemove }: MultiModelPickerP
             <div className="flex max-h-44 flex-col gap-0.5 overflow-y-auto rounded-xl border p-1"
               style={{ borderColor: "var(--border)" }}>
               {compatibleFields.map((f) => {
-                const mapped = isMappedInCurrentModel(f.name);
+                const mapped = isMappedInCurrentDefinition(f.name);
                 return (
                   <button key={f.name} type="button" onClick={() => toggleField(f.name)}
                     className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition-all"
@@ -777,11 +784,11 @@ export default function FilterEditDialog({
   }, [kind]);
 
   function addMapping(m: FilterMapping) {
-    setMappings((prev) => [...prev.filter((x) => x.modelId !== m.modelId), m]);
+    setMappings((prev) => [...prev.filter((x) => x.definitionId !== m.definitionId), m]);
   }
 
-  function removeMapping(modelId: string) {
-    setMappings((prev) => prev.filter((m) => m.modelId !== modelId));
+  function removeMapping(definitionId: string) {
+    setMappings((prev) => prev.filter((m) => m.definitionId !== definitionId));
   }
 
   function toggleTarget(id: string) {

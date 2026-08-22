@@ -16,29 +16,26 @@ import {
 
 // ── Types ────────────────────────────────────────────────────────────────
 
-export type JoinKind = "join_one" | "join_many" | "join_cross";
+export type JoinRelationship = "one_to_one" | "one_to_many" | "many_to_one" | "many_to_many";
 export type AggFn = "count" | "sum" | "avg" | "min" | "max";
 export type SourceType = "connection" | "file";
+export type DimensionType = "string" | "number" | "boolean" | "time";
 
-/** A plain rename of an existing column — no computation, `rename: name is field`. */
-export interface WizardAlias { id: string; name: string; field: string }
-/** A real computed field — always a free-form expression, `dimension: name is expression`. */
-export interface WizardDimension { id: string; name: string; expression: string }
+/** Cube's display-formatting hint — purely presentational, doesn't affect
+ * the value itself, just how BI tools render it. "" means unset/default. */
+export type DimensionFormat = "" | "id" | "imageUrl" | "link" | "currency" | "percent";
+export type MeasureFormat = "" | "currency" | "percent";
+
+/** A plain rename of a raw column into a queryable dimension — Cube has no
+ * bare "expose this column" default, every field needs an explicit
+ * dimension, so a rename is just a dimension whose sql is the raw column. */
+export interface WizardAlias { id: string; name: string; field: string; type: DimensionType; format: DimensionFormat }
+/** A computed dimension — `sql` is a real SQL expression now (Cube's `sql:`
+ * is raw SQL), not a Malloy expression. */
+export interface WizardDimension { id: string; name: string; expression: string; type: DimensionType; format: DimensionFormat }
 export type MeasureKind = "function" | "expression";
-export interface WizardMeasure { id: string; name: string; kind: MeasureKind; fn: AggFn; field: string; expression: string }
-/** Malloy joins don't need a separate alias — `join_kind: targetSource on condition`
- * both names and references the join by the target source's own name. */
-export interface WizardJoin { id: string; kind: JoinKind; targetSource: string; on: string }
-
-/**
- * A Malloy composite source (`source: name is compose(a, b, ...)`) — per
- * https://docs.malloydata.dev/documentation/experiments/composite_sources,
- * `members` is priority order: for a given query, Malloy picks the first
- * listed member whose own definitions cover every field the query uses.
- * This does NOT merge rows across members like a join — it lets one query
- * surface resolve against whichever single source actually has the fields.
- */
-export interface WizardComposite { id: string; name: string; members: string[] }
+export interface WizardMeasure { id: string; name: string; kind: MeasureKind; fn: AggFn; field: string; expression: string; format: MeasureFormat }
+export interface WizardJoin { id: string; relationship: JoinRelationship; targetSource: string; on: string }
 
 export interface WizardSource {
   id: string;
@@ -50,9 +47,10 @@ export interface WizardSource {
   schema: string;
   // sourceType "file"
   fileId: string;
-  // resolved table reference passed to `<connection>.table('...')` either way
+  // resolved table/path reference — a "schema.table" for connections, or the
+  // in-container file path for a DuckDB-over-file source
   tableRef: string;
-  /** Optional — Malloy doesn't require one, mainly matters for join correctness */
+  /** Optional — mainly matters for join correctness */
   primaryKey: string;
   aliases: WizardAlias[];
   dimensions: WizardDimension[];
@@ -71,32 +69,48 @@ function effectiveColumns(columns: string[], aliases: WizardAlias[]): string[] {
 }
 
 const AGG_FNS: AggFn[] = ["count", "sum", "avg", "min", "max"];
-const JOIN_KINDS: { value: JoinKind; label: string; hint: string }[] = [
-  { value: "join_one", label: "Join One", hint: "at most one matching row (foreign-key style)" },
-  { value: "join_many", label: "Join Many", hint: "one row here can match many rows there" },
-  { value: "join_cross", label: "Join Cross", hint: "cross join, every combination" },
+const DIMENSION_TYPES: DimensionType[] = ["string", "number", "boolean", "time"];
+const DIMENSION_FORMATS: { value: DimensionFormat; label: string }[] = [
+  { value: "", label: "No format" },
+  { value: "id", label: "ID" },
+  { value: "imageUrl", label: "Image URL" },
+  { value: "link", label: "Link" },
+  { value: "currency", label: "Currency" },
+  { value: "percent", label: "Percent" },
+];
+const MEASURE_FORMATS: { value: MeasureFormat; label: string }[] = [
+  { value: "", label: "No format" },
+  { value: "currency", label: "Currency" },
+  { value: "percent", label: "Percent" },
+];
+const JOIN_RELATIONSHIPS: { value: JoinRelationship; label: string; hint: string }[] = [
+  { value: "many_to_one", label: "Many : One", hint: "many rows here match at most one row there (foreign-key style)" },
+  { value: "one_to_many", label: "One : Many", hint: "one row here can match many rows there" },
+  { value: "one_to_one", label: "One : One", hint: "at most one matching row on each side" },
+  { value: "many_to_many", label: "Many : Many", hint: "every combination" },
 ];
 
-// Files live in the same shared volume the publisher container mounts at
-// /publisher/publisher_data (see docker-compose.yml) — File.path already
-// starts with "publisher_data/…", so this is the exact path the publisher's
-// duckdb dialect needs to read the file directly.
-const PUBLISHER_VOLUME_ROOT = "/publisher";
+// Files live in the same shared volume the Cube container mounts at
+// /cube/definitions_root (see docker-compose.yml + backend/cube_conf/cube.js) —
+// File.path already starts with "cube_data/…", so this is the exact absolute
+// path a DuckDB-backed cube's `sql:` needs to read the file directly.
+const CUBE_VOLUME_ROOT = "/cube/definitions_root";
 
 function uid() {
   return Math.random().toString(36).slice(2);
 }
 
-/** Backtick-quoting is always valid Malloy syntax — quote unconditionally so a
- * name that happens to be a reserved word (e.g. `Date`) never breaks compilation. */
-function quoteIdent(raw: string): string {
-  return `\`${raw}\``;
+/** JSON string literals are valid YAML double-quoted scalars — reusing
+ * JSON.stringify's escaping sidesteps hand-rolling YAML quoting rules and
+ * round-trips exactly via JSON.parse in the parser below. */
+function yamlStr(value: string): string {
+  return JSON.stringify(value);
 }
 
-// ── Publisher response normalizers ──────────────────────────────────────
-// Confirmed against a live publisher: schemas are `{name, isHidden, isDefault}`,
-// tables are `{resource, columns}` — NOT `{name}` — so they need separate
-// extraction, not one shared "guess the label key" helper.
+// ── Introspection response normalizers ──────────────────────────────────
+// Schemas are `{name, isHidden, isDefault}`, tables are `{resource, columns}`
+// — NOT `{name}` — so they need separate extraction, matching what
+// backend/utils/db_drivers.py returns (shaped to match, on purpose).
 
 function normalizeSchemas(items: unknown[]): string[] {
   return items
@@ -148,243 +162,226 @@ export function newWizardSource(): WizardSource {
   };
 }
 
-export function newWizardComposite(): WizardComposite {
-  return { id: uid(), name: "", members: [] };
-}
-
-/** Generates a `.malloy` source block per configured source — the only place Malloy syntax gets built. */
-export function generateMalloy(sources: WizardSource[]): string {
-  return sources
-    .filter((s) => s.name.trim() && s.tableRef.trim())
-    .map((s) => {
-      const lines: string[] = [];
-      lines.push(
-        `source: ${quoteIdent(s.name.trim())} is ${s.connectionName || "connection_name"}.table('${s.tableRef.trim()}') extend {`,
-      );
-
-      // If the primary-key column got renamed via an alias below, point
-      // primary_key at the new name — the old column name won't exist anymore.
-      let primaryKey = s.primaryKey.trim();
-      if (primaryKey) {
-        const renamedTo = s.aliases.find((a) => a.name.trim() && a.field.trim() === primaryKey);
-        if (renamedTo) primaryKey = renamedTo.name.trim();
-        lines.push(`  primary_key: ${quoteIdent(primaryKey)}`);
-      }
-
-      for (const a of s.aliases) {
-        if (!a.name.trim() || !a.field.trim()) continue;
-        lines.push(`  rename: ${quoteIdent(a.name.trim())} is ${quoteIdent(a.field.trim())}`);
-      }
-      for (const d of s.dimensions) {
-        if (!d.name.trim() || !d.expression.trim()) continue;
-        lines.push(`  dimension: ${quoteIdent(d.name.trim())} is ${d.expression.trim()}`);
-      }
-      for (const m of s.measures) {
-        if (!m.name.trim()) continue;
-        if (m.kind === "expression") {
-          if (!m.expression.trim()) continue;
-          lines.push(`  measure: ${quoteIdent(m.name.trim())} is ${m.expression.trim()}`);
-        } else {
-          if (!m.field.trim()) continue;
-          lines.push(`  measure: ${quoteIdent(m.name.trim())} is ${m.fn}(${quoteIdent(m.field.trim())})`);
-        }
-      }
-      for (const j of s.joins) {
-        if (!j.targetSource.trim()) continue;
-        const onClause = j.on.trim() ? ` on ${j.on.trim()}` : "";
-        lines.push(`  ${j.kind}: ${quoteIdent(j.targetSource.trim())}${onClause}`);
-      }
-      lines.push("}");
-      return lines.join("\n");
-    })
-    .join("\n\n");
-}
-
-/** Generates one `source: name is compose(a, b, ...)` line per configured
- * composite — the priority-ordered wrapper `docs/experiments/composite_sources`
- * describes for letting a query resolve against whichever member source
- * actually has the fields it selected. `compose()` is gated behind Malloy's
- * `composite_sources` experiment flag — without the pragma the compiler
- * rejects it outright, so it's emitted once up front whenever any composite
- * is defined. */
-export function generateCompositeMalloy(composites: WizardComposite[]): string {
-  const valid = composites.filter((c) => c.name.trim() && c.members.filter((m) => m.trim()).length >= 2);
+/** Generates a Cube `cubes:` YAML block — the only place Cube schema syntax
+ * gets built. One WizardSource -> one cube list entry; every configured
+ * source lands in a single YAML document (matching how the old Malloy
+ * wizard put every source into one .malloy file). */
+export function generateCubeYaml(sources: WizardSource[]): string {
+  // A connection-type source with no connection actually selected would emit
+  // `data_source: "default"` — Cube's own implicit data source name when
+  // none is set — which never matches a real account connection and blows up
+  // driverFactory at query/compile time. Excluding it here (rather than
+  // falling back to a fake "default" value) means an incomplete source is
+  // just not queryable yet, instead of silently generating a broken cube.
+  const valid = sources.filter((s) =>
+    s.name.trim() && s.tableRef.trim() && (s.sourceType === "file" || s.connectionName.trim()),
+  );
   if (valid.length === 0) return "";
 
-  const blocks = valid.map((c) => {
-    const members = c.members.filter((m) => m.trim()).map((m) => quoteIdent(m.trim()));
-    return `source: ${quoteIdent(c.name.trim())} is compose(${members.join(", ")})`;
-  });
+  const lines: string[] = ["cubes:"];
+  for (const s of valid) {
+    lines.push(`  - name: ${yamlStr(s.name.trim())}`);
+    if (s.sourceType === "file") {
+      const isParquet = s.tableRef.trim().toLowerCase().endsWith(".parquet");
+      const readFn = isParquet ? "read_parquet" : "read_csv";
+      lines.push(`    sql: ${yamlStr(`SELECT * FROM ${readFn}('${s.tableRef.trim()}')`)}`);
+      lines.push(`    data_source: "duckdb"`);
+    } else {
+      lines.push(`    sql_table: ${yamlStr(s.tableRef.trim())}`);
+      lines.push(`    data_source: ${yamlStr(s.connectionName.trim())}`);
+    }
 
-  return ["##! experimental { composite_sources }", ...blocks].join("\n\n");
-}
+    // If the primary-key column got renamed via an alias, point at the new
+    // name — the old column name won't exist as a dimension.
+    let primaryKey = s.primaryKey.trim();
+    if (primaryKey) {
+      const renamedTo = s.aliases.find((a) => a.name.trim() && a.field.trim() === primaryKey);
+      if (renamedTo) primaryKey = renamedTo.name.trim();
+    }
 
-const JOIN_KIND_VALUES = new Set<JoinKind>(["join_one", "join_many", "join_cross"]);
-const AGG_FN_VALUES = new Set<AggFn>(["count", "sum", "avg", "min", "max"]);
+    const dimensionEntries: { name: string; sql: string; type: DimensionType; format: DimensionFormat; isPrimaryKey: boolean }[] = [];
+    for (const a of s.aliases) {
+      if (!a.name.trim() || !a.field.trim()) continue;
+      dimensionEntries.push({ name: a.name.trim(), sql: a.field.trim(), type: a.type, format: a.format, isPrimaryKey: a.name.trim() === primaryKey });
+    }
+    for (const d of s.dimensions) {
+      if (!d.name.trim() || !d.expression.trim()) continue;
+      dimensionEntries.push({ name: d.name.trim(), sql: d.expression.trim(), type: d.type, format: d.format, isPrimaryKey: d.name.trim() === primaryKey });
+    }
+    if (dimensionEntries.length) {
+      lines.push("    dimensions:");
+      for (const d of dimensionEntries) {
+        lines.push(`      - name: ${yamlStr(d.name)}`);
+        lines.push(`        sql: ${yamlStr(d.sql)}`);
+        lines.push(`        type: ${yamlStr(d.type)}`);
+        if (d.format) lines.push(`        format: ${yamlStr(d.format)}`);
+        if (d.isPrimaryKey) lines.push(`        primary_key: true`);
+      }
+    }
 
-function unquoteIdent(raw: string): string {
-  return raw.replace(/^`|`$/g, "");
-}
+    const measureEntries = s.measures.filter((m) => m.name.trim() && (m.kind === "expression" ? m.expression.trim() : m.field.trim()));
+    if (measureEntries.length) {
+      lines.push("    measures:");
+      for (const m of measureEntries) {
+        lines.push(`      - name: ${yamlStr(m.name.trim())}`);
+        if (m.kind === "expression") {
+          // Cube's `type: number` measures combine other measures arithmetically
+          // via {measureName} references — the Cube-native equivalent of
+          // Malloy's free-form "sum(a) - sum(b)" expression measures.
+          lines.push(`        sql: ${yamlStr(m.expression.trim())}`);
+          lines.push(`        type: "number"`);
+        } else {
+          lines.push(`        sql: ${yamlStr(m.field.trim())}`);
+          lines.push(`        type: ${yamlStr(m.fn)}`);
+        }
+        if (m.format) lines.push(`        format: ${yamlStr(m.format)}`);
+      }
+    }
 
-/**
- * Matches `fnName(...)` only when the parens right after `fnName` are balanced
- * AND their matching close is the very last character — i.e. the whole string
- * really is one wrapped call, not e.g. "sum(revenue) - sum(cost)" (a greedy
- * `^(\w+)\((.*)\)$` regex would wrongly treat that as a single call).
- */
-function matchSimpleFnCall(text: string): { fn: string; field: string } | null {
-  const head = text.match(/^(\w+)\(/);
-  if (!head) return null;
-  const openIdx = head[0].length - 1;
-  let depth = 1;
-  let i = openIdx + 1;
-  for (; i < text.length && depth > 0; i++) {
-    if (text[i] === "(") depth++;
-    else if (text[i] === ")") depth--;
+    const joinEntries = s.joins.filter((j) => j.targetSource.trim() && j.on.trim());
+    if (joinEntries.length) {
+      lines.push("    joins:");
+      for (const j of joinEntries) {
+        lines.push(`      - name: ${yamlStr(j.targetSource.trim())}`);
+        lines.push(`        sql: ${yamlStr(j.on.trim())}`);
+        lines.push(`        relationship: ${yamlStr(j.relationship)}`);
+      }
+    }
   }
-  if (depth !== 0 || i !== text.length) return null;
-  return { fn: head[1], field: text.slice(openIdx + 1, i - 1) };
+
+  return lines.join("\n");
+}
+
+const JOIN_RELATIONSHIP_VALUES = new Set<JoinRelationship>(["one_to_one", "one_to_many", "many_to_one", "many_to_many"]);
+const AGG_FN_VALUES = new Set<AggFn>(["count", "sum", "avg", "min", "max"]);
+const DIMENSION_TYPE_VALUES = new Set<DimensionType>(["string", "number", "boolean", "time"]);
+const DIMENSION_FORMAT_VALUES = new Set<DimensionFormat>(["id", "imageUrl", "link", "currency", "percent"]);
+const MEASURE_FORMAT_VALUES = new Set<MeasureFormat>(["currency", "percent"]);
+
+function unquote(raw: string): string {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
 }
 
 /**
- * Parses the subset of Malloy this wizard itself generates back into
- * structured sources — `source: name is conn.table('ref') extend { ... }`
- * blocks containing plain `dimension:`/`measure:`/`join_*:` lines. Anything
- * outside that shape (views, nested sources, multi-line expressions, hand
- * written extras) is simply not recognized and left out of the builder —
- * this is a best-effort round-trip for wizard-shaped code, not a full
- * Malloy parser.
+ * Parses the subset of Cube YAML this wizard itself generates back into
+ * structured sources. This is a bespoke line-based parser for the wizard's
+ * own fixed-shape output (matching generateCubeYaml's exact indentation),
+ * not a general YAML parser — hand-authored or otherwise-shaped YAML simply
+ * won't round-trip into the builder (it's still valid Cube schema, just not
+ * editable here).
  */
-export function parseMalloyToSources(text: string): WizardSource[] {
+export function parseCubeYamlToSources(text: string): WizardSource[] {
   if (!text || !text.trim()) return [newWizardSource()];
 
+  const lines = text.split("\n");
   const sources: WizardSource[] = [];
-  const headerRe = /source:\s*(`[^`]+`|[A-Za-z_][A-Za-z0-9_]*)\s+is\s+([A-Za-z_][A-Za-z0-9_]*)\.table\('([^']*)'\)\s*extend\s*\{/g;
+  let current: WizardSource | null = null;
+  let section: "" | "dimensions" | "measures" | "joins" = "";
+  let pendingPrimaryKeyName: string | null = null;
 
-  let match: RegExpExecArray | null;
-  while ((match = headerRe.exec(text)) !== null) {
-    const connectionName = match[2];
-    const tableRef = match[3];
-    const bodyStart = headerRe.lastIndex;
+  const kv = (line: string): { key: string; value: string } | null => {
+    const m = line.match(/^\s*([a-zA-Z_]+):\s*(.*)$/);
+    if (!m) return null;
+    return { key: m[1], value: m[2].trim() };
+  };
 
-    // Find the matching closing brace by depth counting (handles any nested
-    // `{}` inside, e.g. a hand-added calculate block, without misreading it).
-    let depth = 1;
-    let i = bodyStart;
-    for (; i < text.length && depth > 0; i++) {
-      if (text[i] === "{") depth++;
-      else if (text[i] === "}") depth--;
+  for (const rawLine of lines) {
+    if (!rawLine.trim() || rawLine.trim() === "cubes:") continue;
+
+    const cubeStart = rawLine.match(/^\s{2}-\s*name:\s*(.+)$/);
+    if (cubeStart) {
+      if (current) sources.push(current);
+      current = { ...newWizardSource(), name: unquote(cubeStart[1].trim()) };
+      section = "";
+      pendingPrimaryKeyName = null;
+      continue;
     }
-    const body = text.slice(bodyStart, i - 1);
-    headerRe.lastIndex = i; // resume scanning after this block
+    if (!current) continue;
 
-    const source: WizardSource = {
-      ...newWizardSource(),
-      name: unquoteIdent(match[1]),
-      sourceType: connectionName === "duckdb" ? "file" : "connection",
-      connectionName,
-      tableRef,
-    };
-
-    for (const rawLine of body.split("\n")) {
-      const line = rawLine.trim();
-      if (!line) continue;
-
-      const pk = line.match(/^primary_key:\s*(\S+)\s*$/);
-      if (pk) {
-        source.primaryKey = unquoteIdent(pk[1]);
-        continue;
+    // Cube-level fields (4-space indent)
+    if (/^\s{4}\S/.test(rawLine) && !/^\s{4}-/.test(rawLine)) {
+      const pair = kv(rawLine.trim());
+      if (!pair) continue;
+      if (pair.key === "sql_table") {
+        current.sourceType = "connection";
+        current.tableRef = unquote(pair.value);
+      } else if (pair.key === "sql" && section === "") {
+        current.sourceType = "file";
+        const match = unquote(pair.value).match(/read_(?:csv|parquet)\('([^']*)'\)/);
+        current.tableRef = match ? match[1] : "";
+      } else if (pair.key === "data_source") {
+        const ds = unquote(pair.value);
+        if (ds !== "duckdb") current.connectionName = ds;
+      } else if (pair.key === "dimensions") {
+        section = "dimensions";
+      } else if (pair.key === "measures") {
+        section = "measures";
+      } else if (pair.key === "joins") {
+        section = "joins";
       }
+      continue;
+    }
 
-      const alias = line.match(/^rename:\s*(`[^`]+`|[A-Za-z_][A-Za-z0-9_]*)\s+is\s+(\S+)\s*$/);
-      if (alias) {
-        source.aliases.push({ id: uid(), name: unquoteIdent(alias[1]), field: unquoteIdent(alias[2].trim()) });
-        continue;
+    // List item start within a section (6-space indent, "- name: ...")
+    const itemStart = rawLine.match(/^\s{6}-\s*name:\s*(.+)$/);
+    if (itemStart && section) {
+      const name = unquote(itemStart[1].trim());
+      if (section === "dimensions") {
+        current.dimensions.push({ id: uid(), name, expression: "", type: "string", format: "" });
+      } else if (section === "measures") {
+        current.measures.push({ id: uid(), name, kind: "function", fn: "count", field: "", expression: "", format: "" });
+      } else if (section === "joins") {
+        current.joins.push({ id: uid(), relationship: "many_to_one", targetSource: name, on: "" });
       }
+      continue;
+    }
 
-      const dim = line.match(/^dimension:\s*(`[^`]+`|[A-Za-z_][A-Za-z0-9_]*)\s+is\s+(.+)$/);
-      if (dim) {
-        source.dimensions.push({ id: uid(), name: unquoteIdent(dim[1]), expression: dim[2].trim() });
-        continue;
-      }
+    // Fields of the current list item (8-space indent)
+    if (/^\s{8}\S/.test(rawLine)) {
+      const pair = kv(rawLine.trim());
+      if (!pair) continue;
+      const value = unquote(pair.value);
 
-      // A measure is either `fn(field)` (a plain aggregate over one column) or
-      // any other expression — the latter round-trips as a "expression" measure.
-      const measure = line.match(/^measure:\s*(`[^`]+`|[A-Za-z_][A-Za-z0-9_]*)\s+is\s+(.+)$/);
-      if (measure) {
-        const name = unquoteIdent(measure[1]);
-        const rest = measure[2].trim();
-        const fnCall = matchSimpleFnCall(rest);
-        if (fnCall && AGG_FN_VALUES.has(fnCall.fn as AggFn)) {
-          source.measures.push({
-            id: uid(),
-            name,
-            kind: "function",
-            fn: fnCall.fn as AggFn,
-            field: unquoteIdent(fnCall.field.trim()),
-            expression: "",
-          });
-        } else {
-          source.measures.push({ id: uid(), name, kind: "expression", fn: "count", field: "", expression: rest });
+      if (section === "dimensions") {
+        const dim = current.dimensions[current.dimensions.length - 1];
+        if (!dim) continue;
+        if (pair.key === "sql") dim.expression = value;
+        else if (pair.key === "type" && DIMENSION_TYPE_VALUES.has(value as DimensionType)) dim.type = value as DimensionType;
+        else if (pair.key === "format" && DIMENSION_FORMAT_VALUES.has(value as DimensionFormat)) dim.format = value as DimensionFormat;
+        else if (pair.key === "primary_key" && value === "true") pendingPrimaryKeyName = dim.name;
+      } else if (section === "measures") {
+        const m = current.measures[current.measures.length - 1];
+        if (!m) continue;
+        if (pair.key === "type" && value === "number") {
+          m.kind = "expression";
+        } else if (pair.key === "type" && AGG_FN_VALUES.has(value as AggFn)) {
+          m.kind = "function";
+          m.fn = value as AggFn;
+        } else if (pair.key === "sql") {
+          if (m.kind === "expression") m.expression = value;
+          else m.field = value;
+        } else if (pair.key === "format" && MEASURE_FORMAT_VALUES.has(value as MeasureFormat)) {
+          m.format = value as MeasureFormat;
         }
-        continue;
-      }
-
-      // `join_kind: target on condition` — also tolerates the older
-      // `join_kind: name is target on condition` shape (the alias is dropped;
-      // Malloy joins don't need one, the target's own name is the reference).
-      const join = line.match(/^(join_one|join_many|join_cross):\s*(?:(?:`[^`]+`|[A-Za-z_][A-Za-z0-9_]*)\s+is\s+)?(`[^`]+`|[A-Za-z_][A-Za-z0-9_]*)(?:\s+on\s+(.+))?$/);
-      if (join && JOIN_KIND_VALUES.has(join[1] as JoinKind)) {
-        source.joins.push({
-          id: uid(),
-          kind: join[1] as JoinKind,
-          targetSource: unquoteIdent(join[2].trim()),
-          on: (join[3] ?? "").trim(),
-        });
+      } else if (section === "joins") {
+        const j = current.joins[current.joins.length - 1];
+        if (!j) continue;
+        if (pair.key === "sql") j.on = value;
+        else if (pair.key === "relationship" && JOIN_RELATIONSHIP_VALUES.has(value as JoinRelationship)) j.relationship = value as JoinRelationship;
       }
     }
+  }
 
-    sources.push(source);
+  if (current) {
+    if (pendingPrimaryKeyName) current.primaryKey = pendingPrimaryKeyName;
+    sources.push(current);
   }
 
   return sources.length > 0 ? sources : [newWizardSource()];
-}
-
-/**
- * Parses `source: name is compose(a, b, ...) [extend { ... }]` blocks back
- * into structured composites. An `extend` body (for composite-level extra
- * defs) is skipped over, not parsed — this wizard only edits the member list,
- * so any hand-written extend content wouldn't round-trip through it anyway.
- */
-export function parseMalloyToComposites(text: string): WizardComposite[] {
-  if (!text || !text.trim()) return [];
-
-  const composites: WizardComposite[] = [];
-  const headerRe = /source:\s*(`[^`]+`|[A-Za-z_][A-Za-z0-9_]*)\s+is\s+compose\(([^)]*)\)\s*(extend\s*\{)?/g;
-
-  let match: RegExpExecArray | null;
-  while ((match = headerRe.exec(text)) !== null) {
-    const name = unquoteIdent(match[1]);
-    const members = match[2]
-      .split(",")
-      .map((m) => unquoteIdent(m.trim()))
-      .filter(Boolean);
-
-    if (match[3]) {
-      // Skip past the matching closing brace of the extend block.
-      let depth = 1;
-      let i = headerRe.lastIndex;
-      for (; i < text.length && depth > 0; i++) {
-        if (text[i] === "{") depth++;
-        else if (text[i] === "}") depth--;
-      }
-      headerRe.lastIndex = i;
-    }
-
-    composites.push({ id: uid(), name, members });
-  }
-
-  return composites;
 }
 
 // ── Shared row styling ───────────────────────────────────────────────────
@@ -420,6 +417,34 @@ function FieldPicker({
       className={`${rowInputCls} cursor-pointer`} style={{ ...rowInputSty, ...style }}>
       <option value="">Select a field…</option>
       {columns.map((c) => <option key={c} value={c}>{c}</option>)}
+    </select>
+  );
+}
+
+/** Cube requires an explicit type on every dimension. */
+function DimensionTypePicker({ value, onChange }: { value: DimensionType; onChange: (v: DimensionType) => void }) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value as DimensionType)}
+      className={`${rowInputCls} shrink-0 cursor-pointer`} style={{ ...rowInputSty, flex: "0 0 90px" }}>
+      {DIMENSION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+    </select>
+  );
+}
+
+/** Optional display-formatting hint (Cube's `format:`) — purely how BI tools
+ * render the value, e.g. as a currency or percentage. Doesn't change the data. */
+function FormatPicker<F extends string>({
+  value, onChange, options, title,
+}: {
+  value: F;
+  onChange: (v: F) => void;
+  options: { value: F; label: string }[];
+  title: string;
+}) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value as F)} title={title}
+      className={`${rowInputCls} shrink-0 cursor-pointer`} style={{ ...rowInputSty, flex: "0 0 100px" }}>
+      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   );
 }
@@ -497,7 +522,6 @@ interface SourceCardProps {
   onAddJoin: () => void;
   onUpdateJoin: (id: string, patch: Partial<WizardJoin>) => void;
   onRemoveJoin: (id: string) => void;
-  onComposeWithJoins: () => void;
 }
 
 function SourceCard({
@@ -507,7 +531,7 @@ function SourceCard({
   onAddAlias, onUpdateAlias, onRemoveAlias,
   onAddDimension, onUpdateDimension, onRemoveDimension,
   onAddMeasure, onUpdateMeasure, onRemoveMeasure,
-  onAddJoin, onUpdateJoin, onRemoveJoin, onComposeWithJoins,
+  onAddJoin, onUpdateJoin, onRemoveJoin,
 }: SourceCardProps) {
   const usingManualTable = source.sourceType === "connection" && schemaOptions.length === 0 && !source.schema;
   // Measures/primary key reference fields as they exist AFTER renames — the
@@ -536,7 +560,7 @@ function SourceCard({
       <>
       {/* Name + source type */}
       <div className="grid grid-cols-2 gap-3">
-        <CTextInput label="Source Name" value={source.name} onChange={(v) => onUpdate({ name: v })} placeholder="e.g. orders" required />
+        <CTextInput label="Cube Name" value={source.name} onChange={(v) => onUpdate({ name: v })} placeholder="e.g. orders" required />
 
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" style={{ color: "var(--text-h)" }}>Reads from</label>
@@ -651,7 +675,9 @@ function SourceCard({
 
       {source.tableRef && (
         <p className="text-[11px]" style={{ color: "var(--text)" }}>
-          Reads: <span className="font-mono" style={{ color: "var(--text-h)" }}>{source.connectionName}.table('{source.tableRef}')</span>
+          Reads: <span className="font-mono" style={{ color: "var(--text-h)" }}>
+            {source.sourceType === "file" ? `read_${source.tableRef.toLowerCase().endsWith(".parquet") ? "parquet" : "csv"}('${source.tableRef}')` : source.tableRef}
+          </span>
         </p>
       )}
 
@@ -672,7 +698,7 @@ function SourceCard({
         </select>
       </div>
 
-      {/* Aliases — plain renames of a raw column, no computation */}
+      {/* Aliases — rename a raw column into a queryable dimension */}
       <div>
         <SectionHeader label="Aliases" count={source.aliases.length} collapsed={!aliasesOpen} onToggleCollapse={() => setAliasesOpen((v) => !v)} />
         {aliasesOpen && (
@@ -681,9 +707,11 @@ function SourceCard({
               {source.aliases.map((a) => (
                 <div key={a.id} className="flex items-center gap-1.5">
                   <input value={a.name} onChange={(e) => onUpdateAlias(a.id, { name: e.target.value })}
-                    placeholder="new name" className={rowInputCls} style={{ ...rowInputSty, flex: "0 0 30%" }} />
+                    placeholder="new name" className={rowInputCls} style={{ ...rowInputSty, flex: "0 0 25%" }} />
                   <span className="shrink-0 text-[10px] opacity-60" style={{ color: "var(--text)" }}>is</span>
                   <FieldPicker value={a.field} onChange={(v) => onUpdateAlias(a.id, { field: v })} columns={columnOptions} />
+                  <DimensionTypePicker value={a.type} onChange={(v) => onUpdateAlias(a.id, { type: v })} />
+                  <FormatPicker value={a.format} onChange={(v) => onUpdateAlias(a.id, { format: v })} options={DIMENSION_FORMATS} title="Display format" />
                   <RemoveRowButton onClick={() => onRemoveAlias(a.id)} title="Remove alias" />
                 </div>
               ))}
@@ -696,8 +724,11 @@ function SourceCard({
         )}
       </div>
 
-      {/* Dimensions — always a real computed expression, never a plain field picker */}
+      {/* Dimensions — a real SQL expression (Cube's `sql:` is raw SQL) */}
       <div>
+        <datalist id={`dim-columns-${source.id}`}>
+          {postAliasColumns.map((c) => <option key={c} value={c} />)}
+        </datalist>
         <SectionHeader label="Dimensions" count={source.dimensions.length} collapsed={!dimensionsOpen} onToggleCollapse={() => setDimensionsOpen((v) => !v)} />
         {dimensionsOpen && (
           <>
@@ -705,10 +736,13 @@ function SourceCard({
               {source.dimensions.map((d) => (
                 <div key={d.id} className="flex items-center gap-1.5">
                   <input value={d.name} onChange={(e) => onUpdateDimension(d.id, { name: e.target.value })}
-                    placeholder="name" className={rowInputCls} style={{ ...rowInputSty, flex: "0 0 30%" }} />
+                    placeholder="name" className={rowInputCls} style={{ ...rowInputSty, flex: "0 0 25%" }} />
                   <span className="shrink-0 text-[10px] opacity-60" style={{ color: "var(--text)" }}>is</span>
                   <input value={d.expression} onChange={(e) => onUpdateDimension(d.id, { expression: e.target.value })}
-                    placeholder="expression, e.g. upper(status)" className={rowInputCls} style={rowInputSty} />
+                    placeholder="Pick a column or type a SQL expression, e.g. UPPER(status)"
+                    list={`dim-columns-${source.id}`} className={rowInputCls} style={rowInputSty} />
+                  <DimensionTypePicker value={d.type} onChange={(v) => onUpdateDimension(d.id, { type: v })} />
+                  <FormatPicker value={d.format} onChange={(v) => onUpdateDimension(d.id, { format: v })} options={DIMENSION_FORMATS} title="Display format" />
                   <RemoveRowButton onClick={() => onRemoveDimension(d.id)} title="Remove dimension" />
                 </div>
               ))}
@@ -746,7 +780,7 @@ function SourceCard({
                 <span className="shrink-0 text-[10px] opacity-60" style={{ color: "var(--text)" }}>is</span>
                 {m.kind === "expression" ? (
                   <input value={m.expression} onChange={(e) => onUpdateMeasure(m.id, { expression: e.target.value })}
-                    placeholder="expression, e.g. sum(revenue) - sum(cost)" className={rowInputCls} style={rowInputSty} />
+                    placeholder="e.g. {total_revenue} - {total_cost} — references other measure names" className={rowInputCls} style={rowInputSty} />
                 ) : (
                   <>
                     <select value={m.fn} onChange={(e) => onUpdateMeasure(m.id, { fn: e.target.value as AggFn })}
@@ -756,6 +790,7 @@ function SourceCard({
                     <FieldPicker value={m.field} onChange={(v) => onUpdateMeasure(m.id, { field: v })} columns={postAliasColumns} />
                   </>
                 )}
+                <FormatPicker value={m.format} onChange={(v) => onUpdateMeasure(m.id, { format: v })} options={MEASURE_FORMATS} title="Display format" />
               </div>
             </div>
           ))}
@@ -770,35 +805,22 @@ function SourceCard({
 
       {/* Joins */}
       <div>
-        <div className="flex items-center justify-between">
-          <SectionHeader label="Joins" count={source.joins.length} collapsed={!joinsOpen} onToggleCollapse={() => setJoinsOpen((v) => !v)} />
-          {source.joins.length > 0 && (
-            <button
-              type="button"
-              onClick={onComposeWithJoins}
-              title="Create a composite source combining this source with its joined sources, per Malloy's composite-sources experiment — lets a query resolve fields from whichever one actually has them, queried independently rather than merged via the join."
-              className="mb-1.5 shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:bg-[var(--accent-muted)] hover:text-[var(--accent)]"
-              style={{ color: "var(--text)" }}
-            >
-              Compose with joins
-            </button>
-          )}
-        </div>
+        <SectionHeader label="Joins" count={source.joins.length} collapsed={!joinsOpen} onToggleCollapse={() => setJoinsOpen((v) => !v)} />
         {joinsOpen && (
           <>
             <div className="flex flex-col gap-1.5">
               {source.joins.map((j) => (
                 <div key={j.id} className="flex items-center gap-1.5">
-                  <select value={j.kind} onChange={(e) => onUpdateJoin(j.id, { kind: e.target.value as JoinKind })}
-                    title={JOIN_KINDS.find((k) => k.value === j.kind)?.hint}
+                  <select value={j.relationship} onChange={(e) => onUpdateJoin(j.id, { relationship: e.target.value as JoinRelationship })}
+                    title={JOIN_RELATIONSHIPS.find((k) => k.value === j.relationship)?.hint}
                     className={`${rowInputCls} shrink-0 cursor-pointer`} style={{ ...rowInputSty, flex: "0 0 110px" }}>
-                    {JOIN_KINDS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+                    {JOIN_RELATIONSHIPS.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
                   </select>
                   <input value={j.targetSource} onChange={(e) => onUpdateJoin(j.id, { targetSource: e.target.value })}
-                    placeholder="target source" className={rowInputCls} style={{ ...rowInputSty, flex: "0 0 30%" }} />
+                    placeholder="target cube name" className={rowInputCls} style={{ ...rowInputSty, flex: "0 0 25%" }} />
                   <span className="shrink-0 text-[10px] opacity-60" style={{ color: "var(--text)" }}>on</span>
                   <input value={j.on} onChange={(e) => onUpdateJoin(j.id, { on: e.target.value })}
-                    placeholder="condition" className={rowInputCls} style={rowInputSty} />
+                    placeholder={`{CUBE}.id = {${j.targetSource || "target"}}.foreign_id`} className={rowInputCls} style={rowInputSty} />
                   <RemoveRowButton onClick={() => onRemoveJoin(j.id)} title="Remove join" />
                 </div>
               ))}
@@ -816,82 +838,17 @@ function SourceCard({
   );
 }
 
-// ── Composite source card ─────────────────────────────────────────────────
-
-interface CompositeCardProps {
-  composite: WizardComposite;
-  sourceNames: string[];
-  onUpdate: (patch: Partial<WizardComposite>) => void;
-  onRemove: () => void;
-  onAddMember: () => void;
-  onUpdateMember: (index: number, value: string) => void;
-  onRemoveMember: (index: number) => void;
-}
-
-/** Members are priority order — the select for member N excludes names
- * already chosen for earlier members so the same source can't be listed twice. */
-function CompositeCard({
-  composite, sourceNames, onUpdate, onRemove, onAddMember, onUpdateMember, onRemoveMember,
-}: CompositeCardProps) {
-  return (
-    <div className="flex flex-col gap-3 rounded-xl border p-4" style={{ borderColor: "var(--border)", background: "var(--bg-card, var(--bg))" }}>
-      <div className="flex items-center justify-between">
-        <CTextInput
-          label="Composite Name"
-          value={composite.name}
-          onChange={(v) => onUpdate({ name: v })}
-          placeholder="e.g. orders_composite"
-          required
-        />
-        <RemoveRowButton onClick={onRemove} title="Remove composite source" />
-      </div>
-
-      <div>
-        <label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>
-          Members <span className="ml-1 font-normal opacity-60">— priority order, first that has every queried field wins</span>
-        </label>
-        <div className="flex flex-col gap-1.5">
-          {composite.members.map((member, idx) => {
-            const takenByOthers = new Set(composite.members.filter((_, i) => i !== idx));
-            const options = sourceNames.filter((n) => n === member || !takenByOthers.has(n));
-            return (
-              <div key={idx} className="flex items-center gap-1.5">
-                <span className="w-5 shrink-0 text-[10px] opacity-60" style={{ color: "var(--text)" }}>{idx + 1}.</span>
-                <select
-                  value={member}
-                  onChange={(e) => onUpdateMember(idx, e.target.value)}
-                  className={`${rowInputCls} cursor-pointer`}
-                  style={rowInputSty}
-                >
-                  <option value="">Select a source…</option>
-                  {options.map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
-                <RemoveRowButton onClick={() => onRemoveMember(idx)} title="Remove member" />
-              </div>
-            );
-          })}
-          {composite.members.length === 0 && (
-            <p className="text-[11px] italic opacity-60" style={{ color: "var(--text)" }}>No members yet — add at least two.</p>
-          )}
-        </div>
-        <AddRowButton onClick={onAddMember} label="Add member" />
-      </div>
-    </div>
-  );
-}
-
 // ── Wizard ───────────────────────────────────────────────────────────────
 
-interface MalloyModelWizardProps {
+interface CubeDefinitionWizardProps {
   /** Existing code to load into the builder when it's opened — parsed once on mount. */
   initialCode?: string;
-  /** Called with the generated `.malloy` text whenever the builder's state changes. */
-  onChange: (malloyCode: string) => void;
+  /** Called with the generated `.yml` text whenever the builder's state changes. */
+  onChange: (cubeYaml: string) => void;
 }
 
-export default function MalloyModelWizard({ initialCode = "", onChange }: MalloyModelWizardProps) {
-  const [sources, setSources] = useState<WizardSource[]>(() => parseMalloyToSources(initialCode));
-  const [composites, setComposites] = useState<WizardComposite[]>(() => parseMalloyToComposites(initialCode));
+export default function CubeDefinitionWizard({ initialCode = "", onChange }: CubeDefinitionWizardProps) {
+  const [sources, setSources] = useState<WizardSource[]>(() => parseCubeYamlToSources(initialCode));
 
   const [connections, setConnections] = useState<ConnectionPublicResponse[]>([]);
   const [connLoading, setConnLoading] = useState(true);
@@ -975,7 +932,7 @@ export default function MalloyModelWizard({ initialCode = "", onChange }: Malloy
       setSchemaOptions((prev) => ({ ...prev, [source.id]: normalizeSchemas(schemas) }));
     } catch {
       // Introspection is a convenience, not a requirement — the manual table-path
-      // input below always covers this case if the publisher can't list schemas.
+      // input below always covers this case if introspection fails.
     } finally {
       setSchemaLoading((prev) => ({ ...prev, [source.id]: false }));
     }
@@ -999,8 +956,8 @@ export default function MalloyModelWizard({ initialCode = "", onChange }: Malloy
   }
 
   function handleTableChange(source: WizardSource, table: string) {
-    // `table` here is already the publisher's fully-qualified `resource`
-    // (e.g. "public.orders") — no need to re-prefix with the schema.
+    // `table` here is already the introspection endpoint's fully-qualified
+    // `resource` (e.g. "public.orders") — no need to re-prefix with the schema.
     updateSource(source.id, { tableRef: table });
     const matched = (tableOptions[source.id] ?? []).find((t) => t.resource === table);
     setColumnOptions((prev) => ({ ...prev, [source.id]: matched?.columns ?? [] }));
@@ -1013,10 +970,15 @@ export default function MalloyModelWizard({ initialCode = "", onChange }: Malloy
       setColumnOptions((prev) => ({ ...prev, [source.id]: [] }));
       return;
     }
+    // file.path is "cube_data/{account}/files" — relative to LOCAL_DIR on the
+    // backend's own disk. The cube container's volume mount already maps
+    // .local/cube_data (host) -> CUBE_VOLUME_ROOT (container), so that
+    // "cube_data/" prefix must be stripped before joining, or it'd appear twice.
+    const inContainerDir = file.path.replace(/^cube_data\//, "");
     updateSource(source.id, {
       fileId,
       connectionName: "duckdb",
-      tableRef: `${PUBLISHER_VOLUME_ROOT}/${file.path}/${file.file_name}`,
+      tableRef: `${CUBE_VOLUME_ROOT}/${inContainerDir}/${file.file_name}`,
     });
     setColumnOptions((prev) => ({ ...prev, [source.id]: [] }));
     try {
@@ -1028,7 +990,7 @@ export default function MalloyModelWizard({ initialCode = "", onChange }: Malloy
   }
 
   function addAlias(source: WizardSource) {
-    updateSource(source.id, { aliases: [...source.aliases, { id: uid(), name: "", field: "" }] });
+    updateSource(source.id, { aliases: [...source.aliases, { id: uid(), name: "", field: "", type: "string", format: "" }] });
   }
   function updateAlias(source: WizardSource, id: string, patch: Partial<WizardAlias>) {
     updateSource(source.id, { aliases: source.aliases.map((a) => (a.id === id ? { ...a, ...patch } : a)) });
@@ -1038,7 +1000,7 @@ export default function MalloyModelWizard({ initialCode = "", onChange }: Malloy
   }
 
   function addDimension(source: WizardSource) {
-    updateSource(source.id, { dimensions: [...source.dimensions, { id: uid(), name: "", expression: "" }] });
+    updateSource(source.id, { dimensions: [...source.dimensions, { id: uid(), name: "", expression: "", type: "string", format: "" }] });
   }
   function updateDimension(source: WizardSource, id: string, patch: Partial<WizardDimension>) {
     updateSource(source.id, { dimensions: source.dimensions.map((d) => (d.id === id ? { ...d, ...patch } : d)) });
@@ -1048,7 +1010,7 @@ export default function MalloyModelWizard({ initialCode = "", onChange }: Malloy
   }
 
   function addMeasure(source: WizardSource) {
-    updateSource(source.id, { measures: [...source.measures, { id: uid(), name: "", kind: "function", fn: "count", field: "", expression: "" }] });
+    updateSource(source.id, { measures: [...source.measures, { id: uid(), name: "", kind: "function", fn: "count", field: "", expression: "", format: "" }] });
   }
   function updateMeasure(source: WizardSource, id: string, patch: Partial<WizardMeasure>) {
     updateSource(source.id, { measures: source.measures.map((m) => (m.id === id ? { ...m, ...patch } : m)) });
@@ -1058,7 +1020,7 @@ export default function MalloyModelWizard({ initialCode = "", onChange }: Malloy
   }
 
   function addJoin(source: WizardSource) {
-    updateSource(source.id, { joins: [...source.joins, { id: uid(), kind: "join_one", targetSource: "", on: "" }] });
+    updateSource(source.id, { joins: [...source.joins, { id: uid(), relationship: "many_to_one", targetSource: "", on: "" }] });
   }
   function updateJoin(source: WizardSource, id: string, patch: Partial<WizardJoin>) {
     updateSource(source.id, { joins: source.joins.map((j) => (j.id === id ? { ...j, ...patch } : j)) });
@@ -1067,46 +1029,7 @@ export default function MalloyModelWizard({ initialCode = "", onChange }: Malloy
     updateSource(source.id, { joins: source.joins.filter((j) => j.id !== id) });
   }
 
-  function addComposite() {
-    setComposites((prev) => [...prev, newWizardComposite()]);
-  }
-  function updateComposite(id: string, patch: Partial<WizardComposite>) {
-    setComposites((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
-  }
-  function removeComposite(id: string) {
-    setComposites((prev) => prev.filter((c) => c.id !== id));
-  }
-  function addCompositeMember(composite: WizardComposite) {
-    updateComposite(composite.id, { members: [...composite.members, ""] });
-  }
-  function updateCompositeMember(composite: WizardComposite, index: number, value: string) {
-    updateComposite(composite.id, { members: composite.members.map((m, i) => (i === index ? value : m)) });
-  }
-  function removeCompositeMember(composite: WizardComposite, index: number) {
-    updateComposite(composite.id, { members: composite.members.filter((_, i) => i !== index) });
-  }
-
-  /** "Compose with joins" button: builds/updates a composite named after this
-   * source, prioritizing the source itself first, then each distinct joined
-   * source in the order its join was added. */
-  function composeSourceWithJoins(source: WizardSource) {
-    const joinedNames = Array.from(new Set(source.joins.map((j) => j.targetSource.trim()).filter(Boolean)));
-    const members = [source.name.trim(), ...joinedNames].filter(Boolean);
-    if (members.length < 2) return;
-
-    const compositeName = `${source.name.trim()}_composite`;
-    setComposites((prev) => {
-      const existing = prev.find((c) => c.name.trim() === compositeName);
-      if (existing) {
-        return prev.map((c) => (c.id === existing.id ? { ...c, members } : c));
-      }
-      return [...prev, { id: uid(), name: compositeName, members }];
-    });
-  }
-
-  const generated = [generateMalloy(sources), generateCompositeMalloy(composites)]
-    .filter((block) => block.trim())
-    .join("\n\n");
+  const generated = generateCubeYaml(sources);
 
   // Keep the Code tab's content live-synced with the builder — but only once
   // the builder's output actually differs from what it produced at mount, so
@@ -1163,34 +1086,11 @@ export default function MalloyModelWizard({ initialCode = "", onChange }: Malloy
           onAddJoin={() => addJoin(source)}
           onUpdateJoin={(id, patch) => updateJoin(source, id, patch)}
           onRemoveJoin={(id) => removeJoin(source, id)}
-          onComposeWithJoins={() => composeSourceWithJoins(source)}
         />
       ))}
       <CButton variant="outline" onClick={addSource}>
         <FaPlus size={11} /> Add Source
       </CButton>
-
-      {/* Composite sources — per Malloy's composite-sources experiment, wraps
-          several sources so a query resolves against whichever one actually
-          has the fields it selected, instead of merging rows via a join. */}
-      <div className="flex flex-col gap-3">
-        <h3 className="text-xs font-bold" style={{ color: "var(--text-h)" }}>Composite Sources</h3>
-        {composites.map((composite) => (
-          <CompositeCard
-            key={composite.id}
-            composite={composite}
-            sourceNames={sources.map((s) => s.name.trim()).filter(Boolean)}
-            onUpdate={(patch) => updateComposite(composite.id, patch)}
-            onRemove={() => removeComposite(composite.id)}
-            onAddMember={() => addCompositeMember(composite)}
-            onUpdateMember={(idx, v) => updateCompositeMember(composite, idx, v)}
-            onRemoveMember={(idx) => removeCompositeMember(composite, idx)}
-          />
-        ))}
-        <CButton variant="outline" onClick={addComposite}>
-          <FaPlus size={11} /> Add Composite Source
-        </CButton>
-      </div>
     </div>
   );
 }

@@ -4,30 +4,30 @@ from datetime import datetime
 from typing import Literal, Optional, Any
 
 
-class QueryPackage(BaseModel):
+class DatasetModel(BaseModel):
     id: UUID = Field(..., validation_alias="public_key")
     name: str = Field(..., validation_alias="name")
 
-class QuerySemanticModel(BaseModel):
+class DatasetDefinition(BaseModel):
     id: UUID = Field(..., validation_alias="public_key")
     name: str = Field(..., validation_alias="name")
-    package: QueryPackage
+    model: DatasetModel
 
-class QueryBase(BaseModel):
+class DatasetBase(BaseModel):
     id: UUID = Field(..., validation_alias="public_key")
     name: str
     description: str | None = None
     source: str
-    semantic_model: QuerySemanticModel
+    definition: DatasetDefinition
     created_at: datetime
     updated_at: datetime
     created_by: str = Field(validation_alias=AliasPath("creator", "username"))
     updated_by: str = Field(validation_alias=AliasPath("updater", "username"))
 
-class QueryPublicResponse(QueryBase):
+class DatasetPublicResponse(DatasetBase):
     pass
 
-class QueryDetailedResponse(QueryBase):
+class DatasetDetailedResponse(DatasetBase):
     source: str
     aggregation_fields: list[str]
     group_by_fields: list[str] | None = None
@@ -36,15 +36,15 @@ class QueryDetailedResponse(QueryBase):
     calculated_fields: list | None = None
     order_by_fields: dict | None = None
     limit: int | None = 1000
-    malloy_query: str
+    cube_query: dict
     sql_query: str | None = None
-    semantic_model: QuerySemanticModel
+    definition: DatasetDefinition
 
     class Config:
         from_attributes = True
 
 
-class QueryCreateRequest(BaseModel):
+class DatasetCreateRequest(BaseModel):
     name: str
     description: str | None = None
     source: str
@@ -55,13 +55,13 @@ class QueryCreateRequest(BaseModel):
     calculated_fields: list | None = None
     order_by_fields: dict | None = None
     limit: int | None = 1000
-    malloy_query: str
+    cube_query: dict
     sql_query: str | None = None
 
     class Config:
         from_attributes = True
 
-class QueryUpdateRequest(BaseModel):
+class DatasetUpdateRequest(BaseModel):
     name: str | None = None
     description: str | None = None
     source: str | None = None
@@ -72,6 +72,6 @@ class QueryUpdateRequest(BaseModel):
     calculated_fields: list | None = None
     order_by_fields: dict | None = None
     limit: int | None = 1000
-    malloy_query: str | None = None
+    cube_query: dict | None = None
     sql_query: str | None = None
-    semantic_model_id: UUID | None = None
+    definition_id: UUID | None = None

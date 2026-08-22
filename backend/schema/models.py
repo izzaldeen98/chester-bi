@@ -2,18 +2,18 @@ from pydantic import BaseModel, Field , AliasPath
 from uuid import UUID
 from datetime import datetime
 
-class PackageBase(BaseModel):
+class ModelBase(BaseModel):
     name: str = Field(..., min_length=3)
     description: str | None = Field(None, min_length=3)
 
-class PackageCreate(PackageBase):
-    pass
-    
-
-class PackageUpdate(PackageBase):
+class ModelCreate(ModelBase):
     pass
 
-class PackageResponse(BaseModel):
+
+class ModelUpdate(ModelBase):
+    pass
+
+class ModelResponse(BaseModel):
     id: UUID = Field(..., validation_alias="public_key")
     name : str
     location : str

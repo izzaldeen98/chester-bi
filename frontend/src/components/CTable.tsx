@@ -14,6 +14,13 @@ function formatCell(value: unknown): string {
   return String(value);
 }
 
+// Cube keys result rows as "Cube.field" — show just "field" as the header,
+// keep the full key as the row accessor so lookups still work.
+function shortColumnTitle(col: string): string {
+  const dot = col.lastIndexOf(".");
+  return dot === -1 ? col : col.slice(dot + 1);
+}
+
 export default function CTable({
   columns,
   rows,
@@ -45,6 +52,7 @@ export default function CTable({
             {columns.map((col) => (
               <th
                 key={col}
+                title={col}
                 className="px-3 py-2 text-left font-semibold whitespace-nowrap"
                 style={{
                   color: "var(--text-h)",
@@ -52,7 +60,7 @@ export default function CTable({
                   borderRight: "1px solid var(--border)",
                 }}
               >
-                {col}
+                {shortColumnTitle(col)}
               </th>
             ))}
           </tr>

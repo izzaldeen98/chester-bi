@@ -21,6 +21,7 @@
 | Load Examples | modeling | ✅ Done |
 | Text and waterfall charts | Visualization | ✅ Done |
 | Make Malloy an internal service | Visualization | ✅ Done|
+| Migrate query engine from Malloy to Cube Core | Query Engine | ✅ Done|
 | Dashboard Settings | charts | 📋 Planned|
 
 

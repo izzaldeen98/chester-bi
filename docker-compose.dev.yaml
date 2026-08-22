@@ -8,7 +8,7 @@ version: '3.8'
 #    backend    – FastAPI / Uvicorn               (port 8989, internal only)
 #    postgres   – PostgreSQL 16                   (port 5432)
 #    redis      – Redis 7 cache                   (port 6379, internal only)
-#    publisher  – Malloy Publisher (query engine) (port 4000)
+#    cube       – Cube Core (query engine)        (port 4000)
 #
 #  Quick start:
 #    1. cp .example.env .env   and fill in the values
@@ -35,23 +35,36 @@ services:
       timeout: 3s
       retries: 5
 
-  # ── Malloy Publisher ───────────────────────────────────────────────────────
-  publisher:
-    image: ms2data/malloy-publisher
-    container_name: chester_publisher
+  # ── Cube Core ──────────────────────────────────────────────────────────────
+  cube:
+    image: cubejs/cube:latest
+    container_name: chester_cube
     restart: unless-stopped
     environment:
-      PUBLISHER_MAX_QUERY_ROWS: 9999999
-      PUBLISHER_MAX_RESPONSE_BYTES: 10000000000
-    
+      CUBEJS_API_SECRET: ${CUBEJS_API_SECRET:-changeme}
+      # Cache/queue driver: this Cube version only accepts "cubestore" or
+      # "memory" here — NOT "redis" directly. Cube Store is bundled and runs
+      # in-process automatically; our own Redis (used for the backend's own
+      # query-result cache, see backend/utils/redis_handler.py) is unrelated
+      # and Cube doesn't need it at all.
+      CUBEJS_DEV_MODE: "true"
+
     ports:
       - "4000:4000"
-      - "4040:4040"
 
     volumes:
-      - .local/publisher_data:/publisher/publisher_data
+      # Kept at separate top-level paths (not nested) — nesting cube_data
+      # under the read-only ./backend/cube_conf mount fails because Docker
+      # can't create the inner mountpoint directory on a read-only mount.
+      - .local/cube_data:/cube/definitions_root
+      # NOT read-only: process.cwd() for Cube's own process IS /cube/conf, and
+      # its bundled Cube Store engine writes its metastore under
+      # /cube/conf/.cubestore/ on startup — a :ro mount here makes Cube Store
+      # panic and crash on boot.
+      - ./backend/cube_conf:/cube/conf
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/status"]
+      # cubejs/cube ships neither curl nor wget, only node.
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/readyz', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -61,4 +74,4 @@ services:
 volumes:
   pg_data:
   redis_data:
-  local_data:       # shared between backend and publisher (Malloy data files)
+  cube_data:       # shared between backend and cube (per-account Cube schema files)

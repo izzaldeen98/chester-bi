@@ -41,9 +41,9 @@ const features = [
   },
   {
     icon: <PiFileSqlFill size={22} />,
-    title: "Malloy Query Builder",
+    title: "Visual Query Builder",
     description:
-      "Write powerful Malloy queries in the browser with syntax highlighting, autocomplete, and live previews.",
+      "Build powerful Cube queries in the browser with a drag-and-drop field picker and live previews.",
   },
   {
     icon: <IoBarChartSharp size={22} />,
@@ -65,7 +65,7 @@ const features = [
   },
   {
     icon: <GoPackage size={22} />,
-    title: "Malloy Packages",
+    title: "Cube Model Packages",
     description:
       "Organise and share reusable semantic models and query bundles across your whole organisation.",
   },
@@ -73,7 +73,7 @@ const features = [
     icon: <FaTable size={22} />,
     title: "File & Model Management",
     description:
-      "Upload data files, manage Malloy model files, and keep everything organised in one place.",
+      "Upload data files, manage Cube model files, and keep everything organised in one place.",
   },
   {
     icon: <FiLock size={22} />,
@@ -86,7 +86,7 @@ const features = [
 // ── Steps ──────────────────────────────────────────────────────────────────
 const steps = [
   { n: "01", title: "Clone & configure", body: "Clone the repo, copy .example.env to .env, and fill in your secret keys and database credentials." },
-  { n: "02", title: "docker compose up", body: "One command starts Postgres, Redis, the Malloy Publisher, the FastAPI backend, and the React frontend." },
+  { n: "02", title: "docker compose up", body: "One command starts Postgres, Redis, Cube Core, the FastAPI backend, and the React frontend." },
   { n: "03", title: "Create your account", body: "Register your organisation owner account and start connecting data sources immediately." },
 ];
 
@@ -240,7 +240,7 @@ function Hero({ stars }: { stars: string | null }) {
 
         <p className="mx-auto mb-10 max-w-2xl text-lg" style={{ color: "var(--text)" }}>
           Chester BI is a free, open-source BI platform you run on your own infrastructure.
-          Connect your databases, write Malloy queries, build dashboards, and share insights —
+          Connect your databases, build Cube queries, build dashboards, and share insights —
           with full control over your data.
         </p>
 

@@ -23,7 +23,7 @@ export function renderWidgetChart(
   meta: WidgetMetaLike,
   data?: WidgetQueryData | null,
 ): ReactNode {
-  if (!meta.queryId || !meta.chartConfig) return undefined;
+  if (!meta.datasetId || !meta.chartConfig) return undefined;
 
   const cfg = meta.chartConfig;
   const previewValue = data?.previewValue ?? meta.previewValue ?? null;
@@ -227,11 +227,11 @@ export default function DashboardWidgetChart({
   const activeFiltersKey = JSON.stringify(activeFilters);
 
   const [liveData, setLiveData] = useState<WidgetQueryData | null>(null);
-  const [loading, setLoading] = useState(!hasCachedPreview && Boolean(meta.queryId && meta.chartConfig));
+  const [loading, setLoading] = useState(!hasCachedPreview && Boolean(meta.datasetId && meta.chartConfig));
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (hasCachedPreview || !meta.queryId || !meta.chartConfig) {
+    if (hasCachedPreview || !meta.datasetId || !meta.chartConfig) {
       setLoading(false);
       return;
     }
@@ -259,7 +259,7 @@ export default function DashboardWidgetChart({
     };
   // activeFiltersKey triggers re-fetch when any filter value changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasCachedPreview, meta.queryId, meta.chartType, JSON.stringify(meta.chartConfig), activeFiltersKey]);
+  }, [hasCachedPreview, meta.datasetId, meta.chartType, JSON.stringify(meta.chartConfig), activeFiltersKey]);
 
   if (loading) {
     return (

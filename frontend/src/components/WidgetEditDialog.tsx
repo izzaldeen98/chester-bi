@@ -30,7 +30,7 @@ import WaterfallChart from "./charts/WaterfallChart";
 import TreemapChart from "./charts/TreemapChart";
 import ScatterChart from "./charts/ScatterChart";
 import { CardSchema, LineChartSchema, BarChartSchema, PieChartSchema, TableChartSchema, WaterFallChartSchema, TreemapChartSchema, ScatterChartSchema } from "./charts/ChartsSchemas";
-import { getQueries, getQuery, runQuery, getCompiledModel, type QueryPublicResponse, type QueryDetailedResponse, type SemanticModelSchema } from "../lib/Api";
+import { getDatasets, getDataset, runQuery, getCompiledDefinition, type DatasetPublicResponse, type DatasetDetailedResponse, type DefinitionSchema } from "../lib/Api";
 import { normalizeQueryRows } from "../lib/queryResult";
 import { isDateTimeTypeKind, resolveXAxisFieldType } from "../lib/fieldTypes";
 import { VscDebugRerun } from "react-icons/vsc";
@@ -40,8 +40,8 @@ type ChartType = "card" | "line" | "bar" | "pie" | "table" | "waterfall" | "tree
 export type { ChartType };
 
 export interface WidgetChartConfig {
-  queryId?: string;
-  queryName?: string;
+  datasetId?: string;
+  datasetName?: string;
   chartType?: ChartType;
   chartConfig?: Record<string, string>;
   previewValue?: number | null;
@@ -49,7 +49,7 @@ export interface WidgetChartConfig {
 }
 
 export interface WidgetSaveResult {
-  query: QueryPublicResponse;
+  dataset: DatasetPublicResponse;
   chartType: ChartType;
   chartConfig: Record<string, string>;
   previewValue: number | null;
@@ -361,7 +361,7 @@ function YAxisFieldEditor({
   );
 }
 
-function getQueryInitials(name: string) {
+function getDatasetInitials(name: string) {
   const words = name.trim().split(/\s+/);
   if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
   return name.slice(0, 2).toUpperCase();
@@ -497,9 +497,9 @@ export default function WidgetEditDialog({
   const isHydratingRef = useRef(false);
   const wasOpenRef = useRef(false);
   const prevSelectedIdRef = useRef<string | null | undefined>(undefined);
-  const [queries, setQueries] = useState<QueryPublicResponse[]>([]);
-  const [queryDetails, setQueryDetails] = useState<QueryDetailedResponse | null>(null);
-  const [compiledModel, setCompiledModel] = useState<SemanticModelSchema | null>(null);
+  const [datasets, setDatasets] = useState<DatasetPublicResponse[]>([]);
+  const [datasetDetails, setDatasetDetails] = useState<DatasetDetailedResponse | null>(null);
+  const [compiledDefinition, setCompiledDefinition] = useState<DefinitionSchema | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -528,7 +528,7 @@ export default function WidgetEditDialog({
     const savedConfig = initialConfig?.chartConfig;
     const title = savedConfig?.title || widgetTitle;
 
-    setSelectedId(initialConfig?.queryId ?? null);
+    setSelectedId(initialConfig?.datasetId ?? null);
     setSelectedChart(initialConfig?.chartType ?? null);
     setChartConfig(
       savedConfig
@@ -537,11 +537,11 @@ export default function WidgetEditDialog({
     );
     setPreviewValue(initialConfig?.previewValue ?? null);
     setPreviewRows(initialConfig?.previewRows ?? null);
-    setQueryDetails(null);
+    setDatasetDetails(null);
 
-    getQueries()
-      .then(setQueries)
-      .catch((e: Error) => setError(e.message ?? "Failed to load queries."))
+    getDatasets()
+      .then(setDatasets)
+      .catch((e: Error) => setError(e.message ?? "Failed to load datasets."))
       .finally(() => {
         setLoading(false);
         isHydratingRef.current = false;
@@ -550,8 +550,8 @@ export default function WidgetEditDialog({
 
   useEffect(() => {
     if (!selectedId) {
-      setQueryDetails(null);
-      setCompiledModel(null);
+      setDatasetDetails(null);
+      setCompiledDefinition(null);
       if (prevSelectedIdRef.current !== undefined) {
         setPreviewValue(null);
         setPreviewRows(null);
@@ -561,9 +561,9 @@ export default function WidgetEditDialog({
       return;
     }
 
-    const queryChanged =
+    const datasetChanged =
       prevSelectedIdRef.current !== undefined && prevSelectedIdRef.current !== selectedId;
-    if (queryChanged) {
+    if (datasetChanged) {
       setPreviewValue(null);
       setPreviewRows(null);
       setRunError("");
@@ -571,58 +571,58 @@ export default function WidgetEditDialog({
     prevSelectedIdRef.current = selectedId;
 
     setDetailsLoading(true);
-    getQuery(selectedId)
-      .then(setQueryDetails)
-      .catch(() => setQueryDetails(null))
+    getDataset(selectedId)
+      .then(setDatasetDetails)
+      .catch(() => setDatasetDetails(null))
       .finally(() => setDetailsLoading(false));
   }, [selectedId]);
 
   useEffect(() => {
-    if (!queryDetails?.semantic_model?.id) {
-      setCompiledModel(null);
+    if (!datasetDetails?.definition?.id) {
+      setCompiledDefinition(null);
       return;
     }
 
-    getCompiledModel(queryDetails.semantic_model.id)
-      .then(setCompiledModel)
-      .catch(() => setCompiledModel(null));
-  }, [queryDetails?.semantic_model?.id]);
+    getCompiledDefinition(datasetDetails.definition.id)
+      .then(setCompiledDefinition)
+      .catch(() => setCompiledDefinition(null));
+  }, [datasetDetails?.definition?.id]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return queries;
-    return queries.filter(
-      (query) =>
-        query.name.toLowerCase().includes(q) ||
-        query.description?.toLowerCase().includes(q) ||
-        query.semantic_model.package.name.toLowerCase().includes(q) ||
-        query.semantic_model.name.toLowerCase().includes(q),
+    if (!q) return datasets;
+    return datasets.filter(
+      (dataset) =>
+        dataset.name.toLowerCase().includes(q) ||
+        dataset.description?.toLowerCase().includes(q) ||
+        dataset.definition.model.name.toLowerCase().includes(q) ||
+        dataset.definition.name.toLowerCase().includes(q),
     );
-  }, [queries, search]);
+  }, [datasets, search]);
 
-  const selected = queries.find((q) => q.id === selectedId) ?? null;
+  const selected = datasets.find((d) => d.id === selectedId) ?? null;
   const activeSchema = CHART_OPTIONS.find((c) => c.type === selectedChart)?.schema;
 
   const hasTarget = isConfigTruthy(chartConfig.hasTarget);
 
   const fieldOptions = useMemo(() => {
-    if (!queryDetails) return [];
-    const dims = queryDetails.group_by_fields ?? [];
-    const measures = queryDetails.aggregation_fields ?? [];
-    const calculated = (queryDetails.calculated_fields ?? [])
+    if (!datasetDetails) return [];
+    const dims = datasetDetails.group_by_fields ?? [];
+    const measures = datasetDetails.aggregation_fields ?? [];
+    const calculated = (datasetDetails.calculated_fields ?? [])
       .map((f) => (f as { name?: string })?.name)
       .filter((name): name is string => !!name);
     return [...dims, ...measures, ...calculated].map((f) => ({ value: f, label: f }));
-  }, [queryDetails]);
+  }, [datasetDetails]);
 
-  const querySource = useMemo(() => {
-    if (!compiledModel || !queryDetails?.source) return null;
-    return compiledModel.sources.find((source) => source.name === queryDetails.source) ?? null;
-  }, [compiledModel, queryDetails?.source]);
+  const datasetSource = useMemo(() => {
+    if (!compiledDefinition || !datasetDetails?.source) return null;
+    return compiledDefinition.sources.find((source) => source.name === datasetDetails.source) ?? null;
+  }, [compiledDefinition, datasetDetails?.source]);
 
   const xAxisTypeKind = useMemo(
-    () => resolveXAxisFieldType(chartConfig.xAxis, querySource),
-    [chartConfig.xAxis, querySource],
+    () => resolveXAxisFieldType(chartConfig.xAxis, datasetSource),
+    [chartConfig.xAxis, datasetSource],
   );
 
   const isXAxisDateTime = isDateTimeTypeKind(xAxisTypeKind);
@@ -651,7 +651,7 @@ export default function WidgetEditDialog({
     setChartConfig((prev) => {
       const next = { ...prev, [name]: value };
       if (name === "xAxis" && isDateFormatChart) {
-        const source = compiledModel?.sources.find((item) => item.name === queryDetails?.source) ?? null;
+        const source = compiledDefinition?.sources.find((item) => item.name === datasetDetails?.source) ?? null;
         const typeKind = resolveXAxisFieldType(value, source);
         if (!isDateTimeTypeKind(typeKind)) {
           next.format = "";
@@ -714,11 +714,11 @@ export default function WidgetEditDialog({
 
   const canRun =
     selectedChart === "card"
-      ? !!queryDetails && !!chartConfig.value?.trim()
+      ? !!datasetDetails && !!chartConfig.value?.trim()
       : isSeriesChart
-        ? !!queryDetails && !!chartConfig.xAxis?.trim() && chartYAxisFields.length > 0
+        ? !!datasetDetails && !!chartConfig.xAxis?.trim() && chartYAxisFields.length > 0
         : isRowsChart
-          ? !!queryDetails
+          ? !!datasetDetails
           : false;
 
   async function runSeriesChart() {
@@ -737,7 +737,7 @@ export default function WidgetEditDialog({
     setRunError("");
 
     try {
-      const result = await runQuery(queryDetails!.semantic_model.id, queryDetails!.malloy_query);
+      const result = await runQuery(datasetDetails!.definition.id, datasetDetails!.cube_query);
       const rows = extractRows(result);
 
       if (rows.length === 0) {
@@ -761,7 +761,7 @@ export default function WidgetEditDialog({
     setRunning(true);
     setRunError("");
     try {
-      const result = await runQuery(queryDetails!.semantic_model.id, queryDetails!.malloy_query);
+      const result = await runQuery(datasetDetails!.definition.id, datasetDetails!.cube_query);
       const rows = extractRows(result);
       if (rows.length === 0) {
         setRunError("Query returned no rows.");
@@ -780,7 +780,7 @@ export default function WidgetEditDialog({
   }
 
   async function handleRun() {
-    if (!queryDetails || !selected) return;
+    if (!datasetDetails || !selected) return;
 
     if (isRowsChart) {
       await runPieChart();
@@ -802,7 +802,7 @@ export default function WidgetEditDialog({
     setRunError("");
 
     try {
-      const result = await runQuery(queryDetails.semantic_model.id, queryDetails.malloy_query);
+      const result = await runQuery(datasetDetails.definition.id, datasetDetails.cube_query);
       const rows = extractRows(result);
       const num = readNumericCell(rows, valueField);
 
@@ -838,7 +838,7 @@ export default function WidgetEditDialog({
     setSaving(true);
     try {
       await onSave({
-        query: selected,
+        dataset: selected,
         chartType: selectedChart,
         chartConfig: {
           ...chartConfig,
@@ -859,7 +859,7 @@ export default function WidgetEditDialog({
     <CDialog
       isOpen={isOpen}
       title={`Edit ${widgetTitle}`}
-      subtitle="Pick a query, choose a chart type, then configure the display"
+      subtitle="Pick a dataset, choose a chart type, then configure the display"
       onClose={onClose}
       onSave={handleSave}
       saving={saving}
@@ -868,7 +868,7 @@ export default function WidgetEditDialog({
     >
       {/* Progress steps */}
       <div className="flex h-full min-h-0 flex-1">
-        {/* ── Left: queries ── */}
+        {/* ── Left: datasets ── */}
         <aside
           className="flex w-72 shrink-0 flex-col border-r"
           style={{ borderColor: "var(--border)", background: "var(--bg-subtle)" }}
@@ -876,7 +876,7 @@ export default function WidgetEditDialog({
           <div className="shrink-0 border-b p-4" style={{ borderColor: "var(--border)" }}>
             <div className="mb-3 flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>
-                Queries
+                Datasets
               </p>
               {!loading && (
                 <span
@@ -890,7 +890,7 @@ export default function WidgetEditDialog({
             <CTextInput
               value={search}
               onChange={setSearch}
-              placeholder="Search queries…"
+              placeholder="Search datasets…"
               icon={<FaSearch size={12} />}
             />
           </div>
@@ -906,18 +906,18 @@ export default function WidgetEditDialog({
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <PiFileSqlFill size={28} style={{ color: "var(--border)" }} />
                 <p className="mt-2 text-sm" style={{ color: "var(--text)" }}>
-                  {search ? "No queries match your search." : "No queries available yet."}
+                  {search ? "No datasets match your search." : "No datasets available yet."}
                 </p>
               </div>
             ) : (
               <ul className="flex flex-col gap-1.5">
-                {filtered.map((query) => {
-                  const isSelected = query.id === selectedId;
+                {filtered.map((dataset) => {
+                  const isSelected = dataset.id === selectedId;
                   return (
-                    <li key={query.id}>
+                    <li key={dataset.id}>
                       <button
                         type="button"
-                        onClick={() => setSelectedId(query.id)}
+                        onClick={() => setSelectedId(dataset.id)}
                         className="w-full rounded-xl border p-2.5 text-left transition-all hover:brightness-[0.98]"
                         style={{
                           background: isSelected ? "var(--accent-muted)" : "var(--bg)",
@@ -934,14 +934,14 @@ export default function WidgetEditDialog({
                               border: `1px solid ${isSelected ? "var(--accent)" : "var(--accent-ring)"}`,
                             }}
                           >
-                            {getQueryInitials(query.name)}
+                            {getDatasetInitials(dataset.name)}
                           </span>
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold" style={{ color: "var(--text-h)" }}>
-                              {query.name}
+                              {dataset.name}
                             </p>
                             <p className="mt-0.5 truncate text-[10px]" style={{ color: "var(--text)" }}>
-                              {query.semantic_model.package.name} · {query.semantic_model.name}
+                              {dataset.definition.model.name} · {dataset.definition.name}
                             </p>
                           </div>
                           {isSelected && (
@@ -974,7 +974,7 @@ export default function WidgetEditDialog({
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <FaDatabase size={20} style={{ color: "var(--border)" }} />
                   <p className="mt-3 text-xs" style={{ color: "var(--text)" }}>
-                    Select a query to configure
+                    Select a dataset to configure
                   </p>
                 </div>
               ) : (
@@ -1042,7 +1042,7 @@ export default function WidgetEditDialog({
                               </label>
                               {fieldOptions.length === 0 ? (
                                 <p className="text-[11px]" style={{ color: "var(--text)" }}>
-                                  Select a query with fields to choose Y axis values.
+                                  Select a dataset with fields to choose Y axis values.
                                 </p>
                               ) : (
                                 <YAxisFieldEditor
@@ -1078,7 +1078,7 @@ export default function WidgetEditDialog({
                               </label>
                               {fieldOptions.length === 0 ? (
                                 <p className="text-[11px]" style={{ color: "var(--text)" }}>
-                                  Select a query to choose columns.
+                                  Select a dataset to choose columns.
                                 </p>
                               ) : (
                                 <div className="flex flex-col gap-1 rounded-xl border p-2" style={{ borderColor: "var(--border)" }}>
@@ -1425,7 +1425,7 @@ export default function WidgetEditDialog({
                     {selected.name}
                   </p>
                   <p className="truncate text-[10px]" style={{ color: "var(--text)" }}>
-                    {selected.semantic_model.package.name} · {selected.semantic_model.name} · {selected.source}
+                    {selected.definition.model.name} · {selected.definition.name} · {selected.source}
                   </p>
                 </div>
               )}

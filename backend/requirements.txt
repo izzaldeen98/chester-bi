@@ -11,6 +11,12 @@ python-multipart==0.0.32
 SQLAlchemy==2.0.50
 psycopg2-binary==2.9.12
 
+# ── User-connection DB drivers (direct connection test/introspection,
+#    now that there's no Malloy Publisher to proxy this through) ───────────
+PyMySQL==1.1.1
+snowflake-connector-python==3.15.0
+google-cloud-bigquery==3.27.0
+
 # ── Data validation ────────────────────────────────────────────────────────
 pydantic==2.13.4
 pydantic[email]
@@ -37,6 +43,5 @@ openpyxl==3.1.5
 # ── Cache ──────────────────────────────────────────────────────────────────
 redis==8.0.0
 
-# ── Malloy query engine client ─────────────────────────────────────────────
-malloy==2024.1096
+# ── Cube Core query engine client (thin REST calls, see utils/cube.py) ─────
 requests==2.34.2

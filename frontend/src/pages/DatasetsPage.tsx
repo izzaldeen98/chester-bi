@@ -10,17 +10,17 @@ import CAlert from "../components/CAlert";
 import CSpinner from "../components/CSpinner";
 import CDetailRow from "../components/CDetailRow";
 import {
-  getQueries,
-  getQuery,
-  deleteQuery,
-  type QueryPublicResponse,
-  type QueryDetailedResponse,
+  getDatasets,
+  getDataset,
+  deleteDataset,
+  type DatasetPublicResponse,
+  type DatasetDetailedResponse,
 } from "../lib/Api";
 
-const columns = ["#","Name", "Package", "Model", "Source" , "Created At", "Created By"];
+const columns = ["#","Name", "Model", "Definition", "Source" , "Created At", "Created By"];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function getQueryInitials(name: string) {
+function getDatasetInitials(name: string) {
   const words = name.trim().split(/\s+/);
   if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
   return name.slice(0, 2).toUpperCase();
@@ -48,21 +48,21 @@ function isToday(iso: string) {
   );
 }
 
-function openQueryEditor(queryId: string) {
-  window.open(`/queries/${queryId}/edit`, "_blank", "noopener,noreferrer");
+function openDatasetEditor(datasetId: string) {
+  window.open(`/datasets/${datasetId}/edit`, "_blank", "noopener,noreferrer");
 }
 
 // ── Page ───────────────────────────────────────────────────────────────────
-export default function QueriesPage() {
+export default function DatasetsPage() {
   // Data
-  const [queries, setQueries]       = useState<QueryPublicResponse[]>([]);
+  const [datasets, setDatasets]     = useState<DatasetPublicResponse[]>([]);
   const [loading, setLoading]       = useState(true);
   const [pageError, setPageError]   = useState("");
   const [search, setSearch]         = useState("");
 
   // Sidebar
-  const [selected, setSelected]   = useState<QueryPublicResponse | null>(null);
-  const [details, setDetails]     = useState<QueryDetailedResponse | null>(null);
+  const [selected, setSelected]   = useState<DatasetPublicResponse | null>(null);
+  const [details, setDetails]     = useState<DatasetDetailedResponse | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -72,17 +72,17 @@ export default function QueriesPage() {
   const [deleteError, setDeleteError] = useState("");
 
   // ── Fetch on mount ───────────────────────────────────────────────────────
-  useEffect(() => { fetchQueries(); }, []);
+  useEffect(() => { fetchDatasets(); }, []);
 
-  async function fetchQueries() {
+  async function fetchDatasets() {
     setLoading(true);
     setPageError("");
     try {
-      setQueries(await getQueries());
+      setDatasets(await getDatasets());
     } catch (e: any) {
-      const msg = e.message ?? "Failed to load queries.";
-      if (msg.toLowerCase().includes("no queries found")) {
-        setQueries([]);
+      const msg = e.message ?? "Failed to load datasets.";
+      if (msg.toLowerCase().includes("no datasets found")) {
+        setDatasets([]);
       } else {
         setPageError(msg);
       }
@@ -91,41 +91,41 @@ export default function QueriesPage() {
     }
   }
 
-  async function fetchDetails(queryId: string) {
+  async function fetchDetails(datasetId: string) {
     setDetailsLoading(true);
     setDetails(null);
     try {
-      setDetails(await getQuery(queryId));
+      setDetails(await getDataset(datasetId));
     } catch (e: any) {
-      setFormError(e.message ?? "Failed to load query details.");
+      setFormError(e.message ?? "Failed to load dataset details.");
     } finally {
       setDetailsLoading(false);
     }
   }
 
   // ── Derived metrics ──────────────────────────────────────────────────────
-  const total        = queries.length;
-  const thisMonth    = queries.filter((q) => isThisMonth(q.created_at)).length;
-  const updatedToday = queries.filter((q) => isToday(q.updated_at)).length;
-  const modelCount   = new Set(queries.map((q) => q.semantic_model.id)).size;
+  const total        = datasets.length;
+  const thisMonth    = datasets.filter((d) => isThisMonth(d.created_at)).length;
+  const updatedToday = datasets.filter((d) => isToday(d.updated_at)).length;
+  const modelCount   = new Set(datasets.map((d) => d.definition.id)).size;
 
   // ── Search ───────────────────────────────────────────────────────────────
-  const filtered = queries.filter((q) => {
+  const filtered = datasets.filter((d) => {
     const term = search.toLowerCase();
     return (
-      q.name.toLowerCase().includes(term) ||
-      q.source.toLowerCase().includes(term) ||
-      q.semantic_model.name.toLowerCase().includes(term) ||
-      q.semantic_model.package.name.toLowerCase().includes(term)
+      d.name.toLowerCase().includes(term) ||
+      d.source.toLowerCase().includes(term) ||
+      d.definition.name.toLowerCase().includes(term) ||
+      d.definition.model.name.toLowerCase().includes(term)
     );
   });
 
   const isSidebarOpen = !!selected;
 
-  function openView(q: QueryPublicResponse) {
-    setSelected(q);
+  function openView(d: DatasetPublicResponse) {
+    setSelected(d);
     setFormError("");
-    fetchDetails(q.id);
+    fetchDetails(d.id);
   }
 
   function closePanel() {
@@ -140,8 +140,8 @@ export default function QueriesPage() {
     setDeleting(true);
     setDeleteError("");
     try {
-      await deleteQuery(selected.id);
-      await fetchQueries();
+      await deleteDataset(selected.id);
+      await fetchDatasets();
       setConfirmOpen(false);
       closePanel();
     } catch (e: any) {
@@ -164,7 +164,7 @@ export default function QueriesPage() {
             className="flex h-16 w-16 items-center justify-center rounded-2xl text-xl font-bold"
             style={{ background: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--accent-ring)" }}
           >
-            {getQueryInitials(selected.name)}
+            {getDatasetInitials(selected.name)}
           </div>
           <p className="text-base font-bold text-center" style={{ color: "var(--text-h)" }}>
             {selected.name}
@@ -179,8 +179,8 @@ export default function QueriesPage() {
           <>
             <CDetailRow label="Description"    value={selected.description} />
             <CDetailRow label="Source"         value={selected.source} />
-            <CDetailRow label="Model" value={selected.semantic_model.name} />
-            <CDetailRow label="Package"        value={selected.semantic_model.package.name} />
+            <CDetailRow label="Definition" value={selected.definition.name} />
+            <CDetailRow label="Model"        value={selected.definition.model.name} />
             <CDetailRow label="Created"      value={formatDate(selected.created_at)} />
             <CDetailRow label="Last Updated" value={formatDate(selected.updated_at)} />
             <CDetailRow label="Created By"   value={selected.created_by} />
@@ -196,15 +196,15 @@ export default function QueriesPage() {
     return (
       <div className="flex flex-col gap-2">
         {deleteError && <CAlert variant="error" message={deleteError} />}
-        <CButton variant="outline" fullWidth onClick={() => openQueryEditor(selected.id)}>
-          <FaEdit size={14} /> Edit Query
+        <CButton variant="outline" fullWidth onClick={() => openDatasetEditor(selected.id)}>
+          <FaEdit size={14} /> Edit Dataset
         </CButton>
         <CButton
           variant="danger"
           fullWidth
           onClick={() => { setDeleteError(""); setConfirmOpen(true); }}
         >
-          <FaTrash size={13} /> Delete Query
+          <FaTrash size={13} /> Delete Dataset
         </CButton>
       </div>
     );
@@ -213,7 +213,7 @@ export default function QueriesPage() {
   const sidebarTitle = selected ? selected.name : "";
 
   const sidebarSubtitle = selected
-    ? `${selected.semantic_model.package.name} · ${selected.source}`
+    ? `${selected.definition.model.name} · ${selected.source}`
     : "";
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -222,13 +222,13 @@ export default function QueriesPage() {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>Queries</h1>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>Datasets</h1>
           <p className="mt-1 text-sm" style={{ color: "var(--text)" }}>
-            Create and manage your data queries.
+            Create and manage your datasets.
           </p>
         </div>
-        <CButton variant="primary" onClick={() => window.open("/queries/new", "_blank", "noopener,noreferrer")}>
-          <FaPlus size={12} /> New Query
+        <CButton variant="primary" onClick={() => window.open("/datasets/new", "_blank", "noopener,noreferrer")}>
+          <FaPlus size={12} /> New Dataset
         </CButton>
       </div>
 
@@ -239,7 +239,7 @@ export default function QueriesPage() {
         <CMetricCard label="Total"              value={total}        icon={<PiFileSqlFill size={18} />} />
         <CMetricCard label="Created This Month" value={thisMonth}    icon={<FaCalendarAlt size={16} />} trend="new this month" up={thisMonth > 0} />
         <CMetricCard label="Updated Today"      value={updatedToday} icon={<FaSyncAlt size={16} />}   trend={updatedToday > 0 ? "recently changed" : "no changes today"} up={updatedToday > 0} />
-        <CMetricCard label="Models Used"        value={modelCount}   icon={<FaDatabase size={16} />} />
+        <CMetricCard label="Definitions Used"   value={modelCount}   icon={<FaDatabase size={16} />} />
       </div>
 
       {/* Search */}
@@ -247,12 +247,12 @@ export default function QueriesPage() {
         <CTextInput
           value={search}
           onChange={setSearch}
-          placeholder="Search by name, source, or model…"
+          placeholder="Search by name, source, or definition…"
           icon={<FaSearch size={13} />}
         />
       </div>
 
-      {/* Query grid */}
+      {/* Dataset grid */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <CSpinner size={28} />
@@ -261,7 +261,7 @@ export default function QueriesPage() {
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <PiFileSqlFill size={36} style={{ color: "var(--border)" }} />
           <p className="mt-3 text-sm" style={{ color: "var(--text)" }}>
-            {search ? "No queries match your search." : "No queries yet — create one above."}
+            {search ? "No datasets match your search." : "No datasets yet — create one above."}
           </p>
         </div>
       ) : (
@@ -275,34 +275,34 @@ export default function QueriesPage() {
                     ))}
                 </thead>
                 <tbody>
-                    {filtered.map((q, index) => (
+                    {filtered.map((d, index) => (
                         <tr
-                            key={q.id}
+                            key={d.id}
                             className={`transition-colors group cursor-pointer`}
                             style={{ background: index % 2 === 0 ? "var(--bg)" : "var(--bg-subtle)" }}
-                            onClick={() => openView(q)}
+                            onClick={() => openView(d)}
                             onMouseEnter={e => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--accent-muted)"; }}
                             onMouseLeave={e => { (e.currentTarget as HTMLTableRowElement).style.background = index % 2 === 0 ? "var(--bg)" : "var(--bg-subtle)"; }}
                         >
                             <td>{index + 1}</td>
                             <td className="px-3 py-2 font-semibold" style={{ color: "var(--text-h)" }}>
-                              {q.name}
+                              {d.name}
                             </td>
-                            <td>{q.semantic_model.package.name}</td>
-                            <td>{q.semantic_model.name}</td>
+                            <td>{d.definition.model.name}</td>
+                            <td>{d.definition.name}</td>
                             <td>
                               <span className="font-mono text-xs" style={{ color: "var(--accent-dim)" }}>
-                                {q.source}
+                                {d.source}
                               </span>
                             </td>
                             <td>
-                              <span className="whitespace-nowrap">{formatDate(q.created_at)}</span>
+                              <span className="whitespace-nowrap">{formatDate(d.created_at)}</span>
                             </td>
-                            <td>{q.created_by}</td>
+                            <td>{d.created_by}</td>
                             {/* Actions column */}
                         </tr>
                     ))}
-               
+
                 </tbody>
             </table>
         </div>
@@ -322,7 +322,7 @@ export default function QueriesPage() {
       {/* Delete confirmation */}
       <CConfirmDialog
         isOpen={confirmOpen}
-        title="Delete Query"
+        title="Delete Dataset"
         message={
           selected
             ? `Are you sure you want to delete "${selected.name}"? This action cannot be undone.`

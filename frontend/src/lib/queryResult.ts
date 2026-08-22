@@ -1,46 +1,5 @@
-function unwrapMalloyCell(cell: unknown): unknown {
-  if (cell == null || typeof cell !== "object") return cell;
-  const c = cell as Record<string, unknown>;
-  const kind = c.kind;
-
-  if (kind === "string_cell") return c.string_value;
-  if (kind === "number_cell") return c.number_value;
-  if (kind === "boolean_cell") return c.boolean_value;
-  if (kind === "timestamp_cell") return c.timestamp_value ?? c.string_value;
-  if (kind === "date_cell") return c.date_value ?? c.string_value;
-  if (kind === "null_cell") return null;
-  if (kind === "record_cell" && Array.isArray(c.record_value)) {
-    return c.record_value.map(unwrapMalloyCell);
-  }
-  if (kind === "array_cell" && Array.isArray(c.array_value)) {
-    return c.array_value.map(unwrapMalloyCell);
-  }
-
-  return cell;
-}
-
 function isPlainRow(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value) && !("kind" in value));
-}
-
-function parseMalloyCompact(payload: Record<string, unknown>): Record<string, unknown>[] {
-  const fields =
-    (payload.schema as { fields?: { name: string }[] } | undefined)?.fields?.map((field) => field.name) ?? [];
-  const data = payload.data as Record<string, unknown> | undefined;
-
-  if (!data || data.kind !== "array_cell" || !Array.isArray(data.array_value)) {
-    return [];
-  }
-
-  return data.array_value.map((record) => {
-    const values = unwrapMalloyCell(record);
-    if (!Array.isArray(values)) return {};
-    const row: Record<string, unknown> = {};
-    fields.forEach((name, index) => {
-      row[name] = values[index];
-    });
-    return row;
-  });
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 function extractArrayRows(value: unknown): Record<string, unknown>[] {
@@ -54,11 +13,8 @@ function extractArrayRows(value: unknown): Record<string, unknown>[] {
   if (typeof value !== "object") return [];
   const record = value as Record<string, unknown>;
 
-  if (record.schema && record.data) {
-    return parseMalloyCompact(record);
-  }
-
-  for (const key of ["result", "data", "rows", "results"]) {
+  // Cube's /cubejs-api/v1/load response shape: {"data": [{"Cube.field": value, ...}]}.
+  for (const key of ["data", "result", "rows", "results"]) {
     const nested = record[key];
     if (Array.isArray(nested) && (nested.length === 0 || isPlainRow(nested[0]))) {
       return nested as Record<string, unknown>[];

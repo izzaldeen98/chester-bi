@@ -3,7 +3,7 @@ import { FaChevronDown, FaChevronRight, FaHashtag, FaCalendarAlt, FaSortAmountDo
 import { IoText } from "react-icons/io5";
 import { IoIosSwitch } from "react-icons/io";
 import { TbRulerMeasure2, TbMathFunction } from "react-icons/tb";
-import { FieldInfo } from "@malloydata/malloy-interfaces";
+import { FieldInfo } from "../lib/cubeTypes";
 import { TIME_GRANULARITIES, type Granularity, type SortItem, isDateTime } from "../lib/fieldTree";
 
 interface FieldGroup {

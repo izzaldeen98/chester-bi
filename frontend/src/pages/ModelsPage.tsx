@@ -11,12 +11,12 @@ import CTextInput from "../components/CTextInput";
 import CAlert from "../components/CAlert";
 import CSpinner from "../components/CSpinner";
 import CDetailRow from "../components/CDetailRow";
-import { getPackages, createPackage, type PackageResponse } from "../lib/Api";
+import { getModels, createModel, type ModelResponse } from "../lib/Api";
 
 type SidebarMode = "view" | "create";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function getPackageInitials(name: string) {
+function getModelInitials(name: string) {
   const words = name.trim().split(/\s+/);
   if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
   return name.slice(0, 2).toUpperCase();
@@ -71,18 +71,18 @@ function CTextArea({
 }
 
 // ── Page ───────────────────────────────────────────────────────────────────
-export default function PackagesPage() {
+export default function ModelsPage() {
   const navigate = useNavigate();
 
   // Data
-  const [packages, setPackages]   = useState<PackageResponse[]>([]);
+  const [models, setModels]       = useState<ModelResponse[]>([]);
   const [loading, setLoading]     = useState(true);
   const [pageError, setPageError] = useState("");
   const [search, setSearch]       = useState("");
 
   // Sidebar
   const [mode, setMode]           = useState<SidebarMode>("view");
-  const [selected, setSelected]   = useState<PackageResponse | null>(null);
+  const [selected, setSelected]   = useState<ModelResponse | null>(null);
   const [saving, setSaving]       = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -91,28 +91,28 @@ export default function PackagesPage() {
   const [cDescription, setCDescription] = useState("");
 
   // ── Fetch on mount ───────────────────────────────────────────────────────
-  useEffect(() => { fetchPackages(); }, []);
+  useEffect(() => { fetchModels(); }, []);
 
-  async function fetchPackages() {
+  async function fetchModels() {
     setLoading(true);
     setPageError("");
     try {
-      setPackages(await getPackages());
+      setModels(await getModels());
     } catch (e: any) {
-      setPageError(e.message ?? "Failed to load packages.");
+      setPageError(e.message ?? "Failed to load models.");
     } finally {
       setLoading(false);
     }
   }
 
   // ── Derived metrics ──────────────────────────────────────────────────────
-  const total     = packages.length;
-  const active    = packages.filter((p) => p.is_active).length;
+  const total     = models.length;
+  const active    = models.filter((p) => p.is_active).length;
   const inactive  = total - active;
-  const thisMonth = packages.filter((p) => isThisMonth(p.created_at)).length;
+  const thisMonth = models.filter((p) => isThisMonth(p.created_at)).length;
 
   // ── Search ───────────────────────────────────────────────────────────────
-  const filtered = packages.filter((p) => {
+  const filtered = models.filter((p) => {
     const q = search.toLowerCase();
     return p.name.toLowerCase().includes(q) || p.location.toLowerCase().includes(q);
   });
@@ -120,7 +120,7 @@ export default function PackagesPage() {
   // ── Open modes ───────────────────────────────────────────────────────────
   const isSidebarOpen = mode === "create" || !!selected;
 
-  function openView(p: PackageResponse) {
+  function openView(p: ModelResponse) {
     setSelected(p); setMode("view"); setFormError("");
   }
 
@@ -139,8 +139,8 @@ export default function PackagesPage() {
     if (!cName.trim()) { setFormError("Name is required."); return; }
     setSaving(true); setFormError("");
     try {
-      await createPackage(cName, cDescription || undefined);
-      await fetchPackages();
+      await createModel(cName, cDescription || undefined);
+      await fetchModels();
       closePanel();
     } catch (e: any) {
       setFormError(e.message ?? "Create failed.");
@@ -154,7 +154,7 @@ export default function PackagesPage() {
         <div className="flex flex-col gap-4">
           {formError && <CAlert variant="error" message={formError} />}
           <CTextInput label="Name"        value={cName}        onChange={setCName}        placeholder="e.g. sales-analytics" required />
-          <CTextArea  label="Description" value={cDescription} onChange={setCDescription} placeholder="What does this package contain?" rows={4} />
+          <CTextArea  label="Description" value={cDescription} onChange={setCDescription} placeholder="What does this model contain?" rows={4} />
         </div>
       );
     }
@@ -169,7 +169,7 @@ export default function PackagesPage() {
             className="flex h-16 w-16 items-center justify-center rounded-2xl text-xl font-bold"
             style={{ background: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--accent-ring)" }}
           >
-            {getPackageInitials(selected.name)}
+            {getModelInitials(selected.name)}
           </div>
           <p className="text-base font-bold text-center" style={{ color: "var(--text-h)" }}>
             {selected.name}
@@ -198,7 +198,7 @@ export default function PackagesPage() {
       return (
         <div className="flex gap-2">
           <CButton variant="primary" fullWidth loading={saving} onClick={saveCreate} disabled={!cName.trim()}>
-            Create Package
+            Create Model
           </CButton>
           <CButton variant="ghost" onClick={closePanel} disabled={saving}>Cancel</CButton>
         </div>
@@ -207,7 +207,7 @@ export default function PackagesPage() {
     // view
     if (selected) {
       return (
-        <CButton variant="outline" fullWidth onClick={() => navigate(`/packages/${selected.id}/editor`)}>
+        <CButton variant="outline" fullWidth onClick={() => navigate(`/models/${selected.id}/editor`)}>
           <FaCode size={13} /> Open Editor
         </CButton>
       );
@@ -217,7 +217,7 @@ export default function PackagesPage() {
 
   // ── Sidebar meta ─────────────────────────────────────────────────────────
   const sidebarTitle =
-    mode === "create" ? "New Package" :
+    mode === "create" ? "New Model" :
     selected ? selected.name : "";
 
   const sidebarSubtitle =
@@ -230,13 +230,13 @@ export default function PackagesPage() {
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>Packages</h1>
+          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>Models</h1>
           <p className="mt-1 text-sm" style={{ color: "var(--text)" }}>
-            Manage analytics packages and their models.
+            Manage analytics models and their definitions.
           </p>
         </div>
         <CButton variant="primary" onClick={openCreate}>
-          <FaPlus size={12} /> New Package
+          <FaPlus size={12} /> New Model
         </CButton>
       </div>
 
@@ -260,7 +260,7 @@ export default function PackagesPage() {
         />
       </div>
 
-      {/* Package grid */}
+      {/* Model grid */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <CSpinner size={28} />
@@ -269,7 +269,7 @@ export default function PackagesPage() {
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <FaFolderOpen size={36} style={{ color: "var(--border)" }} />
           <p className="mt-3 text-sm" style={{ color: "var(--text)" }}>
-            {search ? "No packages match your search." : "No packages yet — create one above."}
+            {search ? "No models match your search." : "No models yet — create one above."}
           </p>
         </div>
       ) : (
@@ -280,7 +280,7 @@ export default function PackagesPage() {
               title={p.name}
               subtitle={p.location}
               meta={`By ${p.created_by}`}
-              initials={getPackageInitials(p.name)}
+              initials={getModelInitials(p.name)}
               isSelected={selected?.id === p.id && mode !== "create"}
               badge={{ label: p.is_active ? "Active" : "Inactive", variant: p.is_active ? "green" : "red" }}
               onClick={() => openView(p)}

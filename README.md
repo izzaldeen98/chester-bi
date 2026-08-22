@@ -19,9 +19,9 @@
 
 ## What is Chester BI?
 
-Chester BI is a fully self-hosted business intelligence platform you run on your **own infrastructure**. Connect your databases, write [Malloy](https://www.malloydata.dev/) semantic queries, build interactive drag-and-drop dashboards, and share insights with your team — with zero vendor lock-in and no data leaving your servers.
+Chester BI is a fully self-hosted business intelligence platform you run on your **own infrastructure**. Connect your databases, model them as [Cube](https://cube.dev/) semantic cubes, build interactive drag-and-drop dashboards, and share insights with your team — with zero vendor lock-in and no data leaving your servers.
 
-> Built on FastAPI, React, PostgreSQL, Redis, and the Malloy Publisher query engine.
+> Built on FastAPI, React, PostgreSQL, Redis, and the Cube Core query engine.
 
 ---
 
@@ -37,11 +37,11 @@ _Interactive dashboards — KPI tiles, charts, and tables wired together with sh
 <tr>
 <td width="50%">
 <img src="assets/screenshot-query-builder.png" alt="Query Builder" />
-<br/><sub><b>Query Builder</b> — drag-and-drop dimensions, measures, filters, and calculated (window function) columns, with live Malloy/SQL/JSON previews</sub>
+<br/><sub><b>Query Builder</b> — drag-and-drop dimensions, measures, and filters, with live Cube query/SQL/JSON previews</sub>
 </td>
 <td width="50%">
 <img src="assets/screenshot-package-editor.png" alt="Package Editor" />
-<br/><sub><b>Package Editor</b> — edit Malloy semantic model files directly in the browser</sub>
+<br/><sub><b>Package Editor</b> — edit Cube semantic model YAML files directly in the browser</sub>
 </td>
 </tr>
 <tr>
@@ -75,7 +75,7 @@ _Interactive dashboards — KPI tiles, charts, and tables wired together with sh
 ### Backend
 - **[FastAPI](https://fastapi.tiangolo.com/)** + **Uvicorn** — async Python API
 - **SQLAlchemy 2** + **PostgreSQL 16** — relational data store
-- **[Malloy Publisher](https://github.com/malloydata/publisher)** — semantic query engine
+- **[Cube Core](https://github.com/cube-js/cube)** — semantic query engine
 - **Redis 7** — query result caching
 - **JWT + Bcrypt** — authentication & password hashing
 - **Fernet** — encryption for stored connection credentials
@@ -133,7 +133,7 @@ This spins up five containers:
 | `chester_backend` | FastAPI API | internal |
 | `chester_postgres` | PostgreSQL 16 | 5432 |
 | `chester_redis` | Redis 7 cache | internal |
-| `chester_publisher` | Malloy Publisher | 4000 / 4040 |
+| `chester_cube` | Cube Core | internal (4000) |
 
 ### 4. Create your account
 Open [http://localhost:3000](http://localhost:3000) and click **Get Started** to register your organisation owner account.
@@ -154,7 +154,7 @@ source .venv/bin/activate
 
 pip install -r requirements.txt
 
-# Make sure PostgreSQL, Redis, and Malloy Publisher are running, then:
+# Make sure PostgreSQL, Redis, and Cube Core are running, then:
 uvicorn main:app --reload --port 8989
 ```
 
@@ -185,8 +185,8 @@ Copy `.example.env` → `.env`. The full annotated reference is in that file. Ke
 | `AWS_REGION` | No | AWS region for S3 |
 | `AWS_ACCESS_KEY_ID` | No | AWS access key |
 | `AWS_SECRET_ACCESS_KEY` | No | AWS secret key |
-| `MALLOY_HOST` | No | Malloy Publisher host (default: `host.docker.internal`) |
-| `MALLOY_PORT` | No | Malloy Publisher port (default: `4000`) |
+| `CUBE_URL` | No | Cube Core base URL (default: `http://localhost:4000`) |
+| `CUBEJS_API_SECRET` | **Yes** | Shared secret for signing/verifying the JWT sent to Cube |
 | `REDIS_HOST` | No | Redis host (default: `host.docker.internal`) |
 | `REDIS_PORT` | No | Redis port (default: `6379`) |
 | `REDIS_CACHE_TTL` | No | Cache TTL in seconds (default: `1800`) |
@@ -204,7 +204,7 @@ chester-bi/
 │   ├── models/               # SQLAlchemy ORM models
 │   ├── routes/               # API route handlers
 │   ├── schema/               # Pydantic request/response schemas
-│   ├── utils/                # Storage, config, Redis, Malloy helpers
+│   ├── utils/                # Storage, config, Redis, Cube helpers
 │   ├── security.py           # JWT, hashing, encryption
 │   ├── main.py               # Application entry point
 │   ├── requirements.txt      # Python dependencies
@@ -257,13 +257,13 @@ Please open an issue first for large changes so we can discuss the approach.
 
 Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
 
-Chester BI uses the **Malloy Publisher** under its own license. See [`LICENSES/LICENSE-THIRD-PARTY`](LICENSES/LICENSE-THIRD-PARTY) for third-party attributions.
+Chester BI uses **Cube Core** under its own license. See [`LICENSES/LICENSE-THIRD-PARTY`](LICENSES/LICENSE-THIRD-PARTY) for third-party attributions.
 
 ---
 
 ## Acknowledgements
 
-- [Malloy](https://www.malloydata.dev/) — the semantic query language powering Chester BI's query engine
+- [Cube](https://cube.dev/) — the semantic query engine powering Chester BI's query layer
 - [FastAPI](https://fastapi.tiangolo.com/) — the backend framework
 - [React Grid Layout](https://github.com/react-grid-layout/react-grid-layout) — dashboard drag-and-drop
 - [ECharts](https://echarts.apache.org/) — charting library

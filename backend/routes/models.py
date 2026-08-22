@@ -1,28 +1,26 @@
 from fastapi import APIRouter, Depends, HTTPException, status , Form
-from schema.packages import PackageCreate, PackageResponse , PackageUpdate
+from schema.models import ModelCreate, ModelResponse , ModelUpdate
 from utils.init_database import get_db
 from security import get_current_user
 from sqlalchemy.orm import Session, joinedload
 from models.user import User
-from models.packages import Package
+from models.models import Model
 from security import check_permissions
 from utils.config_files import storage
 from io import BytesIO
 import json
 from typing import List
 from uuid import UUID
-from models.semantic_models import SemanticModel
-from utils.malloy import Malloy
+from models.definitions import Definition
+from utils.cube import ensure_account_definition_dir
 
 
-router = APIRouter(prefix="/api/v1/packages" , tags=["packages"])
+router = APIRouter(prefix="/api/v1/models" , tags=["models"])
 
 
-
-# router = APIRouter()
 
 @router.post("/create", status_code=status.HTTP_201_CREATED )
-async def create_package(
+async def create_model(
     # 1. FIX: Changed to Form fields so it cleanly accepts 'multipart/form-data'
     name: str = Form(...),
     description: str = Form(None),
@@ -30,7 +28,7 @@ async def create_package(
     current_user: User = Depends(get_current_user),
 ):
     # 2. Permission Check
-    permissions = ["*", "packages:*", "packages:create"]
+    permissions = ["*", "models:*", "models:create"]
     if not check_permissions(current_user, *permissions):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -38,18 +36,18 @@ async def create_package(
         )
 
     # 3. Multi-Tenant Uniqueness Check
-    existing_package = (
-        db.query(Package)
+    existing_model = (
+        db.query(Model)
         .filter(
-            Package.name == name, 
-            Package.account_id == current_user.account_id
+            Model.name == name,
+            Model.account_id == current_user.account_id
         )
         .first()
     )
-    if existing_package:
+    if existing_model:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Package with this name already exists",
+            detail="Model with this name already exists",
         )
 
     # 4. CRITICAL FIX: Safe Relationship Retrieval
@@ -62,8 +60,12 @@ async def create_package(
             detail="Account metadata configuration is missing."
         )
 
-    model_folder = f"publisher_data/{account_public_key}/{name}"
-    package_content = {
+    # Model manifests live in their own "models" folder, deliberately
+    # outside the account's Cube definition directory (cube_data/{account}/definitions/)
+    # — Cube's repositoryFactory (see backend/cube_conf/cube.js) only expects
+    # .yml/.js cube definitions there, so model metadata JSON stays separate.
+    model_folder = f"cube_data/{account_public_key}/models"
+    model_content = {
         "name": name,
         "description": description,
         "version": "1.0.0",
@@ -72,19 +74,19 @@ async def create_package(
     # 5. Storage Upload
     try:
         location = await storage.upload_file(
-            file=BytesIO(json.dumps(package_content).encode("utf-8")),
-            file_name="publisher.json",
+            file=BytesIO(json.dumps(model_content).encode("utf-8")),
+            file_name=f"{name}.json",
             path=model_folder,
         )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to upload package: {str(e)}",
+            detail=f"Failed to upload model: {str(e)}",
         )
 
     # 6. Database Commit wrapped in a try/except for transactional safety
     try:
-        new_package = Package(
+        new_model = Model(
             name=name,
             location=location,
             description=description,
@@ -92,160 +94,148 @@ async def create_package(
             created_by=current_user.id,
             updated_by=current_user.id,
         )
-        db.add(new_package)
+        db.add(new_model)
         db.commit()
     except Exception as db_err:
         db.rollback()
         # Edge case: If DB fails, you'd ideally trigger a background task to delete the orphan storage file
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Package storage succeeded, but database tracking failed. , {db_err}"
+            detail=f"Model storage succeeded, but database tracking failed. , {db_err}"
         )
 
-    return {"message": "Package created successfully"}
+    return {"message": "Model created successfully"}
 
 
-@router.get("/list", response_model=List[PackageResponse])
-def list_packages(
+@router.get("/list", response_model=List[ModelResponse])
+def list_models(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    permissions = ["*", "packages:*", "packages:list"]
+    permissions = ["*", "models:*", "models:list"]
     if not check_permissions(current_user, *permissions):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Unauthorized : Insufficient permissions",
         )
-    packages = db.query(Package).filter(Package.account_id == current_user.account_id).all()
-    return packages
+    models = db.query(Model).filter(Model.account_id == current_user.account_id).all()
+    return models
 
-@router.get("/list-models")
-def list_models(
+@router.get("/list-with-definitions")
+def list_models_with_definitions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    permissions = ["*", "packages:*", "packages:list"]
+    permissions = ["*", "models:*", "models:list"]
     if not check_permissions(current_user, *permissions):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Unauthorized: Insufficient permissions",
         )
-    
-    # 1. Fetch packages and eagerly load their models in ONE query
-    packages = (
-        db.query(Package)
-        .options(joinedload(Package.semantic_models))  # Assumes a relationship named 'semantic_models' on Package
-        .filter(Package.account_id == current_user.account_id)
+
+    # 1. Fetch models and eagerly load their definitions in ONE query
+    models = (
+        db.query(Model)
+        .options(joinedload(Model.definitions))  # Assumes a relationship named 'definitions' on Model
+        .filter(Model.account_id == current_user.account_id)
         .all()
     )
-    
+
     # 2. Build the tree structure
     output = []
-    for package in packages:
+    for model in models:
         output.append({
-            "id": str(package.public_key),
-            "name": package.name,
-            "models": [
+            "id": str(model.public_key),
+            "name": model.name,
+            "definitions": [
                 {
-                    "id": str(model.public_key),
-                    "name": model.name,
-                    "file_name": model.file_name,
+                    "id": str(definition.public_key),
+                    "name": definition.name,
+                    "file_name": definition.file_name,
                 }
-                for model in package.semantic_models
+                for definition in model.definitions
             ]
         })
-        
+
     return output
 
 
-@router.get("/get", response_model=PackageResponse)
-def get_package(
-    package_id: UUID,
+@router.get("/get", response_model=ModelResponse)
+def get_model(
+    model_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    permissions = ["*", "packages:*", "packages:get"]
+    permissions = ["*", "models:*", "models:get"]
     if not check_permissions(current_user, *permissions):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Unauthorized : Insufficient permissions",
         )
-    package = db.query(Package).filter(Package.public_key == package_id, Package.account_id == current_user.account_id).first()
-    if not package:
+    model = db.query(Model).filter(Model.public_key == model_id, Model.account_id == current_user.account_id).first()
+    if not model:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Package not found",
+            detail="Model not found",
         )
-    return package
+    return model
 
 
 @router.get("/list-files")
-def list_files(
-    package_id: UUID,
+def list_definition_files(
+    model_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    permissions = ["*", "packages:*", "packages:list"]
+    permissions = ["*", "models:*", "models:list"]
     if not check_permissions(current_user, *permissions):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Unauthorized : Insufficient permissions",
         )
-    package = db.query(Package).filter(Package.public_key == package_id, Package.account_id == current_user.account_id).first()
+    model = db.query(Model).filter(Model.public_key == model_id, Model.account_id == current_user.account_id).first()
 
-    output = [{"file": "publisher.json", "location": package.location, "model_id": None}]
+    output = [{"file": f"{model.name}.json", "location": model.location, "definition_id": None}]
 
-    models = db.query(SemanticModel).filter(SemanticModel.package_id == package.id).all()
-    for model in models:
+    definitions = db.query(Definition).filter(Definition.model_id == model.id).all()
+    for definition in definitions:
         output.append({
-            "file": model.file_name,
-            "location": model.file_path,
-            "model_id": str(model.public_key),
+            "file": definition.file_name,
+            "location": definition.file_path,
+            "definition_id": str(definition.public_key),
         })
 
     return output
 
-@router.post("/load-package")
-async def load_package(
-    package_id: UUID,
+@router.post("/load-model")
+async def load_model(
+    model_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    permissions = ["*", "packages:*", "packages:edit"]
+    permissions = ["*", "models:*", "models:edit"]
     if not check_permissions(current_user, *permissions):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Unauthorized : Insufficient permissions",
         )
-    package = db.query(Package).filter(Package.public_key == package_id, Package.account_id == current_user.account_id).first()
-    if not package:
+    model = db.query(Model).filter(Model.public_key == model_id, Model.account_id == current_user.account_id).first()
+    if not model:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Package not found",
+            detail="Model not found",
         )
-    
-    try : 
 
-       malloy = Malloy().create_environment(envid=current_user.account.public_key)
-    except Exception as e:
-        malloy = Malloy(envid=current_user.account.public_key)
-    
+    # Cube has no "register a model" API — its repositoryFactory (see
+    # backend/cube_conf/cube.js) reads the account's definition directory fresh
+    # on every request, so there's nothing to register. Just make sure the
+    # directory exists so add_definition has somewhere to write into.
     try:
-        malloy.create_package(name=package.name, description=package.description, location=f"/publisher/publisher_data/{current_user.account.public_key}/{package.name}")
+        ensure_account_definition_dir(current_user.account.public_key)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to load package: {str(e)}",
-        )
-    
-    try:
-        malloy.create_package(name=package.name, description=package.description, location=f"/publisher/publisher_data/{current_user.account.public_key}/{package.name}")
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to load package: {str(e)}",
+            detail=f"Failed to load model: {str(e)}",
         )
 
-    
-    return {"message": "Package loaded successfully"}
-
+    return {"message": "Model loaded successfully"}
