@@ -174,8 +174,13 @@ export default function FilesPage() {
   }
 
   function addFiles(picked: FileList | null) {
-    if (!picked) return;
-    setCFiles((prev) => [...prev, ...Array.from(picked)]);
+    if (!picked || picked.length === 0) return;
+    // Snapshot to a real array HERE, eagerly. `picked` is the input's *live*
+    // FileList, and the caller resets input.value right after this returns to
+    // allow re-picking the same file — a lazy `Array.from(picked)` inside the
+    // state updater would run after that reset and read an empty list.
+    const added = Array.from(picked);
+    setCFiles((prev) => [...prev, ...added]);
   }
 
   function removeFile(index: number) {
@@ -238,8 +243,8 @@ export default function FilesPage() {
             <label className="text-sm font-medium" style={{ color: "var(--text-h)" }}>
               Files <span className="text-[var(--accent)]">*</span>
             </label>
-            {/* Plain, fully visible native file input — no hidden-input/label
-                or ref+click() indirection that could get blocked. */}
+            {/* Resetting value after addFiles lets the same file be re-picked;
+                addFiles snapshots the FileList first (see the note there). */}
             <input
               type="file"
               multiple
@@ -414,15 +419,17 @@ export default function FilesPage() {
         <div>
           <table className="w-full border-collapse text-xs">
             <thead>
-              {columns.map((column) => (
-                <th
-                  key={column}
-                  className="px-3 py-2 text-left font-semibold whitespace-nowrap"
-                  style={{ color: "var(--text-h)", borderBottom: "2px solid var(--border)", borderRight: "1px solid var(--border)" }}
-                >
-                  {column}
-                </th>
-              ))}
+              <tr>
+                {columns.map((column) => (
+                  <th
+                    key={column}
+                    className="px-3 py-2 text-left font-semibold whitespace-nowrap"
+                    style={{ color: "var(--text-h)", borderBottom: "2px solid var(--border)", borderRight: "1px solid var(--border)" }}
+                  >
+                    {column}
+                  </th>
+                ))}
+              </tr>
             </thead>
             <tbody>
               {filtered.map((file, index) => (
@@ -456,6 +463,7 @@ export default function FilesPage() {
         title={sidebarTitle}
         subtitle={sidebarSubtitle}
         footer={renderSidebarFooter()}
+        closeOnBackdropClick={mode !== "create"}
       >
         {renderSidebarContent()}
       </CInfoSideBar>

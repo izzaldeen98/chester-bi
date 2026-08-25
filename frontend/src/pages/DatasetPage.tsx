@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
-  FaPlay, FaTable, FaLayerGroup, FaDatabase, FaTerminal, FaCode, FaSave
+  FaPlay, FaTable, FaLayerGroup, FaDatabase, FaTerminal, FaCode, FaSave, FaThumbtack
 } from "react-icons/fa";
 import { PiFileSqlFill } from "react-icons/pi";
 import { MdRefresh } from "react-icons/md";
@@ -53,6 +53,14 @@ function extractRows(result: unknown): Record<string, unknown>[] {
 
 function extractColumns(rows: Record<string, unknown>[]): string[] {
   return rows.length > 0 ? Object.keys(rows[0]) : [];
+}
+
+/** A field tagged with the cube/source it came from — lets group-by fields
+ * and measures be picked from more than one joined source at once. */
+type MultiField = FieldInfo & { sourceName: string };
+
+function sameField(a: MultiField, name: string, sourceName: string): boolean {
+  return a.name === name && a.sourceName === sourceName;
 }
 
 interface PendingHydration {
@@ -127,12 +135,16 @@ export default function DatasetPage() {
   const [schemaError, setSchemaError] = useState("");
   const [activeSchema, setActiveSchema] = useState<SourceInfo | null>(null);
   const [activeSource, setActiveSource] = useState<Array<SourceInfo> | null>(null);
+  // Sources shown (and selectable from) alongside the active one — lets a
+  // query mix fields from several joined cubes, not just the active one.
+  const [pinnedSourceNames, setPinnedSourceNames] = useState<Set<string>>(new Set());
 
   // Field selections
-  const [groupByFields, setGroupByFields] = useState<FieldInfo[]>([]);
-  const [aggFields, setAggFields] = useState<FieldInfo[]>([]);
+  const [groupByFields, setGroupByFields] = useState<MultiField[]>([]);
+  const [aggFields, setAggFields] = useState<MultiField[]>([]);
+  // Keyed by "sourceName::fieldName" to avoid collisions between sources.
   const [granularityMap, setGranularityMap] = useState<Record<string, Granularity>>({});
-  const [sortMap, setSortMap] = useState<SortItem[]>([]);
+  const [sortMap, setSortMap] = useState<(SortItem & { field: MultiField })[]>([]);
   const [limit, setLimit] = useState(1000);
 
   const [query, setQuery] = useState<CubeQuery | null>(null);
@@ -239,7 +251,7 @@ export default function DatasetPage() {
   // ── Load schema — also callable directly by the "Refresh Definition" button ────
   const loadSchema = useCallback(() => {
     if (!selectedDefinitionId) return;
-    setSchemaError(""); setActiveSource(null);
+    setSchemaError(""); setActiveSource(null); setPinnedSourceNames(new Set());
     setGroupByFields([]); setAggFields([]); setGranularityMap({}); setSortMap([]); setFilterQuery(EMPTY_FILTER_QUERY);
     setQueryResult(null); setQueryError("");
     setLoadingSchema(true);
@@ -267,28 +279,30 @@ export default function DatasetPage() {
 
     const fields = source.schema?.fields ?? [];
     const findField = (name: string) => fields.find((f) => f.name === name);
+    const tag = (field: FieldInfo): MultiField => ({ ...field, sourceName: source.name });
 
-    const nextGroupBy: FieldInfo[] = [];
+    const nextGroupBy: MultiField[] = [];
     const nextGranularity: Record<string, Granularity> = {};
 
     for (const entry of pendingHydration.groupBy) {
       const parsed = parseGroupByEntry(entry);
       const field = findField(parsed.name);
       if (!field) continue;
-      nextGroupBy.push(field);
-      if (parsed.granularity) nextGranularity[field.name] = parsed.granularity;
+      nextGroupBy.push(tag(field));
+      if (parsed.granularity) nextGranularity[`${source.name}::${field.name}`] = parsed.granularity;
     }
 
     const nextAgg = pendingHydration.agg
       .map((name) => findField(name))
-      .filter((f): f is FieldInfo => !!f);
+      .filter((f): f is FieldInfo => !!f)
+      .map(tag);
 
-    const nextSort: SortItem[] = [];
+    const nextSort: (SortItem & { field: MultiField })[] = [];
     if (pendingHydration.orderBy) {
       for (const [fieldName, dir] of Object.entries(pendingHydration.orderBy)) {
         const field = findField(fieldName);
         if (!field) continue;
-        nextSort.push({ field, dir: dir === "desc" ? "desc" : "asc" });
+        nextSort.push({ field: tag(field), dir: dir === "desc" ? "desc" : "asc" });
       }
     }
 
@@ -318,30 +332,53 @@ export default function DatasetPage() {
 
   const hasSelection = groupByFields.length > 0 || aggFields.length > 0;
 
+  // Sources whose fields are currently selectable/filterable — the active
+  // one plus any pinned alongside it.
+  const includedSources = useMemo(
+    () => (activeSource ?? []).filter((s) => s.name === activeSchema?.name || pinnedSourceNames.has(s.name)),
+    [activeSource, activeSchema, pinnedSourceNames],
+  );
+  const otherIncludedSources = useMemo(
+    () => includedSources.filter((s) => s.name !== activeSchema?.name),
+    [includedSources, activeSchema],
+  );
+
+  // Filter fields merged across every included source. With just one
+  // source (the common case) field ids stay bare, exactly as before —
+  // preserving already-saved filters. Once a second source is pinned,
+  // ids are qualified ("source::field") so same-named fields from
+  // different sources stay distinct, and the label shows the source too.
+  const filterableFields = useMemo(() => {
+    if (includedSources.length <= 1) return includedSources.flatMap((s) => s.schema?.fields ?? []);
+    return includedSources.flatMap((s) =>
+      (s.schema?.fields ?? []).map((f) => ({ ...f, name: `${s.name}::${f.name}`, label: `${s.name}.${f.name}` })),
+    );
+  }, [includedSources]);
+
   const generatedQuery = useMemo(() => {
     if (!activeSchema) return null;
 
     try {
-      const builder = new CubeQueryBuilder(activeSchema);
+      const builder = new CubeQueryBuilder(activeSchema, otherIncludedSources);
 
       for (const field of groupByFields) {
-        builder.addGroupBy(field.name, granularityMap[field.name]);
+        builder.addGroupBy(field.name, granularityMap[`${field.sourceName}::${field.name}`], field.sourceName);
       }
       for (const field of aggFields) {
-        builder.addAgg(field);
+        builder.addAgg(field, field.sourceName);
       }
       if (limit > 0) {
         builder.setLimit(limit);
       }
 
-      const activeGroupNames = groupByFields.map((f) => f.name);
+      const activeGroupKeys = groupByFields.map((f) => `${f.sourceName}::${f.name}`);
       for (const sortItem of sortMap) {
-        if (!activeGroupNames.includes(sortItem.field.name)) continue;
-        builder.addSort(sortItem.field, sortItem.dir === "asc" ? "asc" : "desc");
+        if (!activeGroupKeys.includes(`${sortItem.field.sourceName}::${sortItem.field.name}`)) continue;
+        builder.addSort(sortItem.field, sortItem.dir === "asc" ? "asc" : "desc", sortItem.field.sourceName);
       }
 
       if (filterQuery && filterQuery.rules && filterQuery.rules.length > 0) {
-        const { where, having } = partitionFilterQuery(filterQuery, activeSchema.schema?.fields ?? []);
+        const { where, having } = partitionFilterQuery(filterQuery, filterableFields);
         if (where) builder.addFilter(where);
         if (having) builder.addHaving(having);
       }
@@ -351,7 +388,7 @@ export default function DatasetPage() {
       console.error("Failed building Cube query:", e);
       return null;
     }
-  }, [groupByFields, aggFields, limit, sortMap, filterQuery, granularityMap, activeSchema]);
+  }, [groupByFields, aggFields, limit, sortMap, filterQuery, granularityMap, activeSchema, otherIncludedSources, filterableFields]);
 
   // Pipes the built query straight into the editable/persisted state, unless
   // a saved-query hydration is still in flight (that owns `query` until done).
@@ -362,51 +399,63 @@ export default function DatasetPage() {
   }, [generatedQuery]);
 
   // ── Toggle field ─────────────────────────────────────────────────────────
-  function toggleField(field: FieldInfo) {
+  function toggleField(field: FieldInfo, sourceName: string) {
     const kind = field.kind.toLowerCase();
+    const tagged: MultiField = { ...field, sourceName };
     if (kind === "measure") {
-      setAggFields((prev) => prev.some((f) => f.name === field.name) ? prev.filter((f) => f.name !== field.name) : [...prev, field]);
+      setAggFields((prev) => prev.some((f) => sameField(f, field.name, sourceName)) ? prev.filter((f) => !sameField(f, field.name, sourceName)) : [...prev, tagged]);
     } else {
       setGroupByFields((prev) => {
-        const next = prev.some((f) => f.name === field.name) ? prev.filter((f) => f.name !== field.name) : [...prev, field];
+        const wasSelected = prev.some((f) => sameField(f, field.name, sourceName));
+        const next = wasSelected ? prev.filter((f) => !sameField(f, field.name, sourceName)) : [...prev, tagged];
         // clear granularity if deselected
-        if (prev.some((f) => f.name === field.name)) setGranularityMap((g) => { const c = { ...g }; delete c[field.name]; return c; });
+        if (wasSelected) setGranularityMap((g) => { const c = { ...g }; delete c[`${sourceName}::${field.name}`]; return c; });
         return next;
       });
     }
     // clear sort if deselected
     setSortMap((prev) => {
-      const isSelected = kind === "measure" ? aggFields.some((f) => f.name === field.name) : groupByFields.some((f) => f.name === field.name);
-      if (isSelected) { return prev.filter((s) => s.field.name !== field.name); }
+      const isSelected = kind === "measure" ? aggFields.some((f) => sameField(f, field.name, sourceName)) : groupByFields.some((f) => sameField(f, field.name, sourceName));
+      if (isSelected) { return prev.filter((s) => !sameField(s.field, field.name, sourceName)); }
       return prev;
     });
   }
 
   // ── Toggle sort ───────────────────────────────────────────────────────────
-  function cycleSort(e: React.MouseEvent<HTMLDivElement>, field: FieldInfo) {
+  function cycleSort(e: React.MouseEvent<HTMLDivElement>, field: FieldInfo, sourceName: string) {
     e.preventDefault();
     e.stopPropagation();
 
+    const tagged: MultiField = { ...field, sourceName };
     setSortMap((prev) => {
       const current = Array.isArray(prev) ? prev : [];
-      const existing = current.find((s) => s.field.name === field.name);
+      const existing = current.find((s) => sameField(s.field, field.name, sourceName));
 
       if (!existing) {
-        return [...current, { field, dir: "asc" }];
+        return [...current, { field: tagged, dir: "asc" }];
       }
       if (existing.dir === "asc") {
         return current.map((s) =>
-          s.field.name === field.name ? { ...s, dir: "desc" as const } : s
+          sameField(s.field, field.name, sourceName) ? { ...s, dir: "desc" as const } : s
         );
       }
-      return current.filter((s) => s.field.name !== field.name);
+      return current.filter((s) => !sameField(s.field, field.name, sourceName));
     });
   }
 
   // ── Set granularity ───────────────────────────────────────────────────────
-  function setGranularity(e: React.MouseEvent, fieldName: string, gran: Granularity) {
+  function setGranularity(e: React.MouseEvent, sourceName: string, fieldName: string, gran: Granularity) {
     e.stopPropagation();
-    setGranularityMap((prev) => ({ ...prev, [fieldName]: gran }));
+    setGranularityMap((prev) => ({ ...prev, [`${sourceName}::${fieldName}`]: gran }));
+  }
+
+  // ── Toggle a source's inclusion alongside the active one ────────────────
+  function togglePinnedSource(sourceName: string) {
+    setPinnedSourceNames((prev) => {
+      const next = new Set(prev);
+      next.has(sourceName) ? next.delete(sourceName) : next.add(sourceName);
+      return next;
+    });
   }
 
   // ── Save ─────────────────────────────────────────────────────────────────
@@ -414,9 +463,9 @@ export default function DatasetPage() {
     const name = datasetName?.trim();
     if (!name || !selectedDefinitionId || !activeSchema || !query) return null;
 
-    const groupBy = buildGroupByFields(groupByFields, granularityMap);
+    const groupBy = buildGroupByFields(groupByFields, (f) => granularityMap[`${(f as MultiField).sourceName}::${f.name}`]);
     const orderBy = buildOrderByFields(sortMap);
-    const { where, having } = partitionFilterQuery(filterQuery, activeSchema.schema?.fields ?? []);
+    const { where, having } = partitionFilterQuery(filterQuery, filterableFields);
     const filters = where ? wrapFilters(where) : undefined;
     const havings = having ? wrapFilters(having) : undefined;
 
@@ -576,7 +625,7 @@ export default function DatasetPage() {
         <CToggleButtons buttons={[
           {label: "Table", value: "table", icon: FaTable},
           {label: "JSON", value: "json", icon: FaCode},
-          {label: "Cube Query", value: "cube", icon: FaDatabase , disabled: query === null},
+          {label: "Cube", value: "cube", icon: FaDatabase , disabled: query === null},
           {label: "SQL", value: "sql", icon: FaTerminal , disabled: query === null},
         ]} selected={resultView} onChange={(value) => setResultView(value as ResultView)} />
 
@@ -647,29 +696,49 @@ export default function DatasetPage() {
 
             {activeSource?.map((schema: SourceInfo) => {
               const srcActive = activeSchema?.name === schema.name;
+              const pinned = pinnedSourceNames.has(schema.name);
+              const included = srcActive || pinned;
+              const granPrefix = `${schema.name}::`;
+              const scopedGranularityMap = Object.fromEntries(
+                Object.entries(granularityMap)
+                  .filter(([k]) => k.startsWith(granPrefix))
+                  .map(([k, v]) => [k.slice(granPrefix.length), v]),
+              );
               return (
                 <div key={schema.name}>
                   {/* Source row */}
-                  <button type="button" onClick={() => { setActiveSchema(schema); setGroupByFields([]); setAggFields([]); setGranularityMap({}); setSortMap([]); setFilterQuery(EMPTY_FILTER_QUERY); }}
+                  <div
                     className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors"
                     style={srcActive ? { background: "var(--accent-muted)", color: "var(--accent)" } : { color: "var(--text-h)" }}
                   >
-                    <FaLayerGroup size={12} style={{ color: srcActive ? "var(--accent)" : "var(--text)" }} />
-                    <span className="text-xs font-semibold">{schema.name}</span>
-                    <span className="ml-auto text-[10px]" style={{ color: "var(--text)" }}>{schema.schema?.fields.length}</span>
-                  </button>
+                    <button type="button" onClick={() => setActiveSchema(schema)}
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    >
+                      <FaLayerGroup size={12} style={{ color: srcActive ? "var(--accent)" : "var(--text)" }} />
+                      <span className="truncate text-xs font-semibold">{schema.name}</span>
+                      <span className="ml-auto shrink-0 text-[10px]" style={{ color: "var(--text)" }}>{schema.schema?.fields.length}</span>
+                    </button>
+                    {!srcActive && (
+                      <button type="button" onClick={() => togglePinnedSource(schema.name)}
+                        title={pinned ? "Stop including this source" : "Include this source alongside the active one"}
+                        className="shrink-0 rounded-md p-1 transition-colors hover:bg-[var(--border)]"
+                      >
+                        <FaThumbtack size={10} style={{ color: pinned ? "var(--accent)" : "var(--text)" }} />
+                      </button>
+                    )}
+                  </div>
 
                   {/* Field tree */}
-                  {srcActive && (
+                  {included && (
                     <CFieldTree
                       fields={schema.schema.fields}
-                      groupByFields={groupByFields}
-                      aggFields={aggFields}
-                      granularityMap={granularityMap}
-                      sortMap={sortMap}
-                      onToggleField={toggleField}
-                      onSetGranularity={setGranularity}
-                      onCycleSort={cycleSort}
+                      groupByFields={groupByFields.filter((f) => f.sourceName === schema.name)}
+                      aggFields={aggFields.filter((f) => f.sourceName === schema.name)}
+                      granularityMap={scopedGranularityMap}
+                      sortMap={sortMap.filter((s) => s.field.sourceName === schema.name)}
+                      onToggleField={(f) => toggleField(f, schema.name)}
+                      onSetGranularity={(e, name, g) => setGranularity(e, schema.name, name, g)}
+                      onCycleSort={(e, f) => cycleSort(e, f, schema.name)}
                     />
                   )}
                 </div>
@@ -682,7 +751,7 @@ export default function DatasetPage() {
         <main className="flex flex-1 flex-col overflow-hidden">
 
           <CQueryBuilder
-            fields={activeSchema?.schema?.fields}
+            fields={filterableFields}
             query={filterQuery}
             onQueryChange={setFilterQuery}
           />

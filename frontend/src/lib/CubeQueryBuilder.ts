@@ -11,8 +11,6 @@ function isRule(filter: any): filter is RuleType {
   return filter && typeof filter === 'object' && 'field' in filter && 'operator' in filter;
 }
 
-const TIME_GRANULARITIES = ["year", "quarter", "month", "week", "day", "hour", "minute", "second"];
-
 /**
  * Builds a Cube `/cubejs-api/v1/load` query object — replaces
  * MalloyASTQueryBuilder's Malloy query-text generation. Every field is
@@ -23,31 +21,39 @@ const TIME_GRANULARITIES = ["year", "quarter", "month", "week", "day", "hour", "
  */
 export class CubeQueryBuilder {
   private activeSchema: SourceInfo;
-  private groupByFields: string[] = [];
-  private aggFields: FieldInfo[] = [];
+  // Each entry carries its own source name, so a query can pull group-by
+  // fields and measures from multiple joined cubes at once, not just the
+  // one this builder was constructed with (used as the default/fallback
+  // source, and for filter field lookups).
+  private groupByFields: { name: string; granularity?: string; sourceName: string }[] = [];
+  private aggFields: { field: FieldInfo; sourceName: string }[] = [];
   private limit: number = 1000;
-  private sortMap: SortItem[] = [];
+  private sortMap: (SortItem & { sourceName: string })[] = [];
   private filters: RuleGroupType | null = null;
   private havings: RuleGroupType | null = null;
+  // Every source a filter rule might reference — the constructor's schema
+  // plus any extra sources pinned alongside it, keyed by cube name.
+  private sourcesByName: Map<string, SourceInfo>;
 
-  constructor(activeSchema: SourceInfo) {
+  constructor(activeSchema: SourceInfo, extraSources: SourceInfo[] = []) {
     this.activeSchema = activeSchema;
+    this.sourcesByName = new Map([activeSchema, ...extraSources].map((s) => [s.name, s]));
   }
 
-  private qualify(fieldName: string): string {
-    return `${this.activeSchema.name}.${fieldName}`;
+  private qualify(fieldName: string, sourceName?: string): string {
+    return `${sourceName ?? this.activeSchema.name}.${fieldName}`;
   }
 
   public addHaving(having: RuleGroupType) {
     this.havings = having;
   }
 
-  public addGroupBy(fieldName: string, granularity?: string) {
-    this.groupByFields.push(granularity ? `${fieldName}.${granularity}` : fieldName);
+  public addGroupBy(fieldName: string, granularity?: string, sourceName?: string) {
+    this.groupByFields.push({ name: fieldName, granularity, sourceName: sourceName ?? this.activeSchema.name });
   }
 
-  public addAgg(field: FieldInfo) {
-    this.aggFields.push(field);
+  public addAgg(field: FieldInfo, sourceName?: string) {
+    this.aggFields.push({ field, sourceName: sourceName ?? this.activeSchema.name });
   }
 
   /**
@@ -65,8 +71,8 @@ export class CubeQueryBuilder {
     this.limit = limit;
   }
 
-  public addSort(field: FieldInfo, dir: SortDir) {
-    this.sortMap.push({ field, dir });
+  public addSort(field: FieldInfo, dir: SortDir, sourceName?: string) {
+    this.sortMap.push({ field, dir, sourceName: sourceName ?? this.activeSchema.name });
   }
 
   public addFilter(filters: RuleGroupType) {
@@ -79,28 +85,27 @@ export class CubeQueryBuilder {
     const dimensions: string[] = [];
     const timeDimensions: { dimension: string; granularity: string }[] = [];
     for (const entry of this.groupByFields) {
-      const dot = entry.lastIndexOf(".");
-      if (dot !== -1 && TIME_GRANULARITIES.includes(entry.slice(dot + 1))) {
-        timeDimensions.push({ dimension: this.qualify(entry.slice(0, dot)), granularity: entry.slice(dot + 1) });
+      if (entry.granularity) {
+        timeDimensions.push({ dimension: this.qualify(entry.name, entry.sourceName), granularity: entry.granularity });
       } else {
-        dimensions.push(this.qualify(entry));
+        dimensions.push(this.qualify(entry.name, entry.sourceName));
       }
     }
     if (dimensions.length) query.dimensions = dimensions;
     if (timeDimensions.length) query.timeDimensions = timeDimensions;
 
     if (this.aggFields.length) {
-      query.measures = this.aggFields.map((f) => this.qualify(f.name));
+      query.measures = this.aggFields.map(({ field, sourceName }) => this.qualify(field.name, sourceName));
     }
 
     if (this.limit > 0) query.limit = this.limit;
 
     if (this.sortMap.length) {
-      const activeGroupNames = this.groupByFields.map((f) => f.split(".")[0]);
+      const activeGroupKeys = this.groupByFields.map((f) => `${f.sourceName}::${f.name}`);
       const order: Record<string, "asc" | "desc"> = {};
       for (const sortItem of this.sortMap) {
-        if (!activeGroupNames.includes(sortItem.field.name)) continue; // same "only sort selected fields" guard as before
-        order[this.qualify(sortItem.field.name)] = sortItem.dir;
+        if (!activeGroupKeys.includes(`${sortItem.sourceName}::${sortItem.field.name}`)) continue; // same "only sort selected fields" guard as before
+        order[this.qualify(sortItem.field.name, sortItem.sourceName)] = sortItem.dir;
       }
       if (Object.keys(order).length) query.order = order;
     }
@@ -141,10 +146,25 @@ export class CubeQueryBuilder {
     return group.combinator.toLowerCase() === "or" ? { or: expressions } : { and: expressions };
   }
 
+  /** A filter's `field` is either a bare name (assumed to live on the
+   * constructor's schema — the single-source case FilterEditDialog still
+   * uses) or a `sourceName::fieldName` key (the multi-source case, once a
+   * field from a pinned source is merged into the filter's field list). */
+  private resolveFilterField(fieldKey: string): { fieldName: string; field: FieldInfo | undefined; sourceName: string } {
+    const sep = fieldKey.indexOf("::");
+    if (sep === -1) {
+      return { fieldName: fieldKey, sourceName: this.activeSchema.name, field: this.activeSchema.schema?.fields?.find((f) => f.name === fieldKey) };
+    }
+    const sourceName = fieldKey.slice(0, sep);
+    const fieldName = fieldKey.slice(sep + 2);
+    const source = this.sourcesByName.get(sourceName) ?? this.activeSchema;
+    return { fieldName, sourceName: source.name, field: source.schema?.fields?.find((f) => f.name === fieldName) };
+  }
+
   private compileRule(filter: RuleType): CubeFilterExpr | null {
-    const targetField = this.activeSchema?.schema?.fields?.find((f) => f.name === filter.field);
+    const { fieldName, field: targetField, sourceName } = this.resolveFilterField(filter.field);
     const dataType = this.getFieldDataType(targetField);
-    const member = this.qualify(filter.field);
+    const member = this.qualify(fieldName, sourceName);
 
     if (filter.operator === "is null") return { member, operator: "notSet" };
     if (filter.operator === "is not null") return { member, operator: "set" };

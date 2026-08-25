@@ -80,10 +80,10 @@ export function unwrapFilters(stored: unknown): RuleGroupType | null {
 /** Serialize group-by fields; granularity stored as `field_name.gran`. */
 export function buildGroupByFields(
   fields: FieldInfo[],
-  granularityMap: Record<string, Granularity>,
+  granularityFor: (field: FieldInfo) => Granularity | undefined,
 ): string[] {
   return fields.map((field) => {
-    const gran = granularityMap[field.name];
+    const gran = granularityFor(field);
     return gran ? `${field.name}.${gran}` : field.name;
   });
 }

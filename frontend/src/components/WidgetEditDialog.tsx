@@ -31,7 +31,7 @@ import TreemapChart from "./charts/TreemapChart";
 import ScatterChart from "./charts/ScatterChart";
 import { CardSchema, LineChartSchema, BarChartSchema, PieChartSchema, TableChartSchema, WaterFallChartSchema, TreemapChartSchema, ScatterChartSchema } from "./charts/ChartsSchemas";
 import { getDatasets, getDataset, runQuery, getCompiledDefinition, type DatasetPublicResponse, type DatasetDetailedResponse, type DefinitionSchema } from "../lib/Api";
-import { normalizeQueryRows } from "../lib/queryResult";
+import { normalizeQueryRows, getRowFieldValue } from "../lib/queryResult";
 import { isDateTimeTypeKind, resolveXAxisFieldType } from "../lib/fieldTypes";
 import { VscDebugRerun } from "react-icons/vsc";
 
@@ -101,7 +101,7 @@ function extractRows(result: unknown): Record<string, unknown>[] {
 
 function readNumericCell(rows: Record<string, unknown>[], fieldName: string): number | null {
   if (!fieldName || rows.length === 0) return null;
-  const raw = rows[0][fieldName];
+  const raw = getRowFieldValue(rows[0], fieldName);
   if (raw == null) return null;
   const num = typeof raw === "number" ? raw : parseFloat(String(raw));
   return Number.isFinite(num) ? num : null;

@@ -268,11 +268,13 @@ export default function DatasetsPage() {
         <div>
             <table className="w-full border-collapse text-xs">
                 <thead>
+                    <tr>
                     {columns.map((column) => (
                         <th key={column} className="px-3 py-2 text-left font-semibold whitespace-nowrap" style={{ color: "var(--text-h)", borderBottom: "2px solid var(--border)", borderRight: "1px solid var(--border)" }}>
                             {column}
                         </th>
                     ))}
+                    </tr>
                 </thead>
                 <tbody>
                     {filtered.map((d, index) => (

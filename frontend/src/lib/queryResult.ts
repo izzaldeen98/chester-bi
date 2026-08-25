@@ -38,20 +38,20 @@ function stripFieldName(name: string): string {
 
 function buildFieldCandidates(fieldName: string): string[] {
   const stripped = stripFieldName(fieldName);
-  const candidates = [fieldName, stripped];
-
-  if (stripped.includes(".")) {
-    candidates.push(stripped.split(".")[0]);
-  }
-
-  return [...new Set(candidates.filter(Boolean))];
+  return [...new Set([fieldName, stripped].filter(Boolean))];
 }
 
 function findRowKey(row: Record<string, unknown>, candidate: string): string | undefined {
   if (candidate in row) return candidate;
 
   const normalized = stripFieldName(candidate).toLowerCase();
-  return Object.keys(row).find((key) => stripFieldName(key).toLowerCase() === normalized);
+  const exact = Object.keys(row).find((key) => stripFieldName(key).toLowerCase() === normalized);
+  if (exact) return exact;
+
+  // Cube's result rows are keyed "Cube.field" (or "Cube.field.granularity"
+  // for time dimensions), while saved chart/dataset config stores the bare
+  // field name — match a row key whose tail after its cube prefix equals it.
+  return Object.keys(row).find((key) => stripFieldName(key).toLowerCase().endsWith(`.${normalized}`));
 }
 
 export function getRowFieldValue(row: Record<string, unknown>, fieldName: string): unknown {

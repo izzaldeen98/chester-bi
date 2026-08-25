@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { FaPlus, FaTrash, FaChevronDown, FaChevronRight } from "react-icons/fa";
+import { FaPlus, FaTrash, FaChevronDown, FaChevronRight, FaLock } from "react-icons/fa";
 import CButton from "./CButton";
 import CTextInput from "./CTextInput";
 import CAlert from "./CAlert";
@@ -26,13 +26,11 @@ export type DimensionType = "string" | "number" | "boolean" | "time";
 export type DimensionFormat = "" | "id" | "imageUrl" | "link" | "currency" | "percent";
 export type MeasureFormat = "" | "currency" | "percent";
 
-/** A plain rename of a raw column into a queryable dimension — Cube has no
- * bare "expose this column" default, every field needs an explicit
- * dimension, so a rename is just a dimension whose sql is the raw column. */
-export interface WizardAlias { id: string; name: string; field: string; type: DimensionType; format: DimensionFormat }
-/** A computed dimension — `sql` is a real SQL expression now (Cube's `sql:`
- * is raw SQL), not a Malloy expression. */
-export interface WizardDimension { id: string; name: string; expression: string; type: DimensionType; format: DimensionFormat }
+export type DimensionMode = "column" | "expression";
+/** A dimension is either a raw column exposed as-is (`mode: "column"`, name
+ * optional — defaults to the column name) or a computed SQL expression
+ * (Cube's `sql:` is raw SQL, not a Malloy expression). */
+export interface WizardDimension { id: string; name: string; mode: DimensionMode; field: string; expression: string; type: DimensionType; format: DimensionFormat }
 export type MeasureKind = "function" | "expression";
 export interface WizardMeasure { id: string; name: string; kind: MeasureKind; fn: AggFn; field: string; expression: string; format: MeasureFormat }
 export interface WizardJoin { id: string; relationship: JoinRelationship; targetSource: string; on: string }
@@ -52,19 +50,24 @@ export interface WizardSource {
   tableRef: string;
   /** Optional — mainly matters for join correctness */
   primaryKey: string;
-  aliases: WizardAlias[];
+  /** True for a source loaded from an already-saved definition file — its
+   * primary key is locked once saved (see SourceCard); remove and re-add
+   * the source to pick a different one. False for one freshly added in the
+   * wizard this session, whose primary key is still free to set. */
+  existing: boolean;
   dimensions: WizardDimension[];
   measures: WizardMeasure[];
   joins: WizardJoin[];
 }
 
 /** Raw table columns with any renamed ones swapped for their new name — once a
- * column is renamed, only the new name is a valid field reference downstream
- * (measures, primary key, further expressions), the old one no longer exists. */
-function effectiveColumns(columns: string[], aliases: WizardAlias[]): string[] {
+ * column-mode dimension renames a column, only the new name is a valid field
+ * reference downstream (measures, primary key, further expressions), the old
+ * one no longer exists. */
+function effectiveColumns(columns: string[], dimensions: WizardDimension[]): string[] {
   return columns.map((c) => {
-    const alias = aliases.find((a) => a.name.trim() && a.field.trim() === c);
-    return alias ? alias.name.trim() : c;
+    const renamed = dimensions.find((d) => d.mode === "column" && d.name.trim() && d.field.trim() === c);
+    return renamed ? renamed.name.trim() : c;
   });
 }
 
@@ -155,7 +158,7 @@ export function newWizardSource(): WizardSource {
     fileId: "",
     tableRef: "",
     primaryKey: "",
-    aliases: [],
+    existing: false,
     dimensions: [],
     measures: [],
     joins: [],
@@ -191,22 +194,23 @@ export function generateCubeYaml(sources: WizardSource[]): string {
       lines.push(`    data_source: ${yamlStr(s.connectionName.trim())}`);
     }
 
-    // If the primary-key column got renamed via an alias, point at the new
-    // name — the old column name won't exist as a dimension.
+    // If the primary-key column got renamed by a column-mode dimension, point
+    // at the new name — the old column name won't exist as a dimension.
     let primaryKey = s.primaryKey.trim();
     if (primaryKey) {
-      const renamedTo = s.aliases.find((a) => a.name.trim() && a.field.trim() === primaryKey);
+      const renamedTo = s.dimensions.find((d) => d.mode === "column" && d.name.trim() && d.field.trim() === primaryKey);
       if (renamedTo) primaryKey = renamedTo.name.trim();
     }
 
     const dimensionEntries: { name: string; sql: string; type: DimensionType; format: DimensionFormat; isPrimaryKey: boolean }[] = [];
-    for (const a of s.aliases) {
-      if (!a.name.trim() || !a.field.trim()) continue;
-      dimensionEntries.push({ name: a.name.trim(), sql: a.field.trim(), type: a.type, format: a.format, isPrimaryKey: a.name.trim() === primaryKey });
-    }
     for (const d of s.dimensions) {
-      if (!d.name.trim() || !d.expression.trim()) continue;
-      dimensionEntries.push({ name: d.name.trim(), sql: d.expression.trim(), type: d.type, format: d.format, isPrimaryKey: d.name.trim() === primaryKey });
+      const sql = d.mode === "column" ? d.field.trim() : d.expression.trim();
+      if (!sql) continue;
+      // Title is optional for a plain column dimension — default to the
+      // column name itself; an expression has no natural default so it needs one.
+      const name = d.name.trim() || (d.mode === "column" ? sql : "");
+      if (!name) continue;
+      dimensionEntries.push({ name, sql, type: d.type, format: d.format, isPrimaryKey: name === primaryKey });
     }
     if (dimensionEntries.length) {
       lines.push("    dimensions:");
@@ -294,8 +298,11 @@ export function parseCubeYamlToSources(text: string): WizardSource[] {
 
     const cubeStart = rawLine.match(/^\s{2}-\s*name:\s*(.+)$/);
     if (cubeStart) {
-      if (current) sources.push(current);
-      current = { ...newWizardSource(), name: unquote(cubeStart[1].trim()) };
+      if (current) {
+        if (pendingPrimaryKeyName) current.primaryKey = pendingPrimaryKeyName;
+        sources.push(current);
+      }
+      current = { ...newWizardSource(), name: unquote(cubeStart[1].trim()), existing: true };
       section = "";
       pendingPrimaryKeyName = null;
       continue;
@@ -331,7 +338,7 @@ export function parseCubeYamlToSources(text: string): WizardSource[] {
     if (itemStart && section) {
       const name = unquote(itemStart[1].trim());
       if (section === "dimensions") {
-        current.dimensions.push({ id: uid(), name, expression: "", type: "string", format: "" });
+        current.dimensions.push({ id: uid(), name, mode: "expression", field: "", expression: "", type: "string", format: "" });
       } else if (section === "measures") {
         current.measures.push({ id: uid(), name, kind: "function", fn: "count", field: "", expression: "", format: "" });
       } else if (section === "joins") {
@@ -349,7 +356,12 @@ export function parseCubeYamlToSources(text: string): WizardSource[] {
       if (section === "dimensions") {
         const dim = current.dimensions[current.dimensions.length - 1];
         if (!dim) continue;
-        if (pair.key === "sql") dim.expression = value;
+        if (pair.key === "sql") {
+          // A bare identifier is a plain column reference — anything else
+          // (function calls, operators, literals) is a computed expression.
+          if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) { dim.mode = "column"; dim.field = value; }
+          else { dim.mode = "expression"; dim.expression = value; }
+        }
         else if (pair.key === "type" && DIMENSION_TYPE_VALUES.has(value as DimensionType)) dim.type = value as DimensionType;
         else if (pair.key === "format" && DIMENSION_FORMAT_VALUES.has(value as DimensionFormat)) dim.format = value as DimensionFormat;
         else if (pair.key === "primary_key" && value === "true") pendingPrimaryKeyName = dim.name;
@@ -399,21 +411,23 @@ const selectCls =
  * source's columns are known (from table/file introspection), else a plain
  * text fallback so the row stays usable even when introspection failed. */
 function FieldPicker({
-  value, onChange, columns, style,
+  value, onChange, columns, style, disabled, title,
 }: {
   value: string;
   onChange: (v: string) => void;
   columns: string[];
   style?: CSSProperties;
+  disabled?: boolean;
+  title?: string;
 }) {
   if (columns.length === 0) {
     return (
-      <input value={value} onChange={(e) => onChange(e.target.value)}
+      <input value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} title={title}
         placeholder="field" className={rowInputCls} style={{ ...rowInputSty, ...style }} />
     );
   }
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)}
+    <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} title={title}
       className={`${rowInputCls} cursor-pointer`} style={{ ...rowInputSty, ...style }}>
       <option value="">Select a field…</option>
       {columns.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -510,9 +524,6 @@ interface SourceCardProps {
   onTableChange: (table: string) => void;
   onFileChange: (fileId: string) => void;
   onRemove: () => void;
-  onAddAlias: () => void;
-  onUpdateAlias: (id: string, patch: Partial<WizardAlias>) => void;
-  onRemoveAlias: (id: string) => void;
   onAddDimension: () => void;
   onUpdateDimension: (id: string, patch: Partial<WizardDimension>) => void;
   onRemoveDimension: (id: string) => void;
@@ -528,18 +539,17 @@ function SourceCard({
   index, source, connections, connLoading, files, filesLoading,
   schemaOptions, tableOptions, columnOptions, schemaLoading, tableLoading, canRemove,
   onUpdate, onSourceTypeChange, onConnectionChange, onSchemaChange, onTableChange, onFileChange, onRemove,
-  onAddAlias, onUpdateAlias, onRemoveAlias,
   onAddDimension, onUpdateDimension, onRemoveDimension,
   onAddMeasure, onUpdateMeasure, onRemoveMeasure,
   onAddJoin, onUpdateJoin, onRemoveJoin,
 }: SourceCardProps) {
   const usingManualTable = source.sourceType === "connection" && schemaOptions.length === 0 && !source.schema;
   // Measures/primary key reference fields as they exist AFTER renames — the
-  // original column name stops being a valid reference once aliased.
-  const postAliasColumns = effectiveColumns(columnOptions, source.aliases);
+  // original column name stops being a valid reference once renamed by a
+  // column-mode dimension.
+  const postRenameColumns = effectiveColumns(columnOptions, source.dimensions);
 
   const [collapsed, setCollapsed] = useState(false);
-  const [aliasesOpen, setAliasesOpen] = useState(true);
   const [dimensionsOpen, setDimensionsOpen] = useState(true);
   const [measuresOpen, setMeasuresOpen] = useState(true);
   const [joinsOpen, setJoinsOpen] = useState(true);
@@ -681,71 +691,82 @@ function SourceCard({
         </p>
       )}
 
-      {/* Primary key (optional) — references fields as they exist after renames */}
+      {/* Primary key (optional) — references fields as they exist after renames.
+          Locked once the source is saved: changing it later would silently
+          re-point joins/measures built against the old key, so a source
+          that already has one must be removed and re-added instead. */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium" style={{ color: "var(--text-h)" }}>
+        <label className="flex items-center gap-1.5 text-sm font-medium" style={{ color: "var(--text-h)" }}>
           Primary Key <span className="text-xs font-normal opacity-60">(optional)</span>
+          {source.existing && <FaLock size={10} title="Locked once saved — remove and re-add this source to change it." style={{ color: "var(--text)" }} />}
         </label>
         <select
           value={source.primaryKey}
-          onChange={(e) => onUpdate({ primaryKey: e.target.value })}
-          disabled={postAliasColumns.length === 0}
+          onChange={(e) => {
+            const primaryKey = e.target.value;
+            // A primary key with no backing dimension never gets emitted as
+            // `primary_key: true` in the generated YAML (nothing to attach
+            // it to) — expose the raw column as one automatically.
+            const hasDimension = source.dimensions.some((d) =>
+              (d.mode === "column" ? d.name.trim() || d.field.trim() : d.name.trim()) === primaryKey,
+            );
+            const dimensions = !primaryKey || hasDimension
+              ? source.dimensions
+              : [...source.dimensions, { id: uid(), name: "", mode: "column" as DimensionMode, field: primaryKey, expression: "", type: "string" as DimensionType, format: "" as DimensionFormat }];
+            onUpdate({ primaryKey, dimensions });
+          }}
+          disabled={source.existing || postRenameColumns.length === 0}
+          title={source.existing ? "Primary key is locked once saved — remove and re-add this source to change it." : undefined}
           className={selectCls}
           style={{ borderColor: "var(--border)", color: "var(--text-h)" }}
         >
-          <option value="">{postAliasColumns.length === 0 ? "Pick a table first" : "None"}</option>
-          {postAliasColumns.map((c) => <option key={c} value={c}>{c}</option>)}
+          <option value="">{postRenameColumns.length === 0 ? "Pick a table first" : "None"}</option>
+          {postRenameColumns.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 
-      {/* Aliases — rename a raw column into a queryable dimension */}
+      {/* Dimensions — a raw column, or a computed SQL expression (Cube's `sql:` is raw SQL) */}
       <div>
-        <SectionHeader label="Aliases" count={source.aliases.length} collapsed={!aliasesOpen} onToggleCollapse={() => setAliasesOpen((v) => !v)} />
-        {aliasesOpen && (
-          <>
-            <div className="flex flex-col gap-1.5">
-              {source.aliases.map((a) => (
-                <div key={a.id} className="flex items-center gap-1.5">
-                  <input value={a.name} onChange={(e) => onUpdateAlias(a.id, { name: e.target.value })}
-                    placeholder="new name" className={rowInputCls} style={{ ...rowInputSty, flex: "0 0 25%" }} />
-                  <span className="shrink-0 text-[10px] opacity-60" style={{ color: "var(--text)" }}>is</span>
-                  <FieldPicker value={a.field} onChange={(v) => onUpdateAlias(a.id, { field: v })} columns={columnOptions} />
-                  <DimensionTypePicker value={a.type} onChange={(v) => onUpdateAlias(a.id, { type: v })} />
-                  <FormatPicker value={a.format} onChange={(v) => onUpdateAlias(a.id, { format: v })} options={DIMENSION_FORMATS} title="Display format" />
-                  <RemoveRowButton onClick={() => onRemoveAlias(a.id)} title="Remove alias" />
-                </div>
-              ))}
-              {source.aliases.length === 0 && (
-                <p className="text-[11px] italic opacity-60" style={{ color: "var(--text)" }}>No aliases yet.</p>
-              )}
-            </div>
-            <AddRowButton onClick={onAddAlias} label="Add alias" />
-          </>
-        )}
-      </div>
-
-      {/* Dimensions — a real SQL expression (Cube's `sql:` is raw SQL) */}
-      <div>
-        <datalist id={`dim-columns-${source.id}`}>
-          {postAliasColumns.map((c) => <option key={c} value={c} />)}
-        </datalist>
         <SectionHeader label="Dimensions" count={source.dimensions.length} collapsed={!dimensionsOpen} onToggleCollapse={() => setDimensionsOpen((v) => !v)} />
         {dimensionsOpen && (
           <>
             <div className="flex flex-col gap-1.5">
-              {source.dimensions.map((d) => (
+              {source.dimensions.map((d) => {
+                const effectiveName = d.mode === "column" ? d.name.trim() || d.field.trim() : d.name.trim();
+                const pkLocked = source.existing && !!source.primaryKey && effectiveName === source.primaryKey;
+                const pkLockTitle = "This dimension backs the primary key and is locked once saved — remove and re-add the source to change it.";
+                return (
                 <div key={d.id} className="flex items-center gap-1.5">
+                  <div className="flex shrink-0 items-center gap-0.5 rounded-md border p-0.5" style={{ borderColor: "var(--border)" }}>
+                    {(["column", "expression"] as DimensionMode[]).map((m) => (
+                      <button key={m} type="button" onClick={() => onUpdateDimension(d.id, { mode: m })}
+                        disabled={pkLocked} title={pkLocked ? pkLockTitle : undefined}
+                        className="rounded px-1.5 py-0.5 text-[10px] font-medium capitalize transition-all"
+                        style={d.mode === m ? { background: "var(--accent-muted)", color: "var(--accent)" } : { color: "var(--text)" }}
+                      >{m}</button>
+                    ))}
+                  </div>
+                  {d.mode === "column" ? (
+                    <FieldPicker value={d.field} onChange={(v) => onUpdateDimension(d.id, { field: v })} columns={columnOptions} disabled={pkLocked} title={pkLocked ? pkLockTitle : undefined} />
+                  ) : (
+                    <input value={d.expression} onChange={(e) => onUpdateDimension(d.id, { expression: e.target.value })}
+                      placeholder="SQL expression, e.g. UPPER(status)" disabled={pkLocked} title={pkLocked ? pkLockTitle : undefined} className={rowInputCls} style={rowInputSty} />
+                  )}
+                  <span className="shrink-0 text-[10px] opacity-60" style={{ color: "var(--text)" }}>as</span>
                   <input value={d.name} onChange={(e) => onUpdateDimension(d.id, { name: e.target.value })}
-                    placeholder="name" className={rowInputCls} style={{ ...rowInputSty, flex: "0 0 25%" }} />
-                  <span className="shrink-0 text-[10px] opacity-60" style={{ color: "var(--text)" }}>is</span>
-                  <input value={d.expression} onChange={(e) => onUpdateDimension(d.id, { expression: e.target.value })}
-                    placeholder="Pick a column or type a SQL expression, e.g. UPPER(status)"
-                    list={`dim-columns-${source.id}`} className={rowInputCls} style={rowInputSty} />
+                    placeholder={d.mode === "column" ? "title (optional)" : "title"} disabled={pkLocked} title={pkLocked ? pkLockTitle : undefined} className={rowInputCls} style={{ ...rowInputSty, flex: "0 0 25%" }} />
                   <DimensionTypePicker value={d.type} onChange={(v) => onUpdateDimension(d.id, { type: v })} />
                   <FormatPicker value={d.format} onChange={(v) => onUpdateDimension(d.id, { format: v })} options={DIMENSION_FORMATS} title="Display format" />
-                  <RemoveRowButton onClick={() => onRemoveDimension(d.id)} title="Remove dimension" />
+                  {pkLocked ? (
+                    <span className="shrink-0 rounded-md p-1.5" title={pkLockTitle}>
+                      <FaLock size={10} style={{ color: "var(--text)" }} />
+                    </span>
+                  ) : (
+                    <RemoveRowButton onClick={() => onRemoveDimension(d.id)} title="Remove dimension" />
+                  )}
                 </div>
-              ))}
+                );
+              })}
               {source.dimensions.length === 0 && (
                 <p className="text-[11px] italic opacity-60" style={{ color: "var(--text)" }}>No dimensions yet.</p>
               )}
@@ -787,7 +808,7 @@ function SourceCard({
                       className={`${rowInputCls} shrink-0 cursor-pointer`} style={{ ...rowInputSty, flex: "0 0 90px" }}>
                       {AGG_FNS.map((fn) => <option key={fn} value={fn}>{fn}</option>)}
                     </select>
-                    <FieldPicker value={m.field} onChange={(v) => onUpdateMeasure(m.id, { field: v })} columns={postAliasColumns} />
+                    <FieldPicker value={m.field} onChange={(v) => onUpdateMeasure(m.id, { field: v })} columns={postRenameColumns} />
                   </>
                 )}
                 <FormatPicker value={m.format} onChange={(v) => onUpdateMeasure(m.id, { format: v })} options={MEASURE_FORMATS} title="Display format" />
@@ -989,18 +1010,8 @@ export default function CubeDefinitionWizard({ initialCode = "", onChange }: Cub
     }
   }
 
-  function addAlias(source: WizardSource) {
-    updateSource(source.id, { aliases: [...source.aliases, { id: uid(), name: "", field: "", type: "string", format: "" }] });
-  }
-  function updateAlias(source: WizardSource, id: string, patch: Partial<WizardAlias>) {
-    updateSource(source.id, { aliases: source.aliases.map((a) => (a.id === id ? { ...a, ...patch } : a)) });
-  }
-  function removeAlias(source: WizardSource, id: string) {
-    updateSource(source.id, { aliases: source.aliases.filter((a) => a.id !== id) });
-  }
-
   function addDimension(source: WizardSource) {
-    updateSource(source.id, { dimensions: [...source.dimensions, { id: uid(), name: "", expression: "", type: "string", format: "" }] });
+    updateSource(source.id, { dimensions: [...source.dimensions, { id: uid(), name: "", mode: "column", field: "", expression: "", type: "string", format: "" }] });
   }
   function updateDimension(source: WizardSource, id: string, patch: Partial<WizardDimension>) {
     updateSource(source.id, { dimensions: source.dimensions.map((d) => (d.id === id ? { ...d, ...patch } : d)) });
@@ -1074,9 +1085,6 @@ export default function CubeDefinitionWizard({ initialCode = "", onChange }: Cub
           onTableChange={(v) => handleTableChange(source, v)}
           onFileChange={(v) => handleFileChange(source, v)}
           onRemove={() => removeSource(source.id)}
-          onAddAlias={() => addAlias(source)}
-          onUpdateAlias={(id, patch) => updateAlias(source, id, patch)}
-          onRemoveAlias={(id) => removeAlias(source, id)}
           onAddDimension={() => addDimension(source)}
           onUpdateDimension={(id, patch) => updateDimension(source, id, patch)}
           onRemoveDimension={(id) => removeDimension(source, id)}

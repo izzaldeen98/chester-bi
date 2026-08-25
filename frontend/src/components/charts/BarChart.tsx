@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
+import { getRowFieldValue } from "../../lib/queryResult";
 
 interface TitleField {
   value: string;
@@ -142,7 +143,7 @@ export default function BarChart({
       };
     }
 
-    const categories = data.map((row) => readCategoryLabel(row[xAxis]));
+    const categories = data.map((row) => readCategoryLabel(getRowFieldValue(row, xAxis)));
     const hasLegend = legendLabels.length > 1;
     const hasTitle = Boolean(title?.value);
     const titleFontSize = title?.valueFontSize ?? 14;
@@ -266,7 +267,7 @@ export default function BarChart({
             shadowOffsetY: 2,
           },
         },
-        data: data.map((row) => readNumericValue(row[field])),
+        data: data.map((row) => readNumericValue(getRowFieldValue(row, field))),
       })),
     };
   }, [
