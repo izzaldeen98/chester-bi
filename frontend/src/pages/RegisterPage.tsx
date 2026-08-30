@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GiJesterHat } from "react-icons/gi";
 import { IoMdMail } from "react-icons/io";
 import { RiLockPasswordFill } from "react-icons/ri";
 import { FiUser, FiUsers, FiFileText } from "react-icons/fi";
@@ -9,6 +8,7 @@ import { MdBadge } from "react-icons/md";
 import CTextInput from "../components/CTextInput";
 import CButton from "../components/CButton";
 import CAlert from "../components/CAlert";
+import CLogo from "../components/CLogo";
 import { register } from "../lib/Api";
 import { useTheme } from "../lib/theme";
 
@@ -154,7 +154,7 @@ export default function RegisterPage() {
               border: "1px solid var(--accent-ring)",
             }}
           >
-            <GiJesterHat size={30} style={{ color: "var(--accent)" }} />
+            <CLogo size={30} />
           </div>
           <h1
             className="text-2xl font-bold tracking-tight"

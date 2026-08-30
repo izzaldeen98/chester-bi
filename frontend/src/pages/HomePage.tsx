@@ -4,7 +4,7 @@ import { MdDashboard, MdOutlineCloud, MdOpenInNew } from "react-icons/md";
 import { GoPackage } from "react-icons/go";
 import { FaUser } from "react-icons/fa";
 import { FaArrowRight, FaPlus } from "react-icons/fa6";
-import { GiJesterHat } from "react-icons/gi";
+import CLogo from "../components/CLogo";
 import {
   getDashboards,
   getConnections,
@@ -307,7 +307,7 @@ export default function HomePage() {
               className="flex flex-col items-center gap-3 rounded-xl py-12 text-center"
               style={{ border: "1px dashed var(--border)" }}
             >
-              <GiJesterHat size={32} style={{ color: "var(--accent)", opacity: 0.4 }} />
+              <CLogo size={32} style={{ opacity: 0.4 }} />
               <p className="text-sm" style={{ color: "var(--text)" }}>
                 No dashboards yet.{" "}
                 <button

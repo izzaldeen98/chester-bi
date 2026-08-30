@@ -23,6 +23,10 @@ class Dataset(Base):
     calculated_fields = Column(JSON, nullable=True)
     order_by_fields = Column(JSON, nullable=True)
     limit = Column(Integer, nullable=True , default=1000)
+    # Whether `limit` also applies when this dataset is read by a dashboard
+    # widget — off means the editor still previews a limited sample (query
+    # safety), but dashboards fetch the full, unlimited result.
+    limit_enabled = Column(Boolean, nullable=False, default=True)
     description = Column(String, nullable=True)
     cube_query = Column(JSON, nullable=False)
     sql_query = Column(String, nullable=True)

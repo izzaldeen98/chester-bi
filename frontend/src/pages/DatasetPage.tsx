@@ -7,7 +7,6 @@ import { PiFileSqlFill } from "react-icons/pi";
 import { MdRefresh } from "react-icons/md";
 import CFieldTree from "../components/CFieldTree";
 import { TIME_GRANULARITIES, type Granularity, type SortItem } from "../lib/fieldTree";
-import CSelect from "../components/CSelect";
 import CTable from "../components/CTable";
 import CAlert from "../components/CAlert";
 import CSpinner from "../components/CSpinner";
@@ -145,7 +144,10 @@ export default function DatasetPage() {
   // Keyed by "sourceName::fieldName" to avoid collisions between sources.
   const [granularityMap, setGranularityMap] = useState<Record<string, Granularity>>({});
   const [sortMap, setSortMap] = useState<(SortItem & { field: MultiField })[]>([]);
+  // Always applied to the builder's own preview/Run query (query safety) —
+  // dashboards separately decide whether to inherit it via limitOnDashboard.
   const [limit, setLimit] = useState(1000);
+  const [limitOnDashboard, setLimitOnDashboard] = useState(true);
 
   const [query, setQuery] = useState<CubeQuery | null>(null);
   const [datasetName, setDatasetName] = useState<string | null>(null);
@@ -189,6 +191,7 @@ export default function DatasetPage() {
       .then((saved: DatasetDetailedResponse) => {
         setDatasetName(saved.name);
         setLimit(saved.limit ?? 1000);
+        setLimitOnDashboard(saved.limit_enabled ?? true);
         setQuery(saved.cube_query);
         setPendingModelSelection({
           modelId: saved.definition.model.id,
@@ -367,6 +370,8 @@ export default function DatasetPage() {
       for (const field of aggFields) {
         builder.addAgg(field, field.sourceName);
       }
+      // Always capped here, regardless of limitOnDashboard — the builder's
+      // own preview/Run must stay cheap to iterate on.
       if (limit > 0) {
         builder.setLimit(limit);
       }
@@ -478,6 +483,7 @@ export default function DatasetPage() {
       ...(havings ? { havings } : {}),
       ...(orderBy ? { order_by_fields: orderBy } : {}),
       limit,
+      limit_enabled: limitOnDashboard,
       cube_query: query,
     };
   }
@@ -578,6 +584,12 @@ export default function DatasetPage() {
         </div>
       )}
 
+      {modelsError && (
+        <div className="px-4 py-2">
+          <CAlert variant="error" message={modelsError} />
+        </div>
+      )}
+
       {pageBusy ? (
         <div className="flex flex-1 items-center justify-center">
           <CSpinner size={32} />
@@ -620,6 +632,44 @@ export default function DatasetPage() {
           </span>
         )}
 
+        <div className="flex items-center gap-2 pl-3 ml-1" style={{ borderLeft: "1px solid var(--border)" }}>
+          {loadingModels ? (
+            <CSpinner size={14} />
+          ) : (
+            <>
+              <select
+                value={selectedModelId}
+                onChange={(e) => setSelectedModelId(e.target.value)}
+                className="rounded-lg border px-2 py-1 text-xs outline-none transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]"
+                style={{ background: "var(--bg)", color: selectedModelId ? "var(--text-h)" : "var(--text)", borderColor: "var(--border)" }}
+              >
+                <option value="" disabled>Model…</option>
+                {modelOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <select
+                value={selectedDefinitionId}
+                onChange={(e) => setSelectedDefinitionId(e.target.value)}
+                disabled={!selectedModelId}
+                className="rounded-lg border px-2 py-1 text-xs outline-none transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)] disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ background: "var(--bg)", color: selectedDefinitionId ? "var(--text-h)" : "var(--text)", borderColor: "var(--border)" }}
+              >
+                <option value="" disabled>Definition…</option>
+                {definitionOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <button
+                type="button"
+                onClick={loadSchema}
+                disabled={!selectedDefinitionId || loadingSchema}
+                title="Refresh Definition"
+                className="flex shrink-0 items-center justify-center rounded-lg p-1.5 transition-colors hover:bg-[var(--accent-muted)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40"
+                style={{ color: "var(--text)" }}
+              >
+                {loadingSchema ? <CSpinner size={12} /> : <MdRefresh size={14} />}
+              </button>
+            </>
+          )}
+        </div>
+
         <div className="flex-1" />
 
         <CToggleButtons buttons={[
@@ -658,37 +708,6 @@ export default function DatasetPage() {
         <aside className="flex w-72 shrink-0 flex-col overflow-y-auto"
           style={{ borderRight: "1px solid var(--border)", background: "var(--bg-subtle)" }}
         >
-          {/* Selectors */}
-          <div className="flex flex-col gap-3 p-3" style={{ borderBottom: "1px solid var(--border)" }}>
-            {modelsError && <CAlert variant="error" message={modelsError} />}
-            {loadingModels
-              ? <div className="flex justify-center py-4"><CSpinner size={18} /></div>
-              : <>
-                <CSelect label="Model" value={selectedModelId} onChange={setSelectedModelId} options={modelOptions} placeholder="Select model…" />
-                <CSelect label="Definition" value={selectedDefinitionId} onChange={setSelectedDefinitionId} options={definitionOptions} placeholder="Select definition…" />
-                <CButton
-                  variant="outline"
-                  fullWidth
-                  loading={loadingSchema}
-                  disabled={!selectedDefinitionId}
-                  onClick={loadSchema}
-                  className="!text-xs"
-                >
-                  <MdRefresh size={13} /> Refresh Definition
-                </CButton>
-              </>
-            }
-          </div>
-
-          {/* Limit */}
-          <div className="flex items-center justify-between px-3 py-2" style={{ borderBottom: "1px solid var(--border)" }}>
-            <span className="text-xs font-medium" style={{ color: "var(--text)" }}>Limit</span>
-            <input type="number" value={limit} onChange={(e) => setLimit(Math.max(1, Number(e.target.value)))} min={1}
-              className="w-24 rounded-lg border px-2 py-1 text-right text-xs outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]"
-              style={{ background: "var(--bg)", color: "var(--text-h)", borderColor: "var(--border)" }}
-            />
-          </div>
-
           {/* Schema browser */}
           <div className="flex-1 overflow-y-auto py-1">
             {schemaError && <div className="p-3"><CAlert variant="error" message={schemaError} /></div>}
@@ -769,6 +788,31 @@ export default function DatasetPage() {
                   {queryTime !== null && ` · ${queryTime.toFixed(3)}s`}
                 </span>
               )}
+
+              <div className="ml-auto flex items-center gap-1.5">
+                <span className="text-xs font-medium" style={{ color: "var(--text)" }}>Limit</span>
+                <input type="number" value={limit} onChange={(e) => setLimit(Math.max(1, Number(e.target.value)))} min={1}
+                  className="w-20 rounded-lg border px-2 py-1 text-right text-xs outline-none transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]"
+                  style={{ background: "var(--bg)", color: "var(--text-h)", borderColor: "var(--border)" }}
+                />
+                <span className="text-xs" style={{ color: "var(--text)" }}>on dashboards</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={limitOnDashboard}
+                  title={limitOnDashboard
+                    ? "Dashboards using this dataset also get this limit — click to have them fetch the full data instead"
+                    : "Dashboards using this dataset fetch the full, unlimited data — click to cap them at this limit too"}
+                  onClick={() => setLimitOnDashboard((v) => !v)}
+                  className="relative inline-flex h-4 w-8 shrink-0 items-center rounded-full transition-colors"
+                  style={{ background: limitOnDashboard ? "var(--accent)" : "var(--border)" }}
+                >
+                  <span
+                    className="inline-block h-3 w-3 rounded-full bg-white shadow transition-transform"
+                    style={{ transform: limitOnDashboard ? "translateX(16px)" : "translateX(2px)" }}
+                  />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-auto">

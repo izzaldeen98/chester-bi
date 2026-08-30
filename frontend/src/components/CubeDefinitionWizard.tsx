@@ -99,6 +99,17 @@ const JOIN_RELATIONSHIPS: { value: JoinRelationship; label: string; hint: string
 // path a DuckDB-backed cube's `sql:` needs to read the file directly.
 const CUBE_VOLUME_ROOT = "/cube/definitions_root";
 
+/** The canonical in-container path a DuckDB-over-file cube reads this file
+ * from. The cube container's volume maps .local/cube_data (host) ->
+ * CUBE_VOLUME_ROOT, so File.path's "cube_data/" prefix is stripped before
+ * joining or it would appear twice. Single source of truth: both the
+ * file-picker (writing tableRef) and the reverse lookup that re-selects a
+ * file when parsing existing YAML must agree, or the dropdown reads blank. */
+function fileTableRef(file: FilePublicResponse): string {
+  const inContainerDir = file.path.replace(/^cube_data\//, "");
+  return `${CUBE_VOLUME_ROOT}/${inContainerDir}/${file.file_name}`;
+}
+
 function uid() {
   return Math.random().toString(36).slice(2);
 }
@@ -288,7 +299,10 @@ export function parseCubeYamlToSources(text: string): WizardSource[] {
   let pendingPrimaryKeyName: string | null = null;
 
   const kv = (line: string): { key: string; value: string } | null => {
-    const m = line.match(/^\s*([a-zA-Z_]+):\s*(.*)$/);
+    // YAML allows whitespace before the colon ("primary_key : true") and
+    // real definition files in the wild use it — tolerate it here or the
+    // whole line is silently skipped and its setting lost on round-trip.
+    const m = line.match(/^\s*([a-zA-Z_]+)\s*:\s*(.*)$/);
     if (!m) return null;
     return { key: m[1], value: m[2].trim() };
   };
@@ -296,7 +310,7 @@ export function parseCubeYamlToSources(text: string): WizardSource[] {
   for (const rawLine of lines) {
     if (!rawLine.trim() || rawLine.trim() === "cubes:") continue;
 
-    const cubeStart = rawLine.match(/^\s{2}-\s*name:\s*(.+)$/);
+    const cubeStart = rawLine.match(/^\s{2}-\s*name\s*:\s*(.+)$/);
     if (cubeStart) {
       if (current) {
         if (pendingPrimaryKeyName) current.primaryKey = pendingPrimaryKeyName;
@@ -334,7 +348,7 @@ export function parseCubeYamlToSources(text: string): WizardSource[] {
     }
 
     // List item start within a section (6-space indent, "- name: ...")
-    const itemStart = rawLine.match(/^\s{6}-\s*name:\s*(.+)$/);
+    const itemStart = rawLine.match(/^\s{6}-\s*name\s*:\s*(.+)$/);
     if (itemStart && section) {
       const name = unquote(itemStart[1].trim());
       if (section === "dimensions") {
@@ -364,7 +378,10 @@ export function parseCubeYamlToSources(text: string): WizardSource[] {
         }
         else if (pair.key === "type" && DIMENSION_TYPE_VALUES.has(value as DimensionType)) dim.type = value as DimensionType;
         else if (pair.key === "format" && DIMENSION_FORMAT_VALUES.has(value as DimensionFormat)) dim.format = value as DimensionFormat;
-        else if (pair.key === "primary_key" && value === "true") pendingPrimaryKeyName = dim.name;
+        // Raw (unquoted) YAML boolean — `unquote`'s JSON.parse would turn
+        // it into the actual boolean `true`, not the string "true", so
+        // compare against the un-parsed token instead.
+        else if (pair.key === "primary_key" && pair.value === "true") pendingPrimaryKeyName = dim.name;
       } else if (section === "measures") {
         const m = current.measures[current.measures.length - 1];
         if (!m) continue;
@@ -546,8 +563,15 @@ function SourceCard({
   const usingManualTable = source.sourceType === "connection" && schemaOptions.length === 0 && !source.schema;
   // Measures/primary key reference fields as they exist AFTER renames — the
   // original column name stops being a valid reference once renamed by a
-  // column-mode dimension.
-  const postRenameColumns = effectiveColumns(columnOptions, source.dimensions);
+  // column-mode dimension. `columnOptions` only has data once the table has
+  // been (re-)introspected this session — for a source freshly loaded from
+  // an existing YAML file it's empty, so fall back to the dimension names
+  // already known from that file (same source the dimension rows themselves
+  // render from) rather than showing primary key/measure pickers as blank.
+  const knownFieldNames = source.dimensions
+    .map((d) => (d.mode === "column" ? d.name.trim() || d.field.trim() : d.name.trim()))
+    .filter(Boolean);
+  const postRenameColumns = Array.from(new Set([...effectiveColumns(columnOptions, source.dimensions), ...knownFieldNames]));
 
   const [collapsed, setCollapsed] = useState(false);
   const [dimensionsOpen, setDimensionsOpen] = useState(true);
@@ -910,7 +934,7 @@ export default function CubeDefinitionWizard({ initialCode = "", onChange }: Cub
         if (conn) return { ...s, connectionId: conn.id };
       }
       if (s.sourceType === "file" && !s.fileId && s.tableRef) {
-        const file = files.find((f) => s.tableRef.endsWith(`${f.path}/${f.file_name}`));
+        const file = files.find((f) => fileTableRef(f) === s.tableRef);
         if (file) return { ...s, fileId: file.id };
       }
       return s;
@@ -991,15 +1015,10 @@ export default function CubeDefinitionWizard({ initialCode = "", onChange }: Cub
       setColumnOptions((prev) => ({ ...prev, [source.id]: [] }));
       return;
     }
-    // file.path is "cube_data/{account}/files" — relative to LOCAL_DIR on the
-    // backend's own disk. The cube container's volume mount already maps
-    // .local/cube_data (host) -> CUBE_VOLUME_ROOT (container), so that
-    // "cube_data/" prefix must be stripped before joining, or it'd appear twice.
-    const inContainerDir = file.path.replace(/^cube_data\//, "");
     updateSource(source.id, {
       fileId,
       connectionName: "duckdb",
-      tableRef: `${CUBE_VOLUME_ROOT}/${inContainerDir}/${file.file_name}`,
+      tableRef: fileTableRef(file),
     });
     setColumnOptions((prev) => ({ ...prev, [source.id]: [] }));
     try {

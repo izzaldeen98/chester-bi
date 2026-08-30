@@ -65,7 +65,13 @@ export async function fetchWidgetQueryData(
     if (expr) filterExprs.push(expr);
   }
 
-  const cubeQuery = injectFiltersIntoQuery(datasetDetails.cube_query, filterExprs);
+  let cubeQuery = injectFiltersIntoQuery(datasetDetails.cube_query, filterExprs);
+  // The dataset's limit is meant to keep its own editor preview cheap — it
+  // only carries over to dashboards when the dataset opted in via limit_enabled.
+  if (!datasetDetails.limit_enabled && "limit" in cubeQuery) {
+    const { limit: _limit, ...unlimited } = cubeQuery;
+    cubeQuery = unlimited;
+  }
   const result = await runQuery(definitionId, cubeQuery);
   const rows = normalizeQueryRows(result);
 

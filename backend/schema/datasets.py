@@ -36,6 +36,7 @@ class DatasetDetailedResponse(DatasetBase):
     calculated_fields: list | None = None
     order_by_fields: dict | None = None
     limit: int | None = 1000
+    limit_enabled: bool = True
     cube_query: dict
     sql_query: str | None = None
     definition: DatasetDefinition
@@ -55,6 +56,7 @@ class DatasetCreateRequest(BaseModel):
     calculated_fields: list | None = None
     order_by_fields: dict | None = None
     limit: int | None = 1000
+    limit_enabled: bool = True
     cube_query: dict
     sql_query: str | None = None
 
@@ -72,6 +74,7 @@ class DatasetUpdateRequest(BaseModel):
     calculated_fields: list | None = None
     order_by_fields: dict | None = None
     limit: int | None = 1000
+    limit_enabled: bool = True
     cube_query: dict | None = None
     sql_query: str | None = None
     definition_id: UUID | None = None

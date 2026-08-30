@@ -525,6 +525,7 @@ export interface DatasetUpdate {
   calculated_fields?: unknown[];
   order_by_fields?: Record<string, string>;
   limit?: number;
+  limit_enabled?: boolean;
   cube_query?: CubeQuery;
   sql_query?: string;
   definition_id?: string;
@@ -541,6 +542,7 @@ export interface DatasetCreate {
   calculated_fields?: unknown[];
   order_by_fields?: Record<string, string>;
   limit?: number;
+  limit_enabled?: boolean;
   cube_query: CubeQuery;
   sql_query?: string;
 }
@@ -565,6 +567,7 @@ export interface DatasetDetailedResponse {
   calculated_fields: unknown[] | null;
   order_by_fields: Record<string, string> | null;
   limit: number;
+  limit_enabled: boolean;
   cube_query: CubeQuery;
   sql_query: string;
   definition: DatasetDefinition;

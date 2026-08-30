@@ -1,6 +1,8 @@
 <div align="center">
 
-<img src="assets/logo.png" alt="Chester BI" width="280" />
+<img src="assets/logo.svg" alt="Chester BI" width="72" />
+
+# Chester BI
 
 **Self-hosted, open-source Business Intelligence platform**
 

@@ -46,6 +46,7 @@ async def create_dataset(
         calculated_fields=dataset.calculated_fields,
         order_by_fields=dataset.order_by_fields,
         limit=dataset.limit,
+        limit_enabled=dataset.limit_enabled,
         cube_query=dataset.cube_query,
         sql_query=dataset.sql_query,
         created_by=current_user.id,
@@ -100,7 +101,10 @@ async def update_dataset(
     target_dataset.havings = dataset.havings if dataset.havings else target_dataset.havings
     target_dataset.calculated_fields = dataset.calculated_fields if dataset.calculated_fields else target_dataset.calculated_fields
     target_dataset.order_by_fields = dataset.order_by_fields if dataset.order_by_fields else target_dataset.order_by_fields
-    target_dataset.limit = dataset.limit if dataset.limit else target_dataset.limit
+    if "limit" in dataset.model_fields_set:
+        target_dataset.limit = dataset.limit
+    if "limit_enabled" in dataset.model_fields_set:
+        target_dataset.limit_enabled = dataset.limit_enabled
     target_dataset.cube_query = dataset.cube_query if dataset.cube_query else target_dataset.cube_query
     target_dataset.sql_query = dataset.sql_query if dataset.sql_query else target_dataset.sql_query
     target_dataset.definition_id = definition.id
