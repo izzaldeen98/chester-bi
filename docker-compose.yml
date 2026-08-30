@@ -8,7 +8,7 @@ version: '3.8'
 #    backend    – FastAPI / Uvicorn               (port 8989, internal only)
 #    postgres   – PostgreSQL 16                   (port 5432)
 #    redis      – Redis 7 cache                   (port 6379, internal only)
-#    publisher  – Malloy Publisher (query engine) (internal only, backend-reachable)
+#    cube       – Cube Core (query engine)        (internal only, backend-reachable)
 #
 #  Quick start:
 #    1. cp .example.env .env   and fill in the values
@@ -51,9 +51,9 @@ services:
       DB_USER: ${POSTGRES_USER:-bi_admin}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
 
-      # Malloy Publisher (points to the publisher service below)
-      MALLOY_HOST: publisher
-      MALLOY_PORT: 4000
+      # Cube Core (points to the cube service below)
+      CUBE_URL: http://cube:4000
+      CUBEJS_API_SECRET: ${CUBEJS_API_SECRET:-changeme}
 
       # Redis (points to the redis service below)
       REDIS_HOST: redis
@@ -63,15 +63,17 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      publisher:
+      cube:
         condition: service_healthy
     restart: unless-stopped
     volumes:
-      # Mount directly at the publisher_data sub-path so both services share
-      # the same volume root. The backend writes to /app/.local/publisher_data/…
-      # and the publisher reads from /publisher/publisher_data/… — both resolve
-      # to the same location on the shared volume with no extra nesting.
-      - local_data:/app/.local/publisher_data
+      # Mount directly at the cube_data sub-path so both services share
+      # the same volume root. The backend writes definition files to
+      # /app/.local/cube_data/{account_id}/definitions/… and Cube's repositoryFactory
+      # (see backend/cube_conf/cube.js) reads from the same tree at
+      # /cube/definitions_root/{account_id}/definitions/… — both resolve to the same
+      # location on the shared volume with no extra nesting.
+      - cube_data:/app/.local/cube_data
 
   # ── PostgreSQL ─────────────────────────────────────────────────────────────
   postgres:
@@ -109,21 +111,42 @@ services:
       timeout: 3s
       retries: 5
 
-  # ── Malloy Publisher ───────────────────────────────────────────────────────
-  publisher:
-    image: ms2data/malloy-publisher
-    container_name: chester_publisher
+  # ── Cube Core ──────────────────────────────────────────────────────────────
+  cube:
+    image: cubejs/cube:latest
+    container_name: chester_cube
     restart: unless-stopped
+    environment:
+      CUBEJS_API_SECRET: ${CUBEJS_API_SECRET:-changeme}
+      # Multi-tenant driverFactory/repositoryFactory config — see backend/cube_conf/cube.js.
+      # No CUBEJS_DB_* vars here: each request's DB credentials arrive via the
+      # JWT security context the backend mints per query, so Cube itself stays
+      # stateless with respect to any one account's database.
+      #
+      # No cache/queue driver var here either — this Cube version only
+      # accepts "cubestore" or "memory", never "redis" directly. Cube Store
+      # is bundled and runs in-process automatically; our own Redis (used
+      # for the backend's own query-result cache) is unrelated and Cube
+      # doesn't need it at all.
+      CUBEJS_DEV_MODE: "false"
     # Port is intentionally NOT exposed to the host — only the backend talks
-    # to it, over the internal compose network at http://publisher:4000.
+    # to it, over the internal compose network at http://cube:4000.
     # Uncomment if you need direct access during development:
     # ports:
     #   - "4000:4000"
-    #   - "4040:4040"   # MCP endpoint for AI agents
     volumes:
-      - local_data:/publisher/publisher_data
+      # Kept at separate top-level paths (not nested) — nesting cube_data
+      # under the read-only ./backend/cube_conf mount fails because Docker
+      # can't create the inner mountpoint directory on a read-only mount.
+      - cube_data:/cube/definitions_root
+      # NOT read-only: process.cwd() for Cube's own process IS /cube/conf, and
+      # its bundled Cube Store engine writes its metastore under
+      # /cube/conf/.cubestore/ on startup — a :ro mount here makes Cube Store
+      # panic and crash on boot.
+      - ./backend/cube_conf:/cube/conf
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/status"]
+      # cubejs/cube ships neither curl nor wget, only node.
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/readyz', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -133,4 +156,4 @@ services:
 volumes:
   pg_data:
   redis_data:
-  local_data:       # shared between backend and publisher (Malloy data files)
+  cube_data:       # shared between backend and cube (per-account Cube schema files)

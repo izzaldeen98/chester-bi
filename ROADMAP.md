@@ -21,6 +21,7 @@
 | Load Examples | modeling | ✅ Done |
 | Text and waterfall charts | Visualization | ✅ Done |
 | Make Malloy an internal service | Visualization | ✅ Done|
+| Migrate query engine from Malloy to Cube Core | Query Engine | ✅ Done|
 | Dashboard Settings | charts | 📋 Planned|
 
 
@@ -29,8 +30,9 @@
 
 | Feature | Category | Status |
 |---|---|---|
-| Vertical Filter Widget | Distribution | 📋 Planned |
-| Drop Down filter | Distribution | 📋 Planned |
+| Vertical Filter Widget | Distribution | ✅ Done |
+| Model Wizard | modeling | 📋 Planned |
+| Drop Down filter | Distribution | ✅ Done |
 | Row-level security (RLS) | Governance | 📋 Planned |
 | Multipage Dashboard | Governance | 📋 Planned |
 | Dashboard Navigation Widget | Governance | 📋 Planned |
@@ -40,7 +42,7 @@
 ## RM-0004
 | Feature | Category | Status |
 |---|---|---|
-| Model Wizard | modeling | 📋 Planned |
+
 | Metrics API | backend | 📋 Planned |
 | Embedding | Distribution | 📋 Planned |
 | Row-level security (RLS) | Governance | 📋 Planned |

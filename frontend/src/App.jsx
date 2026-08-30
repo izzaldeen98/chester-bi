@@ -6,11 +6,11 @@ import LandingPage from './pages/LandingPage'
 import HomePage from './pages/HomePage'
 import UsersPage from './pages/UsersPage'
 import DashboardsPage from './pages/DashboardsPage'
-import PackagesPage from './pages/PackagesPage'
+import ModelsPage from './pages/ModelsPage'
 import ConnectionsPage from './pages/ConnectionsPage'
-import PackageEditorPage from './pages/PackageEditorPage'
-import QueryPage from './pages/QueryPage'
-import QueriesPage from './pages/QueriesPage'
+import ModelEditorPage from './pages/ModelEditorPage'
+import DatasetPage from './pages/DatasetPage'
+import DatasetsPage from './pages/DatasetsPage'
 import FilesPage from './pages/FilesPage'
 import DashboardWorkSpace from './pages/DashboardWorkSpace'
 import DashboardViewPage from './pages/DashboardViewPage'
@@ -40,18 +40,18 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/home"        element={<HomePage />} />
           <Route path="/dashboard"   element={<DashboardsPage />} />
-          <Route path="/queries"     element={<QueriesPage />} />
+          <Route path="/datasets"    element={<DatasetsPage />} />
           <Route path="/files"       element={<FilesPage />} />
           <Route path="/connections" element={<ConnectionsPage />} />
-          <Route path="/packages"                      element={<PackagesPage />} />
-          <Route path="/packages/:packageId/editor"  element={<PackageEditorPage />} />
+          <Route path="/models"                    element={<ModelsPage />} />
+          <Route path="/models/:modelId/editor"  element={<ModelEditorPage />} />
           <Route path="/users"       element={<UsersPage />} />
         </Route>
 
         {/* Fullscreen — no app sidebar */}
         <Route element={<FullscreenLayout />}>
-          <Route path="/queries/new"             element={<QueryPage />} />
-          <Route path="/queries/:queryId/edit"   element={<QueryPage />} />
+          <Route path="/datasets/new"              element={<DatasetPage />} />
+          <Route path="/datasets/:datasetId/edit"  element={<DatasetPage />} />
           <Route path="/workspace"                element={<DashboardWorkSpace />} />
           <Route path="/workspace/:dashboardId"   element={<DashboardWorkSpace />} />
           <Route path="/view/:dashboardId"         element={<DashboardViewPage />} />

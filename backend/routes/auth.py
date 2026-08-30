@@ -11,7 +11,7 @@ from security import (
 from utils.init_database import get_db
 from models.account import Account
 from schema.account import OwnerCreate
-from utils.malloy import Malloy
+from utils.cube import ensure_account_definition_dir
 from utils.load_examples import load_account
 
 router = APIRouter(prefix="/api/v1/auth" , tags=["auth"])
@@ -96,7 +96,9 @@ async def register_user(payload: OwnerCreate, db: Session = Depends(get_db)):
     db.add(superuser)
     db.flush()
 
-    Malloy().create_environment(name=str(new_account.public_key), description=f"Environment for {new_account.name}")
+    # No Cube-side "environment" to provision — just make sure this account's
+    # definition directory exists for it to write .yml files into later.
+    ensure_account_definition_dir(new_account.public_key)
     await load_account(account_id=new_account.id, user_id=superuser.id, examples=examples, db=db)
 
     db.commit()

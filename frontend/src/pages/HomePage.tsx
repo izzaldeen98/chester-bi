@@ -4,11 +4,11 @@ import { MdDashboard, MdOutlineCloud, MdOpenInNew } from "react-icons/md";
 import { GoPackage } from "react-icons/go";
 import { FaUser } from "react-icons/fa";
 import { FaArrowRight, FaPlus } from "react-icons/fa6";
-import { GiJesterHat } from "react-icons/gi";
+import CLogo from "../components/CLogo";
 import {
   getDashboards,
   getConnections,
-  getPackages,
+  getModels,
   getUsers,
   type DashboardPublicResponse,
   type ConnectionPublicResponse,
@@ -160,7 +160,7 @@ export default function HomePage() {
 
   const [dashboards, setDashboards] = useState<DashboardPublicResponse[] | null>(null);
   const [connections, setConnections] = useState<ConnectionPublicResponse[] | null>(null);
-  const [packageCount, setPackageCount] = useState<number | null>(null);
+  const [modelCount, setModelCount] = useState<number | null>(null);
   const [userCount, setUserCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
@@ -172,7 +172,7 @@ export default function HomePage() {
       const results = await Promise.allSettled([
         getDashboards(),
         getConnections(),
-        getPackages(),
+        getModels(),
         getUsers(),
       ]);
 
@@ -186,8 +186,8 @@ export default function HomePage() {
       if (results[1].status === "fulfilled") setConnections(results[1].value);
       else setConnections([]);
 
-      if (results[2].status === "fulfilled") setPackageCount(results[2].value.length);
-      else setPackageCount(0);
+      if (results[2].status === "fulfilled") setModelCount(results[2].value.length);
+      else setModelCount(0);
 
       if (results[3].status === "fulfilled") setUserCount(results[3].value.length);
       else setUserCount(0);
@@ -262,10 +262,10 @@ export default function HomePage() {
           loading={loading}
         />
         <MetricCard
-          label="Packages"
-          value={packageCount}
+          label="Models"
+          value={modelCount}
           icon={<GoPackage size={19} />}
-          href="/packages"
+          href="/models"
           loading={loading}
         />
         <MetricCard
@@ -307,7 +307,7 @@ export default function HomePage() {
               className="flex flex-col items-center gap-3 rounded-xl py-12 text-center"
               style={{ border: "1px dashed var(--border)" }}
             >
-              <GiJesterHat size={32} style={{ color: "var(--accent)", opacity: 0.4 }} />
+              <CLogo size={32} style={{ opacity: 0.4 }} />
               <p className="text-sm" style={{ color: "var(--text)" }}>
                 No dashboards yet.{" "}
                 <button
@@ -394,7 +394,7 @@ export default function HomePage() {
               {[
                 { label: "New Dashboard",   icon: <MdDashboard size={16} />,   href: "/workspace" },
                 { label: "New Connection",  icon: <MdOutlineCloud size={16} />, href: "/connections" },
-                { label: "Browse Packages", icon: <GoPackage size={15} />,      href: "/packages" },
+                { label: "Browse Models", icon: <GoPackage size={15} />,      href: "/models" },
                 { label: "Manage Users",    icon: <FaUser size={14} />,         href: "/users" },
               ].map((a) => (
                 <button

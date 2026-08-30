@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { GiJesterHat } from "react-icons/gi";
 import { IoMdMail } from "react-icons/io";
 import { RiLockPasswordFill } from "react-icons/ri";
 import { HiSun, HiMoon } from "react-icons/hi";
 import CTextInput from "../components/CTextInput";
 import CButton from "../components/CButton";
 import CAlert from "../components/CAlert";
+import CLogo from "../components/CLogo";
 import { login } from "../lib/Api";
 import { setToken, setUser } from "../lib/auth";
 import { useTheme } from "../lib/theme";
@@ -74,7 +74,7 @@ export default function LoginPage() {
               border: "1px solid var(--accent-ring)",
             }}
           >
-            <GiJesterHat size={30} style={{ color: "var(--accent)" }} />
+            <CLogo size={30} />
           </div>
           <h1
             className="text-2xl font-bold tracking-tight"

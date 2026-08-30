@@ -28,7 +28,7 @@ const PERMISSION_GROUPS: Record<string, string[]> = {
   users:       ["list", "edit", "create", "*"],
   connections: ["create", "edit", "delete", "list", "*"],
   models:      ["view", "edit", "delete", "create", "list", "*"],
-  packages:    ["edit", "delete", "create", "list", "*"],
+  definitions: ["edit", "delete", "create", "list", "*"],
 };
 
 // ── Permission helpers ─────────────────────────────────────────────────────

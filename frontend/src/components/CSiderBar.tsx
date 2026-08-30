@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { GiJesterHat } from "react-icons/gi";
 import { RiHomeLine, RiLogoutBoxLine } from "react-icons/ri";
 import { MdDashboard, MdOutlineCloud } from "react-icons/md";
 import { PiFileSqlFill } from "react-icons/pi";
@@ -9,6 +8,7 @@ import { GoPackage } from "react-icons/go";
 import { clearToken } from "../lib/auth";
 import { useTheme } from "../lib/theme";
 import { HiSun, HiMoon } from "react-icons/hi";
+import CLogo from "./CLogo";
 
 interface NavItem {
   label: string;
@@ -19,10 +19,10 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Home",        path: "/home",        icon: <RiHomeLine size={18} /> },
   { label: "Dashboards",   path: "/dashboard",   icon: <MdDashboard size={18} /> },
-  { label: "Queries",       path: "/queries",       icon: <PiFileSqlFill size={18} /> },
+  { label: "Datasets",       path: "/datasets",       icon: <PiFileSqlFill size={18} /> },
   { label: "Files",       path: "/files",       icon: <FaFileAlt size={17} /> },
   { label: "Connections", path: "/connections", icon: <MdOutlineCloud size={18} /> },
-  { label: "Packages",    path: "/packages",    icon: <GoPackage size={18} /> },
+  { label: "Models",    path: "/models",    icon: <GoPackage size={18} /> },
   { label: "Users",       path: "/users",       icon: <FaUser size={16} /> },
 ];
 
@@ -50,11 +50,7 @@ export default function CSiderBar() {
         className="flex items-center gap-2.5 px-4 py-5"
         style={{ borderBottom: "1px solid var(--border)" }}
       >
-        <GiJesterHat
-          size={26}
-          className="shrink-0"
-          style={{ color: "var(--accent)" }}
-        />
+        <CLogo size={32} className="shrink-0" />
         {!collapsed && (
           <span
             className="truncate text-base font-bold tracking-tight"

@@ -334,7 +334,7 @@ export default function PieChart({
   }, [ready, title, category, value, data, colors, legendLabels, labelFormatter, tooltipFormatter, pieRadius, labelLayout, valuePosition, showPct, isSideLayout]);
 
   return (
-    <div className="flex h-full w-full min-h-0 min-w-0 flex-col">
+    <div className="pointer-events-auto flex h-full w-full min-h-0 min-w-0 flex-col">
       <div ref={ref} className="h-full w-full min-h-0 min-w-0 flex-1">
         {ready && (
           <ReactECharts

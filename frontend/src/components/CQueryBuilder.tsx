@@ -7,7 +7,8 @@ import {
     type Field,
     type RuleGroupType,
     type ValueEditorProps,
-} from "react-querybuilder"; import { FieldInfo } from "@malloydata/malloy-interfaces";
+} from "react-querybuilder";
+import { FieldInfo } from "../lib/cubeTypes";
 import "react-querybuilder/dist/query-builder.css";
 import "../styles/query-builder.css";
 
@@ -101,8 +102,13 @@ function queryBuilderValueEditorType(field: FieldInfo): string {
     return "text";
 }
 
+/** A filterable field, optionally with a display label distinct from its
+ * (possibly source-qualified) id — used when merging fields from more than
+ * one source so same-named fields stay distinguishable. */
+export type FilterableField = FieldInfo & { label?: string };
+
 interface CQueryBuilderProps {
-    fields?: FieldInfo[];
+    fields?: FilterableField[];
     query: RuleGroupType;
     onQueryChange: (query: RuleGroupType) => void;
 }
@@ -341,9 +347,9 @@ export default function CQueryBuilder({ fields, query, onQueryChange }: CQueryBu
 
     const filterRuleCount = useMemo(() => countFilterRules(query), [query]);
 
-    const filterFields = useMemo(() => fields?.map((field: FieldInfo) => ({
+    const filterFields = useMemo(() => fields?.map((field) => ({
         name: field.name,
-        label: field.name,
+        label: field.label ?? field.name,
         inputType: queryBuilderDataType(field),
         valueEditorType: queryBuilderValueEditorType(field),
     })) ?? [],

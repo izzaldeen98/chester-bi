@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GiJesterHat } from "react-icons/gi";
 import { MdDashboard, MdOutlineCloud } from "react-icons/md";
 import { PiFileSqlFill } from "react-icons/pi";
 import { FaArrowRight, FaGithub, FaStar } from "react-icons/fa";
@@ -11,6 +10,7 @@ import { IoBarChartSharp } from "react-icons/io5";
 import { FiFilter, FiLock } from "react-icons/fi";
 import { useTheme } from "../lib/theme";
 import CButton from "../components/CButton";
+import CLogo from "../components/CLogo";
 
 const GITHUB_URL = "https://github.com/izzaldeen98/chester-bi";
 const GITHUB_API  = "https://api.github.com/repos/izzaldeen98/chester-bi";
@@ -41,9 +41,9 @@ const features = [
   },
   {
     icon: <PiFileSqlFill size={22} />,
-    title: "Malloy Query Builder",
+    title: "Visual Query Builder",
     description:
-      "Write powerful Malloy queries in the browser with syntax highlighting, autocomplete, and live previews.",
+      "Build powerful Cube queries in the browser with a drag-and-drop field picker and live previews.",
   },
   {
     icon: <IoBarChartSharp size={22} />,
@@ -65,7 +65,7 @@ const features = [
   },
   {
     icon: <GoPackage size={22} />,
-    title: "Malloy Packages",
+    title: "Cube Model Packages",
     description:
       "Organise and share reusable semantic models and query bundles across your whole organisation.",
   },
@@ -73,7 +73,7 @@ const features = [
     icon: <FaTable size={22} />,
     title: "File & Model Management",
     description:
-      "Upload data files, manage Malloy model files, and keep everything organised in one place.",
+      "Upload data files, manage Cube model files, and keep everything organised in one place.",
   },
   {
     icon: <FiLock size={22} />,
@@ -86,7 +86,7 @@ const features = [
 // ── Steps ──────────────────────────────────────────────────────────────────
 const steps = [
   { n: "01", title: "Clone & configure", body: "Clone the repo, copy .example.env to .env, and fill in your secret keys and database credentials." },
-  { n: "02", title: "docker compose up", body: "One command starts Postgres, Redis, the Malloy Publisher, the FastAPI backend, and the React frontend." },
+  { n: "02", title: "docker compose up", body: "One command starts Postgres, Redis, Cube Core, the FastAPI backend, and the React frontend." },
   { n: "03", title: "Create your account", body: "Register your organisation owner account and start connecting data sources immediately." },
 ];
 
@@ -127,7 +127,7 @@ function Navbar({ stars }: { stars: string | null }) {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         {/* Logo */}
         <div className="flex items-center gap-2">
-          <GiJesterHat size={28} style={{ color: "var(--accent)" }} />
+          <CLogo size={28} />
           <span className="text-xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
             Chester <span style={{ color: "var(--accent)" }}>BI</span>
           </span>
@@ -240,7 +240,7 @@ function Hero({ stars }: { stars: string | null }) {
 
         <p className="mx-auto mb-10 max-w-2xl text-lg" style={{ color: "var(--text)" }}>
           Chester BI is a free, open-source BI platform you run on your own infrastructure.
-          Connect your databases, write Malloy queries, build dashboards, and share insights —
+          Connect your databases, build Cube queries, build dashboards, and share insights —
           with full control over your data.
         </p>
 
@@ -398,7 +398,7 @@ function CTABanner() {
               "radial-gradient(circle 220px at 15% 15%, rgba(255,255,255,0.35) 0%, transparent 70%), radial-gradient(circle 260px at 90% 100%, rgba(0,0,0,0.18) 0%, transparent 70%)",
           }}
         />
-        <GiJesterHat size={44} className="relative mx-auto mb-4" style={{ color: "rgba(0,0,0,0.55)" }} />
+        <CLogo size={44} color="rgba(0,0,0,0.55)" className="relative mx-auto mb-4" />
         <h2 className="relative mb-3 text-4xl font-extrabold tracking-tight text-black">
           Ready to own your data?
         </h2>
@@ -434,7 +434,7 @@ function Footer() {
     <footer style={{ borderTop: "1px solid var(--border)" }} className="px-6 py-8">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 md:flex-row">
         <div className="flex items-center gap-2">
-          <GiJesterHat size={20} style={{ color: "var(--accent)" }} />
+          <CLogo size={20} />
           <span className="font-semibold" style={{ color: "var(--text-h)" }}>Chester BI</span>
           <span
             className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold"

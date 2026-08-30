@@ -100,7 +100,7 @@ export default function CWidget({
 
       {!readOnly && editOpen && (
         <WidgetEditDialog
-          key={`${id}-${config?.queryId ?? "new"}-${config?.chartType ?? "none"}`}
+          key={`${id}-${config?.datasetId ?? "new"}-${config?.chartType ?? "none"}`}
           isOpen
           widgetTitle={title ?? `Widget ${id}`}
           initialConfig={config}

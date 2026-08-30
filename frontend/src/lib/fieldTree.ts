@@ -1,4 +1,4 @@
-import { FieldInfo } from "@malloydata/malloy-interfaces";
+import { FieldInfo } from "./cubeTypes";
 
 export const TIME_GRANULARITIES = ["year", "quarter", "month", "week", "day", "hour", "minute", "second"] as const;
 export type Granularity = typeof TIME_GRANULARITIES[number];
@@ -12,7 +12,6 @@ export interface SortItem {
 export function isDateTime(field: FieldInfo): boolean {
   return (
     field.kind.toLowerCase() === "dimension" &&
-    "type" in field &&
     (field.type.kind.toLowerCase() === "timestamp_type" || field.type.kind.toLowerCase() === "date_type")
   );
 }

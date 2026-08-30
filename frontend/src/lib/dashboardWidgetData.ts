@@ -1,7 +1,8 @@
-import { getQuery, runQuery, type DashboardElementMeta } from "./Api";
+import { getDataset, runQuery, type DashboardElementMeta } from "./Api";
 import { getRowFieldValue, normalizeQueryRows } from "./queryResult";
 import type { FilterRule } from "../components/FilterEditDialog";
-import { buildMalloyFilterClause, injectFiltersIntoQuery } from "./filterInjection";
+import { buildCubeFilterExpr, injectFiltersIntoQuery } from "./filterInjection";
+import type { CubeFilterExpr } from "./cubeTypes";
 
 export interface WidgetQueryData {
   previewValue: number | null;
@@ -12,7 +13,7 @@ export interface WidgetQueryData {
 export interface WidgetMetaLike {
   title: string;
   query?: string;
-  queryId?: string;
+  datasetId?: string;
   chartType?: string;
   chartConfig?: Record<string, string>;
   previewValue?: number | null;
@@ -33,7 +34,7 @@ export function toSavedWidgetMeta(meta: WidgetMetaLike): DashboardElementMeta {
   return {
     title: meta.title,
     query: meta.query,
-    queryId: meta.queryId,
+    datasetId: meta.datasetId,
     chartType: meta.chartType,
     chartConfig: meta.chartConfig,
     filterRule: meta.filterRule as Record<string, unknown> | undefined,
@@ -44,28 +45,34 @@ export async function fetchWidgetQueryData(
   meta: WidgetMetaLike,
   options?: { widgetId?: string; activeFilters?: FilterRule[] },
 ): Promise<WidgetQueryData> {
-  if (!meta.queryId || !meta.chartConfig) {
+  if (!meta.datasetId || !meta.chartConfig) {
     return { previewValue: null, previewRows: null };
   }
 
-  const queryDetails = await getQuery(meta.queryId);
-  const modelId = queryDetails.semantic_model.id;
+  const datasetDetails = await getDataset(meta.datasetId);
+  const definitionId = datasetDetails.definition.id;
 
-  // Build extra where clauses from dashboard-level active filters
+  // Build extra filter expressions from dashboard-level active filters
   const { widgetId, activeFilters = [] } = options ?? {};
-  const filterClauses: string[] = [];
+  const filterExprs: CubeFilterExpr[] = [];
   for (const rule of activeFilters) {
     // Skip if filter targets specific widgets and this one is not included
     if (rule.targetWidgetIds.length > 0 && widgetId && !rule.targetWidgetIds.includes(widgetId)) continue;
-    // Find the mapping for this model
-    const mapping = rule.mappings.find((m) => m.modelId === modelId);
+    // Find the mapping for this definition
+    const mapping = rule.mappings.find((m) => m.definitionId === definitionId);
     if (!mapping) continue;
-    const clause = buildMalloyFilterClause(rule, mapping.fieldName);
-    if (clause) filterClauses.push(clause);
+    const expr = buildCubeFilterExpr(rule, `${mapping.sourceName}.${mapping.fieldName}`);
+    if (expr) filterExprs.push(expr);
   }
 
-  const malloyQuery = injectFiltersIntoQuery(queryDetails.malloy_query, filterClauses);
-  const result = await runQuery(modelId, malloyQuery);
+  let cubeQuery = injectFiltersIntoQuery(datasetDetails.cube_query, filterExprs);
+  // The dataset's limit is meant to keep its own editor preview cheap — it
+  // only carries over to dashboards when the dataset opted in via limit_enabled.
+  if (!datasetDetails.limit_enabled && "limit" in cubeQuery) {
+    const { limit: _limit, ...unlimited } = cubeQuery;
+    cubeQuery = unlimited;
+  }
+  const result = await runQuery(definitionId, cubeQuery);
   const rows = normalizeQueryRows(result);
 
   if (meta.chartType === "card") {

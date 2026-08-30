@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { Responsive, verticalCompactor } from "react-grid-layout";
 import type { LayoutItem, ResponsiveLayouts } from "react-grid-layout";
 import { MdDashboard } from "react-icons/md";
-import { FaPlus, FaSave } from "react-icons/fa";
+import { FaPlus, FaSave, FaEye } from "react-icons/fa";
 import { IoBarChartSharp } from "react-icons/io5";
 import CButton from "../components/CButton";
 import CWidget from "../components/CWidget/CWidget";
@@ -24,7 +24,7 @@ import "../styles/dashboard-workspace.css";
 interface WidgetMeta {
   title: string;
   query?: string;
-  queryId?: string;
+  datasetId?: string;
   chartType?: WidgetChartConfig["chartType"];
   chartConfig?: Record<string, string>;
   previewValue?: number | null;
@@ -32,10 +32,10 @@ interface WidgetMeta {
   filterRule?: FilterRule;
 }
 function toWidgetConfig(meta: WidgetMeta): WidgetChartConfig | undefined {
-  if (!meta.queryId && !meta.chartConfig) return undefined;
+  if (!meta.datasetId && !meta.chartConfig) return undefined;
   return {
-    queryId: meta.queryId,
-    queryName: meta.query,
+    datasetId: meta.datasetId,
+    datasetName: meta.query,
     chartType: meta.chartType,
     chartConfig: meta.chartConfig,
     previewValue: meta.previewValue ?? null,
@@ -129,7 +129,7 @@ export default function DashboardWorkSpace() {
           meta[el.id] = {
             title: el.meta.title,
             query: el.meta.query,
-            queryId: el.meta.queryId,
+            datasetId: el.meta.datasetId,
             chartType: el.meta.chartType as WidgetChartConfig["chartType"],
             chartConfig: el.meta.chartConfig,
             filterRule: el.meta.filterRule as FilterRule | undefined,
@@ -228,8 +228,8 @@ export default function DashboardWorkSpace() {
       ...prev,
       [widgetId]: {
         title: result.chartConfig.title || prev[widgetId]?.title || "Widget",
-        query: result.query.name,
-        queryId: result.query.id,
+        query: result.dataset.name,
+        datasetId: result.dataset.id,
         chartType: result.chartType,
         chartConfig: result.chartConfig,
         previewValue: result.previewValue,
@@ -262,6 +262,12 @@ export default function DashboardWorkSpace() {
       elements,
     });
   }, [dashboardId, layoutItems, widgetMeta, gridRows, bgColor]);
+
+  const handlePreview = useCallback(async () => {
+    if (!dashboardId) return;
+    await handleSave();
+    window.open(`/view/${dashboardId}`, "_blank", "noopener,noreferrer");
+  }, [dashboardId, handleSave]);
 
   return (
     <div className="flex h-full flex-1 flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
@@ -334,6 +340,9 @@ export default function DashboardWorkSpace() {
         </CButton>
         <CButton variant="outline" className="!px-3 !py-1.5 !text-xs" onClick={addFilter}>
           <FaPlus size={11} /> Add Filter
+        </CButton>
+        <CButton variant="outline" className="!px-3 !py-1.5 !text-xs" disabled={!dashboardId} onClick={handlePreview}>
+          <FaEye size={11} /> Preview
         </CButton>
         <CButton variant="primary" className="!px-3 !py-1.5 !text-xs" disabled={!dashboardId} onClick={handleSave}>
           <FaSave size={11} /> Save Layout

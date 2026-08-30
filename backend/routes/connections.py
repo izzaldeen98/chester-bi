@@ -15,7 +15,12 @@ from security import encrypt_password
 from sqlalchemy import and_
 from security import check_permissions
 from uuid import UUID
-from utils.malloy import Malloy
+from utils.db_drivers import (
+    test_connection as db_test_connection,
+    get_schemas as db_get_schemas,
+    get_tables as db_get_tables,
+    decrypt_secret_values,
+)
 
 
 class ConnectionHandler:
@@ -160,32 +165,30 @@ async def create_connection(
         )
     
     connection_handler = ConnectionHandler(db_type=connection.type, **connection.connection_attributes)
-    malloy_client = Malloy(envid=current_user.account.public_key)
     try:
-        malloy_client.create_connection(
-            name=connection.name,
-            type=connection.type,
-            **connection_handler.connection_config,
-        )
+        db_test_connection(connection.type, connection_handler.connection_config)
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create connection: {str(e)}",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to connect: {str(e)}",
         )
     raw_password = connection.connection_attributes.get("password")
     encrypted_password = encrypt_password(raw_password)
     connection.connection_attributes["password"] = encrypted_password
-    new_connection = Connection(
-        type=connection.type,
-        name=connection.name,
-        description=connection.description,
-        connection_attributes=connection_handler.encrypt_secret_values().connection_config,
-        account_id=current_user.account_id,
-        created_by=current_user.id,
-        updated_by=current_user.id,
-    )
+    try:
+        new_connection = Connection(
+            type=connection.type,
+            name=connection.name,
+            description=connection.description,
+            connection_attributes=connection_handler.encrypt_secret_values().connection_config,
+            account_id=current_user.account_id,
+            created_by=current_user.id,
+            updated_by=current_user.id,
+        )
 
-    db.add(new_connection)
+        db.add(new_connection)
+    except Exception as e:
+        return HTTPException(500 , str(e))
     db.commit()
     db.refresh(new_connection)
     return {"message": "Connection created successfully"}
@@ -334,8 +337,6 @@ async def delete_connection(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found"
         )
-    malloy = Malloy(envid=current_user.account.public_key)
-    malloy.get_connection_by_name(db_connection.name).delete()
     db_connection.is_active = False
     db_connection.updated_by = current_user.id
     db.commit()
@@ -365,16 +366,83 @@ async def test_connection(
         )
         .first()
     )
-    if Malloy.test_connection(
-        connection.type,
-        connection.connection_attributes["host"],
-        connection.connection_attributes["port"],
-        connection.connection_attributes["database"],
-        connection.connection_attributes["username"],
-        connection.connection_attributes["password"],
-    ):
-        return {"message": "Connection tested successfully"}
-    else:
+    if not connection:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Failed to test connection"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found"
+        )
+    attrs = decrypt_secret_values(connection.type, connection.connection_attributes)
+    try:
+        db_test_connection(connection.type, attrs)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to test connection: {str(e)}"
+        )
+    return {"message": "Connection tested successfully"}
+
+
+def _get_owned_connection(db: Session, current_user: User, connection_id: UUID) -> Connection:
+    connection = (
+        db.query(Connection)
+        .filter(
+            and_(
+                Connection.account_id == current_user.account_id,
+                Connection.is_active == True,
+                Connection.public_key == connection_id,
+            )
+        )
+        .first()
+    )
+    if not connection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Connection not found"
+        )
+    return connection
+
+
+@router.get("/schemas")
+async def get_connection_schemas(
+    connection_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List the schemas (namespaces) available on a connection's database."""
+    permissions = ["*", "connections:*", "connections:list"]
+    if not check_permissions(current_user, *permissions):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized : Insufficient permissions",
+        )
+    connection = _get_owned_connection(db, current_user, connection_id)
+    attrs = decrypt_secret_values(connection.type, connection.connection_attributes)
+    try:
+        return db_get_schemas(connection.type, attrs)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get connection schemas: {str(e)}",
+        )
+
+
+@router.get("/schemas/tables")
+async def get_connection_schema_tables(
+    connection_id: UUID,
+    schema: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """List the tables within a single schema of a connection's database."""
+    permissions = ["*", "connections:*", "connections:list"]
+    if not check_permissions(current_user, *permissions):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized : Insufficient permissions",
+        )
+    connection = _get_owned_connection(db, current_user, connection_id)
+    attrs = decrypt_secret_values(connection.type, connection.connection_attributes)
+    try:
+        return db_get_tables(connection.type, schema, attrs)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get schema tables: {str(e)}",
         )

@@ -307,6 +307,88 @@ export const BarChartSchema = {
          ],
 };
 
+export const ScatterChartSchema = {
+    chartType: "scatter",
+    fields: [
+        {
+            name: "title",
+            inputType: "text",
+            label: "Title",
+            placeholder: "Enter title",
+            required: false,
+        },
+        {
+            name: "titleFontSize",
+            inputType: "number",
+            label: "Title Font Size",
+            placeholder: "Enter title font size",
+            required: false,
+        },
+        {
+            name: "titleFontColor",
+            inputType: "color",
+            label: "Title Font Color",
+            placeholder: "Enter title font color",
+            required: false,
+        },
+        {
+            name: "pointSize",
+            inputType: "number",
+            label: "Point Size",
+            placeholder: "Enter point size",
+            required: false,
+            defaultValue: "8",
+        },
+        {
+            name: "xAxis",
+            inputType: "select",
+            label: "X Axis",
+            placeholder: "Enter x axis",
+            required: true,
+        },
+        {
+            name: "xAxisColor",
+            inputType: "color",
+            label: "X Axis Color",
+            placeholder: "Enter x axis color",
+            required: false,
+        },
+        {
+            name: "yAxis",
+            inputType: "multi-select",
+            label: "Y Axis",
+            placeholder: "Enter y axis",
+            required: true,
+        },
+        {
+            name: "yAxisColor",
+            inputType: "multi-color",
+            label: "Y Axis Color",
+            placeholder: "Enter y axis color",
+            required: false,
+        },
+        {
+            name: "yAxisFormat",
+            inputType: "select",
+            label: "Y Axis Format",
+            placeholder: "Select Y axis format",
+            required: false,
+            options: [
+                { value: "currency", label: "Currency" },
+                { value: "number", label: "Number" },
+                { value: "decimal", label: "Decimal" },
+            ],
+        },
+        {
+            name: "legend",
+            inputType: "multi-text",
+            label: "Legend",
+            placeholder: "Enter legend",
+            required: false,
+        },
+         ],
+};
+
 
 export const PieChartSchema = {
     chartType: "pie",

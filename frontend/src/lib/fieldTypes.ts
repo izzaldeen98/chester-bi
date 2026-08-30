@@ -1,4 +1,4 @@
-import type { FieldInfo, SourceInfo } from "@malloydata/malloy-interfaces";
+import type { FieldInfo, SourceInfo } from "./cubeTypes";
 
 export function getFieldTypeKind(field: FieldInfo): string | null {
   if (field.kind?.toLowerCase() !== "dimension") return null;

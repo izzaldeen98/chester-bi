@@ -2,7 +2,7 @@
 // and the production server should be configured to do the same.
 
 import { getToken } from "./auth";
-import { FieldInfo, SourceInfo } from "@malloydata/malloy-interfaces";
+import { SourceInfo, CubeQuery } from "./cubeTypes";
 
 function authHeaders(): HeadersInit {
   const token = getToken();
@@ -207,7 +207,7 @@ export interface DashboardElementLayout {
 export interface DashboardElementMeta {
   title: string;
   query?: string;
-  queryId?: string;
+  datasetId?: string;
   chartType?: string;
   chartConfig?: Record<string, string>;
   previewValue?: number | null;
@@ -245,9 +245,9 @@ export async function saveDashboardConfig(dashboardId: string, config: Dashboard
   return handleResponse<void>(res);
 }
 
-// ── Packages ───────────────────────────────────────────────────────────────
+// ── Models ─────────────────────────────────────────────────────────────────
 
-export interface PackageResponse {
+export interface ModelResponse {
   id: string;
   name: string;
   location: string;
@@ -258,11 +258,19 @@ export interface PackageResponse {
   is_active: boolean;
 }
 
-export async function getPackages(): Promise<PackageResponse[]> {
-  const res = await fetch(`/api/v1/packages/list`, {
+export async function getModels(): Promise<ModelResponse[]> {
+  const res = await fetch(`/api/v1/models/list`, {
     headers: { ...authHeaders() },
   });
-  return handleResponse<PackageResponse[]>(res);
+  return handleResponse<ModelResponse[]>(res);
+}
+
+export async function deleteModel(modelId: string): Promise<void> {
+  const res = await fetch(`/api/v1/models/delete?model_id=${modelId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<void>(res);
 }
 
 // ── Connections ────────────────────────────────────────────────────────────
@@ -360,37 +368,44 @@ export async function testConnection(connectionId: string): Promise<void> {
   return handleResponse<void>(res);
 }
 
-// ── Packages ───────────────────────────────────────────────────────────────
-
-export interface PackageFile {
-  file: string;
-  location: string;
-  model_id: string | null;
-}
-
-export interface PackageModelsResponse {
-  id: string;
-  name: string;
-  models : [{
-    id: string;
-    name: string;
-    file_name: string;
-  }]
-}
-
-
-export async function listPackageFiles(packageId: string): Promise<PackageFile[]> {
-  const res = await fetch(`/api/v1/packages/list-files?package_id=${packageId}`, {
+// Raw pass-through — the exact schema/table item shape returned by direct DB
+// introspection (plain strings vs. `{name}` objects) isn't pinned down here;
+// callers should normalize defensively rather than assume one shape.
+export async function getConnectionSchemas(connectionId: string): Promise<unknown[]> {
+  const res = await fetch(`/api/v1/connections/schemas?connection_id=${connectionId}`, {
     headers: { ...authHeaders() },
   });
-  return handleResponse<PackageFile[]>(res);
+  return handleResponse<unknown[]>(res);
 }
 
-export async function saveModelFile(modelId: string, content: string, filename: string): Promise<void> {
+export async function getSchemaTables(connectionId: string, schema: string): Promise<unknown[]> {
+  const res = await fetch(
+    `/api/v1/connections/schemas/tables?connection_id=${connectionId}&schema=${encodeURIComponent(schema)}`,
+    { headers: { ...authHeaders() } },
+  );
+  return handleResponse<unknown[]>(res);
+}
+
+// ── Models (files) ───────────────────────────────────────────────────────
+
+export interface DefinitionFile {
+  file: string;
+  location: string;
+  definition_id: string | null;
+}
+
+export async function listModelFiles(modelId: string): Promise<DefinitionFile[]> {
+  const res = await fetch(`/api/v1/models/list-files?model_id=${modelId}`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<DefinitionFile[]>(res);
+}
+
+export async function saveDefinitionFile(definitionId: string, content: string, filename: string): Promise<void> {
   const body = new FormData();
-  body.append("model_id", modelId);
+  body.append("definition_id", definitionId);
   body.append("file", new File([content], filename, { type: "text/plain" }));
-  const res = await fetch(`/api/v1/semantic-models/save`, {
+  const res = await fetch(`/api/v1/definitions/save`, {
     method: "PUT",
     headers: { ...authHeaders() },
     body,
@@ -398,8 +413,8 @@ export async function saveModelFile(modelId: string, content: string, filename: 
   return handleResponse<void>(res);
 }
 
-export async function addSemanticModel(
-  packageId: string,
+export async function addDefinition(
+  modelId: string,
   name: string,
   content: string,
   filename: string,
@@ -407,10 +422,10 @@ export async function addSemanticModel(
 ): Promise<void> {
   const body = new FormData();
   body.append("name", name);
-  body.append("package_id", packageId);
+  body.append("model_id", modelId);
   if (description) body.append("description", description);
   body.append("file", new File([content], filename, { type: "text/plain" }));
-  const res = await fetch(`/api/v1/semantic-models/add`, {
+  const res = await fetch(`/api/v1/definitions/add`, {
     method: "POST",
     headers: { ...authHeaders() },
     body,
@@ -418,16 +433,16 @@ export async function addSemanticModel(
   return handleResponse<void>(res);
 }
 
-export async function loadPackage(packageId: string): Promise<void> {
-  const res = await fetch(`/api/v1/packages/load-package?package_id=${packageId}`, {
+export async function loadModel(modelId: string): Promise<void> {
+  const res = await fetch(`/api/v1/models/load-model?model_id=${modelId}`, {
     method: "POST",
     headers: { ...authHeaders() },
   });
   return handleResponse<void>(res);
 }
 
-export async function getModelFileContent(modelId: string): Promise<string> {
-  const res = await fetch(`/api/v1/semantic-models/file-content?model_id=${modelId}`, {
+export async function getDefinitionFileContent(definitionId: string): Promise<string> {
+  const res = await fetch(`/api/v1/definitions/file-content?definition_id=${definitionId}`, {
     headers: { ...authHeaders() },
   });
   // Returns raw text
@@ -439,11 +454,11 @@ export async function getModelFileContent(modelId: string): Promise<string> {
   return data.content;
 }
 
-export async function createPackage(name: string, description?: string): Promise<void> {
+export async function createModel(name: string, description?: string): Promise<void> {
   const body = new FormData();
   body.append("name", name);
   if (description) body.append("description", description);
-  const res = await fetch(`/api/v1/packages/create`, {
+  const res = await fetch(`/api/v1/models/create`, {
     method: "POST",
     headers: { ...authHeaders() },
     body,
@@ -451,72 +466,63 @@ export async function createPackage(name: string, description?: string): Promise
   return handleResponse<void>(res);
 }
 
-// ── Semantic Models / Query ────────────────────────────────────────────────
+// ── Definitions / Models ────────────────────────────────────────────────────
 
-export interface ModelRef {
+export interface DefinitionRef {
   id: string;
   name: string;
   file_name: string;
 }
 
-export interface ModelPackage {
+export interface Model {
   id: string;
   name: string;
-  models: ModelRef[];
+  definitions: DefinitionRef[];
 }
 
 
-export interface SemanticModelSource {
-  name: string;
-  fields: FieldInfo[];
-}
-
-export interface SemanticModelSchema {
-  type: string;
-  package_name: string;
-  model_path?: string;
-  malloy_version: string;
+export interface DefinitionSchema {
   sources: SourceInfo[];
 }
 
-export async function listModels(): Promise<ModelPackage[]> {
-  const res = await fetch(`/api/v1/packages/list-models`, {
+export async function listModelsWithDefinitions(): Promise<Model[]> {
+  const res = await fetch(`/api/v1/models/list-with-definitions`, {
     headers: { ...authHeaders() },
   });
-  return handleResponse<ModelPackage[]>(res);
+  return handleResponse<Model[]>(res);
 }
 
-export async function getCompiledModel(modelId: string): Promise<SemanticModelSchema> {
-  const res = await fetch(`/api/v1/semantic-models/get-compiled-model?model_id=${modelId}`, {
+export async function getCompiledDefinition(definitionId: string): Promise<DefinitionSchema> {
+  const res = await fetch(`/api/v1/definitions/get-compiled-definition?definition_id=${definitionId}`, {
     headers: { ...authHeaders() },
   });
-  return handleResponse<SemanticModelSchema>(res);
+  return handleResponse<DefinitionSchema>(res);
 }
 
-export async function runQuery(modelId: string, query: string): Promise<any> {
+export async function runQuery(definitionId: string, query: CubeQuery): Promise<any> {
   const res = await fetch(
-    `/api/v1/semantic-models/query?model_id=${modelId}&query=${encodeURIComponent(query)}`,
+    `/api/v1/definitions/query?definition_id=${definitionId}&query=${encodeURIComponent(JSON.stringify(query))}`,
     { headers: { ...authHeaders() } },
   );
   return handleResponse<any>(res);
 }
 
 
-// ── Queries ───────────────────────────────────────────────────────────────
+// ── Datasets ─────────────────────────────────────────────────────────────
 
-export interface QueryPublicResponse {
+export interface DatasetPublicResponse {
   id: string;
   name: string;
   description: string | null;
   source: string;
-  semantic_model: QuerySemanticModel;
+  definition: DatasetDefinition;
   created_at: string;
   updated_at: string;
   created_by: string;
   updated_by: string;
 }
 
-export interface QueryUpdate {
+export interface DatasetUpdate {
   name?: string;
   description?: string;
   source?: string;
@@ -527,12 +533,13 @@ export interface QueryUpdate {
   calculated_fields?: unknown[];
   order_by_fields?: Record<string, string>;
   limit?: number;
-  malloy_query?: string;
+  limit_enabled?: boolean;
+  cube_query?: CubeQuery;
   sql_query?: string;
-  semantic_model_id?: string;
+  definition_id?: string;
 }
 
-export interface QueryCreate {
+export interface DatasetCreate {
   name: string;
   description?: string;
   source: string;
@@ -543,20 +550,21 @@ export interface QueryCreate {
   calculated_fields?: unknown[];
   order_by_fields?: Record<string, string>;
   limit?: number;
-  malloy_query: string;
+  limit_enabled?: boolean;
+  cube_query: CubeQuery;
   sql_query?: string;
 }
 
-export interface QuerySemanticModel {
+export interface DatasetDefinition {
   id: string;
   name: string;
-  package: QueryPackage;
+  model: DatasetModel;
 }
-export interface QueryPackage {
+export interface DatasetModel {
   id: string;
   name: string;
 }
-export interface QueryDetailedResponse {
+export interface DatasetDetailedResponse {
   id: string;
   name: string;
   source: string;
@@ -567,9 +575,10 @@ export interface QueryDetailedResponse {
   calculated_fields: unknown[] | null;
   order_by_fields: Record<string, string> | null;
   limit: number;
-  malloy_query: string;
+  limit_enabled: boolean;
+  cube_query: CubeQuery;
   sql_query: string;
-  semantic_model: QuerySemanticModel;
+  definition: DatasetDefinition;
   description: string;
   created_at: string;
   updated_at: string;
@@ -577,22 +586,22 @@ export interface QueryDetailedResponse {
   updated_by: string;
 }
 
-export async function getQueries(): Promise<QueryPublicResponse[]> {
-  const res = await fetch(`/api/v1/queries/list`, {
+export async function getDatasets(): Promise<DatasetPublicResponse[]> {
+  const res = await fetch(`/api/v1/datasets/list`, {
     headers: { ...authHeaders() },
   });
-  return handleResponse<QueryPublicResponse[]>(res);
+  return handleResponse<DatasetPublicResponse[]>(res);
 }
 
-export async function getQuery(queryId: string): Promise<QueryDetailedResponse> {
-  const res = await fetch(`/api/v1/queries/get?id=${queryId}`, {
+export async function getDataset(datasetId: string): Promise<DatasetDetailedResponse> {
+  const res = await fetch(`/api/v1/datasets/get?id=${datasetId}`, {
     headers: { ...authHeaders() },
   });
-  return handleResponse<QueryDetailedResponse>(res);
+  return handleResponse<DatasetDetailedResponse>(res);
 }
 
-export async function createQuery(semanticModelId: string, data: QueryCreate): Promise<void> {
-  const res = await fetch(`/api/v1/queries/create?semantic_model_id=${semanticModelId}`, {
+export async function createDataset(definitionId: string, data: DatasetCreate): Promise<void> {
+  const res = await fetch(`/api/v1/datasets/create?definition_id=${definitionId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(data),
@@ -600,8 +609,8 @@ export async function createQuery(semanticModelId: string, data: QueryCreate): P
   return handleResponse<void>(res);
 }
 
-export async function updateQuery(queryId: string, data: QueryUpdate): Promise<void> {
-  const res = await fetch(`/api/v1/queries/update?query_id=${queryId}`, {
+export async function updateDataset(datasetId: string, data: DatasetUpdate): Promise<void> {
+  const res = await fetch(`/api/v1/datasets/update?dataset_id=${datasetId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(data),
@@ -609,8 +618,8 @@ export async function updateQuery(queryId: string, data: QueryUpdate): Promise<v
   return handleResponse<void>(res);
 }
 
-export async function deleteQuery(queryId: string): Promise<void> {
-  const res = await fetch(`/api/v1/queries/delete?query_id=${queryId}`, {
+export async function deleteDataset(datasetId: string): Promise<void> {
+  const res = await fetch(`/api/v1/datasets/delete?dataset_id=${datasetId}`, {
     method: "DELETE",
     headers: { ...authHeaders() },
   });
@@ -654,11 +663,60 @@ export async function createFile(name: string, file: globalThis.File, descriptio
   return handleResponse<void>(res);
 }
 
+/** Bulk uploads name each record after its own filename (extension stripped) — no separate "Name" field to fill in. */
+export function baseFileName(fileName: string): string {
+  return fileName.replace(/\.[^./\\]+$/, "") || fileName;
+}
+
+export interface FileUploadOutcome {
+  file: globalThis.File;
+  error?: string;
+}
+
+/** Uploads each file sequentially (the backend takes one file per request) and
+ * keeps going on individual failures, reporting a per-file outcome instead of
+ * throwing — a partial batch failure still leaves the successful ones saved. */
+export async function createFiles(
+  files: globalThis.File[],
+  description?: string,
+  onProgress?: (done: number, total: number) => void,
+): Promise<FileUploadOutcome[]> {
+  const outcomes: FileUploadOutcome[] = [];
+  for (const file of files) {
+    try {
+      await createFile(baseFileName(file.name), file, description);
+      outcomes.push({ file });
+    } catch (e: any) {
+      outcomes.push({ file, error: e.message ?? "Upload failed." });
+    }
+    onProgress?.(outcomes.length, files.length);
+  }
+  return outcomes;
+}
+
 export async function deleteFile(fileId: string): Promise<void> {
   const res = await fetch(`/api/v1/files/delete?file_id=${fileId}`, {
     method: "DELETE",
     headers: { ...authHeaders() },
   });
   return handleResponse<void>(res);
+}
+
+export interface FileSchemaColumn {
+  name: string;
+  type: string;
+}
+
+export interface FileSchemaResponse {
+  format: string;
+  sample_row_count: number;
+  columns: FileSchemaColumn[];
+}
+
+export async function getFileSchema(fileId: string): Promise<FileSchemaResponse> {
+  const res = await fetch(`/api/v1/files/schema?file_id=${fileId}`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<FileSchemaResponse>(res);
 }
 

@@ -1,6 +1,8 @@
 <div align="center">
 
-<img src="assets/logo.png" alt="Chester BI" width="280" />
+# Chester BI
+
+<img src="assets/logo.svg" alt="Chester BI logo" width="88" />
 
 **Self-hosted, open-source Business Intelligence platform**
 
@@ -17,11 +19,39 @@
 
 ---
 
+## Table of Contents
+
+- [What is Chester BI?](#what-is-chester-bi)
+- [Features](#features)
+- [Screenshots](#screenshots)
+- [Tech Stack](#tech-stack)
+- [Quick Start (Docker — recommended)](#quick-start-docker--recommended)
+- [Local Development (without Docker)](#local-development-without-docker)
+- [Environment Variables](#environment-variables)
+- [Project Structure](#project-structure)
+- [API Reference](#api-reference)
+- [Contributing](#contributing)
+- [License](#license)
+- [Acknowledgements](#acknowledgements)
+
+---
+
 ## What is Chester BI?
 
-Chester BI is a fully self-hosted business intelligence platform you run on your **own infrastructure**. Connect your databases, write [Malloy](https://www.malloydata.dev/) semantic queries, build interactive drag-and-drop dashboards, and share insights with your team — with zero vendor lock-in and no data leaving your servers.
+Chester BI is a fully self-hosted business intelligence platform you run on your **own infrastructure**. Connect your databases, model them as [Cube](https://cube.dev/) semantic cubes, build interactive drag-and-drop dashboards, and share insights with your team — with zero vendor lock-in and no data leaving your servers.
 
-> Built on FastAPI, React, PostgreSQL, Redis, and the Malloy Publisher query engine.
+> Built on FastAPI, React, PostgreSQL, Redis, and the Cube Core query engine.
+
+---
+
+## Features
+
+- **Connections** — connect to your databases (PostgreSQL, MySQL, Snowflake, BigQuery) or upload CSV files directly
+- **Model Editor** — define Cube semantic models with a visual, form-based builder or edit the underlying YAML directly, side by side
+- **Dataset Builder** — a drag-and-drop query builder with dimension/measure pickers, filters, and live Table, JSON, Cube query, and generated SQL previews
+- **Dashboards** — assemble KPI tiles, charts, and tables on a drag-and-drop canvas, backed by saved datasets
+- **Cross-filtering** — configure a single filter, map it to model fields, and apply it across one or many charts at once
+- **Access Control** — per-user permissions across connections, models, datasets, and dashboards
 
 ---
 
@@ -29,42 +59,27 @@ Chester BI is a fully self-hosted business intelligence platform you run on your
 
 <div align="center">
 
-<img src="assets/screenshot-dashboard.png" alt="Interactive dashboard" width="900" />
+<img src="assets/Dashobards.png" alt="Interactive dashboard with KPI tiles, line charts, bar charts, and a data table, filtered by date range and country" width="900" />
 
-_Interactive dashboards — KPI tiles, charts, and tables wired together with shared date/dimension filters_
+_Dashboards — KPI tiles, charts, and tables wired together with shared date/dimension filters_
 
-<table>
-<tr>
-<td width="50%">
-<img src="assets/screenshot-query-builder.png" alt="Query Builder" />
-<br/><sub><b>Query Builder</b> — drag-and-drop dimensions, measures, filters, and calculated (window function) columns, with live Malloy/SQL/JSON previews</sub>
-</td>
-<td width="50%">
-<img src="assets/screenshot-package-editor.png" alt="Package Editor" />
-<br/><sub><b>Package Editor</b> — edit Malloy semantic model files directly in the browser</sub>
-</td>
-</tr>
-<tr>
-<td width="50%">
-<img src="assets/screenshot-dashboard-filter.png" alt="Dashboard filter configuration" />
-<br/><sub><b>Cross-filtering</b> — map one filter to model fields and apply it across multiple charts at once</sub>
-</td>
-<td width="50%">
-<img src="assets/screenshot-queries-list.png" alt="Queries list" />
-<br/><sub><b>Saved Queries</b> — reusable queries organized by package, model, and source</sub>
-</td>
-</tr>
-<tr>
-<td width="50%">
-<img src="assets/screenshot-files.png" alt="Files management" />
-<br/><sub><b>File Manager</b> — upload CSV/data files to back your semantic models</sub>
-</td>
-<td width="50%">
-<img src="assets/screenshot-users.png" alt="User permissions" />
-<br/><sub><b>Access Control</b> — fine-grained, per-resource permissions for every user</sub>
-</td>
-</tr>
-</table>
+<br/>
+
+<img src="assets/Dataset%20Builder.png" alt="Dataset Builder showing the dimension and measure picker, filters, and a results table with Table, JSON, Cube, and SQL view tabs" width="900" />
+
+_Dataset Builder — pick dimensions and measures, filter results, and preview the Table, JSON, Cube query, and generated SQL side by side_
+
+<br/>
+
+<img src="assets/Model%20builder.png" alt="Model Editor visual builder showing a cube's primary key, dimensions, and measures configured from an uploaded CSV file" width="900" />
+
+_Model Editor — define cubes, dimensions, and measures visually, or edit the generated Cube YAML directly_
+
+<br/>
+
+<img src="assets/screenshot-dashboard-filter-browser.png" alt="Configure Filter dialog for mapping a dashboard filter to model fields and choosing which charts it affects" width="900" />
+
+_Cross-filtering — map a filter to compatible model fields and choose exactly which charts it targets_
 
 </div>
 
@@ -75,7 +90,7 @@ _Interactive dashboards — KPI tiles, charts, and tables wired together with sh
 ### Backend
 - **[FastAPI](https://fastapi.tiangolo.com/)** + **Uvicorn** — async Python API
 - **SQLAlchemy 2** + **PostgreSQL 16** — relational data store
-- **[Malloy Publisher](https://github.com/malloydata/publisher)** — semantic query engine
+- **[Cube Core](https://github.com/cube-js/cube)** — semantic query engine
 - **Redis 7** — query result caching
 - **JWT + Bcrypt** — authentication & password hashing
 - **Fernet** — encryption for stored connection credentials
@@ -133,7 +148,7 @@ This spins up five containers:
 | `chester_backend` | FastAPI API | internal |
 | `chester_postgres` | PostgreSQL 16 | 5432 |
 | `chester_redis` | Redis 7 cache | internal |
-| `chester_publisher` | Malloy Publisher | 4000 / 4040 |
+| `chester_cube` | Cube Core | internal (4000) |
 
 ### 4. Create your account
 Open [http://localhost:3000](http://localhost:3000) and click **Get Started** to register your organisation owner account.
@@ -154,7 +169,7 @@ source .venv/bin/activate
 
 pip install -r requirements.txt
 
-# Make sure PostgreSQL, Redis, and Malloy Publisher are running, then:
+# Make sure PostgreSQL, Redis, and Cube Core are running, then:
 uvicorn main:app --reload --port 8989
 ```
 
@@ -185,8 +200,8 @@ Copy `.example.env` → `.env`. The full annotated reference is in that file. Ke
 | `AWS_REGION` | No | AWS region for S3 |
 | `AWS_ACCESS_KEY_ID` | No | AWS access key |
 | `AWS_SECRET_ACCESS_KEY` | No | AWS secret key |
-| `MALLOY_HOST` | No | Malloy Publisher host (default: `host.docker.internal`) |
-| `MALLOY_PORT` | No | Malloy Publisher port (default: `4000`) |
+| `CUBE_URL` | No | Cube Core base URL (default: `http://localhost:4000`) |
+| `CUBEJS_API_SECRET` | **Yes** | Shared secret for signing/verifying the JWT sent to Cube |
 | `REDIS_HOST` | No | Redis host (default: `host.docker.internal`) |
 | `REDIS_PORT` | No | Redis port (default: `6379`) |
 | `REDIS_CACHE_TTL` | No | Cache TTL in seconds (default: `1800`) |
@@ -202,24 +217,24 @@ Copy `.example.env` → `.env`. The full annotated reference is in that file. Ke
 chester-bi/
 ├── backend/                  # FastAPI application
 │   ├── models/               # SQLAlchemy ORM models
-│   ├── routes/               # API route handlers
-│   ├── schema/               # Pydantic request/response schemas
-│   ├── utils/                # Storage, config, Redis, Malloy helpers
+│   ├── routes/                # API route handlers
+│   ├── schema/                # Pydantic request/response schemas
+│   ├── utils/                 # Storage, config, Redis, Cube helpers
 │   ├── security.py           # JWT, hashing, encryption
-│   ├── main.py               # Application entry point
+│   ├── main.py                # Application entry point
 │   ├── requirements.txt      # Python dependencies
 │   └── Dockerfile
 ├── frontend/                 # React + TypeScript application
 │   ├── src/
 │   │   ├── components/       # Reusable UI components
-│   │   ├── pages/            # Route-level page components
-│   │   └── lib/              # API client, auth, theme utilities
+│   │   ├── pages/             # Route-level page components
+│   │   └── lib/               # API client, auth, theme utilities
 │   ├── nginx.conf            # Production Nginx config
 │   ├── package.json
 │   └── Dockerfile
 ├── .example.env              # Annotated environment template
-├── docker-compose.yml        # Full-stack orchestration
-└── LICENSES/                 # Third-party license attributions
+├── docker-compose.yml         # Full-stack orchestration
+└── LICENSES/                  # Third-party license attributions
 ```
 
 ---
@@ -257,13 +272,13 @@ Please open an issue first for large changes so we can discuss the approach.
 
 Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
 
-Chester BI uses the **Malloy Publisher** under its own license. See [`LICENSES/LICENSE-THIRD-PARTY`](LICENSES/LICENSE-THIRD-PARTY) for third-party attributions.
+Chester BI uses **Cube Core** under its own license. See [`LICENSES/LICENSE-THIRD-PARTY`](LICENSES/LICENSE-THIRD-PARTY) for third-party attributions.
 
 ---
 
 ## Acknowledgements
 
-- [Malloy](https://www.malloydata.dev/) — the semantic query language powering Chester BI's query engine
+- [Cube](https://cube.dev/) — the semantic query engine powering Chester BI's query layer
 - [FastAPI](https://fastapi.tiangolo.com/) — the backend framework
 - [React Grid Layout](https://github.com/react-grid-layout/react-grid-layout) — dashboard drag-and-drop
 - [ECharts](https://echarts.apache.org/) — charting library

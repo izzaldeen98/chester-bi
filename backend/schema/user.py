@@ -23,17 +23,17 @@ class UserPermissions(StrEnum):
     CONNECTIONS_DELETE = "connections:delete"
     CONNECTIONS_LIST = "connections:list"
     CONNECTIONS_ALL = "connections:*"
-    MODELS_VIEW = "models:view"
+    DEFINITIONS_VIEW = "definitions:view"
+    DEFINITIONS_EDIT = "definitions:edit"
+    DEFINITIONS_DELETE = "definitions:delete"
+    DEFINITIONS_CREATE = "definitions:create"
+    DEFINITIONS_LIST = "definitions:list"
+    DEFINITIONS_ALL = "definitions:*"
     MODELS_EDIT = "models:edit"
     MODELS_DELETE = "models:delete"
     MODELS_CREATE = "models:create"
     MODELS_LIST = "models:list"
     MODELS_ALL = "models:*"
-    PACKAGES_EDIT = "packages:edit"
-    PACKAGES_DELETE = "packages:delete"
-    PACKAGES_CREATE = "packages:create"
-    PACKAGES_LIST = "packages:list"
-    PACKAGES_ALL = "packages:*"
 
 
 class UserBase(BaseModel):

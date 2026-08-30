@@ -4,8 +4,8 @@ from sqlalchemy.sql import func
 from utils.init_database import Base
 import uuid
 
-class Package(Base):
-    __tablename__ = "packages"
+class Model(Base):
+    __tablename__ = "models"
     id = Column(Integer, primary_key=True, index=True)
     public_key = Column(UUID, nullable=False, unique=True, index=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
@@ -17,7 +17,6 @@ class Package(Base):
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     updated_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    account = relationship("Account", foreign_keys=[account_id] , backref="packages")
-    creator = relationship("User", foreign_keys=[created_by] , backref="created_packages")
-    updater = relationship("User", foreign_keys=[updated_by] , backref="updated_packages")
-
+    account = relationship("Account", foreign_keys=[account_id] , backref="models")
+    creator = relationship("User", foreign_keys=[created_by] , backref="created_models")
+    updater = relationship("User", foreign_keys=[updated_by] , backref="updated_models")

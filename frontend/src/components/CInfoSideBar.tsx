@@ -8,6 +8,11 @@ interface CInfoSideBarProps {
   subtitle?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** Set false while a form has in-progress/unsaved input (e.g. a file picker
+   * flow) — a stray click on the backdrop (including "ghost clicks" some
+   * browsers deliver right after a native dialog like a file picker or
+   * alert() closes) would otherwise silently discard it. Defaults to true. */
+  closeOnBackdropClick?: boolean;
 }
 
 export default function CInfoSideBar({
@@ -17,6 +22,7 @@ export default function CInfoSideBar({
   subtitle,
   children,
   footer,
+  closeOnBackdropClick = true,
 }: CInfoSideBarProps) {
   // Close on Escape key
   useEffect(() => {
@@ -32,7 +38,7 @@ export default function CInfoSideBar({
     <>
       {/* Backdrop */}
       <div
-        onClick={onClose}
+        onClick={closeOnBackdropClick ? onClose : undefined}
         className="fixed inset-0 z-30 transition-opacity duration-200"
         style={{
           background: "rgba(0,0,0,0.25)",

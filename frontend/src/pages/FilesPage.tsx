@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { FaFileAlt, FaSearch, FaTrash, FaPlus, FaCalendarAlt, FaSyncAlt, FaFileCode } from "react-icons/fa";
 import CMetricCard from "../components/CMetricCard";
 import CInfoSideBar from "../components/CInfoSideBar";
@@ -10,7 +10,8 @@ import CSpinner from "../components/CSpinner";
 import CDetailRow from "../components/CDetailRow";
 import {
   getFiles,
-  createFile,
+  createFiles,
+  baseFileName,
   deleteFile,
   type FilePublicResponse,
 } from "../lib/Api";
@@ -92,8 +93,6 @@ function CTextArea({
 
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function FilesPage() {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   // Data
   const [files, setFiles]         = useState<FilePublicResponse[]>([]);
   const [loading, setLoading]     = useState(true);
@@ -107,9 +106,9 @@ export default function FilesPage() {
   const [formError, setFormError] = useState("");
 
   // Create fields
-  const [cName, setCName]               = useState("");
   const [cDescription, setCDescription] = useState("");
-  const [cFile, setCFile]               = useState<globalThis.File | null>(null);
+  const [cFiles, setCFiles]             = useState<globalThis.File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
 
   // Delete confirm dialog
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -160,9 +159,8 @@ export default function FilesPage() {
 
   function openCreate() {
     setSelected(null);
-    setCName("");
     setCDescription("");
-    setCFile(null);
+    setCFiles([]);
     setFormError("");
     setMode("create");
   }
@@ -171,24 +169,45 @@ export default function FilesPage() {
     setSelected(null);
     setMode("view");
     setFormError("");
-    setCFile(null);
+    setCFiles([]);
+    setUploadProgress(null);
+  }
+
+  function addFiles(picked: FileList | null) {
+    if (!picked || picked.length === 0) return;
+    // Snapshot to a real array HERE, eagerly. `picked` is the input's *live*
+    // FileList, and the caller resets input.value right after this returns to
+    // allow re-picking the same file — a lazy `Array.from(picked)` inside the
+    // state updater would run after that reset and read an empty list.
+    const added = Array.from(picked);
+    setCFiles((prev) => [...prev, ...added]);
+  }
+
+  function removeFile(index: number) {
+    setCFiles((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function saveCreate() {
-    if (!cName.trim()) { setFormError("Name is required."); return; }
-    if (!cFile) { setFormError("Please select a file to upload."); return; }
+    if (cFiles.length === 0) { setFormError("Please select at least one file to upload."); return; }
 
     setSaving(true);
     setFormError("");
-    try {
-      await createFile(cName.trim(), cFile, cDescription.trim() || undefined);
-      await fetchFiles();
-      closePanel();
-    } catch (e: any) {
-      setFormError(e.message ?? "Upload failed.");
-    } finally {
-      setSaving(false);
+    setUploadProgress({ done: 0, total: cFiles.length });
+
+    const outcomes = await createFiles(cFiles, cDescription.trim() || undefined, (done, total) =>
+      setUploadProgress({ done, total }),
+    );
+
+    await fetchFiles();
+    setSaving(false);
+    setUploadProgress(null);
+
+    const failed = outcomes.filter((o) => o.error);
+    if (failed.length > 0) {
+      setFormError(failed.map((o) => `${o.file.name}: ${o.error}`).join("; "));
+      return;
     }
+    closePanel();
   }
 
   async function handleDelete() {
@@ -213,40 +232,64 @@ export default function FilesPage() {
       return (
         <div className="flex flex-col gap-4">
           {formError && <CAlert variant="error" message={formError} />}
-          <CTextInput
-            label="Name"
-            value={cName}
-            onChange={setCName}
-            placeholder="e.g. Q2 Sales Report"
-            required
-          />
           <CTextArea
             label="Description"
             value={cDescription}
             onChange={setCDescription}
-            placeholder="Optional description…"
+            placeholder="Optional description, applied to every file in this batch…"
             rows={3}
           />
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium" style={{ color: "var(--text-h)" }}>
-              File <span className="text-[var(--accent)]">*</span>
+              Files <span className="text-[var(--accent)]">*</span>
             </label>
+            {/* Resetting value after addFiles lets the same file be re-picked;
+                addFiles snapshots the FileList first (see the note there). */}
             <input
-              ref={fileInputRef}
               type="file"
-              className="hidden"
-              onChange={(e) => setCFile(e.target.files?.[0] ?? null)}
+              multiple
+              onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }}
+              className="w-full rounded-xl border border-[var(--border)] bg-transparent
+                px-3 py-2 text-sm text-[var(--text-h)]
+                file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--accent)]
+                file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-[var(--accent-fg)]
+                file:cursor-pointer cursor-pointer"
             />
-            <CButton
-              variant="outline"
-              fullWidth
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {cFile ? cFile.name : "Choose file…"}
-            </CButton>
-            {cFile && (
+
+            {cFiles.length > 0 && (
+              <div className="mt-1 flex flex-col gap-1.5">
+                {cFiles.map((f, i) => (
+                  <div
+                    key={`${f.name}-${i}`}
+                    className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5"
+                    style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium" style={{ color: "var(--text-h)" }}>
+                        {baseFileName(f.name)}
+                      </p>
+                      <p className="truncate text-[10px]" style={{ color: "var(--text)" }}>
+                        {f.name} · {formatFileSize(f.size)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(i)}
+                      title="Remove"
+                      className="shrink-0 rounded-md px-1.5 py-0.5 text-xs transition-colors hover:bg-[var(--bg-subtle)]"
+                      style={{ color: "var(--text)" }}
+                      disabled={saving}
+                    >
+                      <FaTrash size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {uploadProgress && (
               <p className="text-xs" style={{ color: "var(--text)" }}>
-                {formatFileSize(cFile.size)}
+                Uploading {uploadProgress.done}/{uploadProgress.total}…
               </p>
             )}
           </div>
@@ -298,9 +341,9 @@ export default function FilesPage() {
             fullWidth
             loading={saving}
             onClick={saveCreate}
-            disabled={!cName.trim() || !cFile}
+            disabled={cFiles.length === 0}
           >
-            Upload File
+            {cFiles.length > 1 ? `Upload ${cFiles.length} Files` : "Upload File"}
           </CButton>
           <CButton variant="ghost" onClick={closePanel} disabled={saving}>Cancel</CButton>
         </div>
@@ -322,11 +365,11 @@ export default function FilesPage() {
   }
 
   const sidebarTitle =
-    mode === "create" ? "Upload File" :
+    mode === "create" ? "Upload Files" :
     selected ? selected.name : "";
 
   const sidebarSubtitle =
-    mode === "create" ? "Choose a file and give it a name" :
+    mode === "create" ? "Choose one or more files — each is named after its own filename" :
     selected ? `${selected.file_name} · ${formatFileSize(selected.file_size)}` : "";
 
   return (
@@ -339,7 +382,7 @@ export default function FilesPage() {
           </p>
         </div>
         <CButton variant="primary" onClick={openCreate}>
-          <FaPlus size={12} /> Upload File
+          <FaPlus size={12} /> Upload Files
         </CButton>
       </div>
 
@@ -376,15 +419,17 @@ export default function FilesPage() {
         <div>
           <table className="w-full border-collapse text-xs">
             <thead>
-              {columns.map((column) => (
-                <th
-                  key={column}
-                  className="px-3 py-2 text-left font-semibold whitespace-nowrap"
-                  style={{ color: "var(--text-h)", borderBottom: "2px solid var(--border)", borderRight: "1px solid var(--border)" }}
-                >
-                  {column}
-                </th>
-              ))}
+              <tr>
+                {columns.map((column) => (
+                  <th
+                    key={column}
+                    className="px-3 py-2 text-left font-semibold whitespace-nowrap"
+                    style={{ color: "var(--text-h)", borderBottom: "2px solid var(--border)", borderRight: "1px solid var(--border)" }}
+                  >
+                    {column}
+                  </th>
+                ))}
+              </tr>
             </thead>
             <tbody>
               {filtered.map((file, index) => (
@@ -418,6 +463,7 @@ export default function FilesPage() {
         title={sidebarTitle}
         subtitle={sidebarSubtitle}
         footer={renderSidebarFooter()}
+        closeOnBackdropClick={mode !== "create"}
       >
         {renderSidebarContent()}
       </CInfoSideBar>

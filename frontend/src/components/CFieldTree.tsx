@@ -3,7 +3,7 @@ import { FaChevronDown, FaChevronRight, FaHashtag, FaCalendarAlt, FaSortAmountDo
 import { IoText } from "react-icons/io5";
 import { IoIosSwitch } from "react-icons/io";
 import { TbRulerMeasure2, TbMathFunction } from "react-icons/tb";
-import { FieldInfo } from "@malloydata/malloy-interfaces";
+import { FieldInfo } from "../lib/cubeTypes";
 import { TIME_GRANULARITIES, type Granularity, type SortItem, isDateTime } from "../lib/fieldTree";
 
 interface FieldGroup {
@@ -33,6 +33,9 @@ interface CFieldTreeProps {
   aggFields: FieldInfo[];
   granularityMap: Record<string, Granularity>;
   sortMap: SortItem[];
+  /** Only set for composite sources — maps a field name to the member
+   * source(s) that actually define it, e.g. {"Dock Doors": ["facilities"]}. */
+  fieldOrigins?: Record<string, string[]> | null;
   onToggleField: (field: FieldInfo) => void;
   onSetGranularity: (e: React.MouseEvent, fieldName: string, gran: Granularity) => void;
   onCycleSort: (e: React.MouseEvent<HTMLDivElement>, field: FieldInfo) => void;
@@ -46,6 +49,7 @@ export default function CFieldTree({
   aggFields,
   granularityMap,
   sortMap,
+  fieldOrigins,
   onToggleField,
   onSetGranularity,
   onCycleSort,
@@ -149,12 +153,24 @@ export default function CFieldTree({
                       style={{ accentColor: isMeasureLike ? "#7c3aed" : "var(--accent)" }}
                     />
                     <FieldIcon field={field} />
-                    <span
-                      className="flex-1 truncate text-xs"
-                      style={{ color: isSelected ? (isMeasureLike ? "#7c3aed" : "var(--accent)") : "var(--text-h)" }}
-                    >
-                      {field.name}
-                    </span>
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <span
+                        className="truncate text-xs"
+                        style={{ color: isSelected ? (isMeasureLike ? "#7c3aed" : "var(--accent)") : "var(--text-h)" }}
+                      >
+                        {field.name}
+                      </span>
+
+                      {fieldOrigins && fieldOrigins[field.name] && (
+                        <span
+                          className="shrink-0 rounded px-1 py-0.5 text-[9px] font-medium"
+                          title={`Defined in: ${fieldOrigins[field.name].join(", ")}`}
+                          style={{ background: "var(--border)", color: "var(--text)" }}
+                        >
+                          {fieldOrigins[field.name].join("/")}
+                        </span>
+                      )}
+                    </div>
 
                     {isSelected && (
                       <div
