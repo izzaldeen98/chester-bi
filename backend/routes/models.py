@@ -12,6 +12,7 @@ import json
 from typing import List
 from uuid import UUID
 from models.definitions import Definition
+from models.datasets import Dataset
 from utils.cube import ensure_account_definition_dir
 
 
@@ -105,6 +106,47 @@ async def create_model(
         )
 
     return {"message": "Model created successfully"}
+
+
+@router.delete("/delete", status_code=status.HTTP_200_OK)
+async def delete_model(
+    model_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    permissions = ["*", "models:*", "models:delete"]
+    if not check_permissions(current_user, *permissions):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized: Insufficient permissions",
+        )
+    model = db.query(Model).filter(Model.public_key == model_id, Model.account_id == current_user.account_id).first()
+    if not model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Model not found",
+        )
+
+    # Every definition (and any dataset built on top of it) must go first —
+    # datasets.definition_id and definitions.model_id have no ON DELETE
+    # CASCADE, so deleting the model row first would fail (Postgres) or
+    # leave orphaned rows behind (SQLite).
+    definitions = db.query(Definition).filter(Definition.model_id == model.id).all()
+    for definition in definitions:
+        db.query(Dataset).filter(Dataset.definition_id == definition.id).delete()
+        await storage.delete_file(definition.file_path, definition.file_name)
+        db.delete(definition)
+
+    try:
+        account_public_key = str(current_user.account.public_key)
+        model_folder = f"cube_data/{account_public_key}/models"
+        await storage.delete_file(model_folder, f"{model.name}.json")
+    except Exception:
+        pass  # storage cleanup is best-effort — the DB row is the source of truth
+
+    db.delete(model)
+    db.commit()
+    return {"message": "Model deleted successfully"}
 
 
 @router.get("/list", response_model=List[ModelResponse])

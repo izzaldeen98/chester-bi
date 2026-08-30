@@ -1,17 +1,18 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GoPackage } from "react-icons/go";
-import { FaSearch, FaPlus, FaCalendarAlt, FaCheckCircle, FaFolderOpen, FaCode } from "react-icons/fa";
+import { FaSearch, FaPlus, FaCalendarAlt, FaCheckCircle, FaFolderOpen, FaCode, FaTrash } from "react-icons/fa";
 import { MdBlock } from "react-icons/md";
 import CMetricCard from "../components/CMetricCard";
 import CHCard from "../components/CHCard";
 import CInfoSideBar from "../components/CInfoSideBar";
+import CConfirmDialog from "../components/CConfirmDialog";
 import CButton from "../components/CButton";
 import CTextInput from "../components/CTextInput";
 import CAlert from "../components/CAlert";
 import CSpinner from "../components/CSpinner";
 import CDetailRow from "../components/CDetailRow";
-import { getModels, createModel, type ModelResponse } from "../lib/Api";
+import { getModels, createModel, deleteModel, type ModelResponse } from "../lib/Api";
 
 type SidebarMode = "view" | "create";
 
@@ -86,6 +87,11 @@ export default function ModelsPage() {
   const [saving, setSaving]       = useState(false);
   const [formError, setFormError] = useState("");
 
+  // Delete confirm dialog
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting]       = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
   // Create fields
   const [cName,        setCName]        = useState("");
   const [cDescription, setCDescription] = useState("");
@@ -132,6 +138,19 @@ export default function ModelsPage() {
 
   function closePanel() {
     setSelected(null); setMode("view"); setFormError("");
+  }
+
+  // ── Delete ───────────────────────────────────────────────────────────────
+  async function handleDelete() {
+    if (!selected) return;
+    setDeleting(true); setDeleteError("");
+    try {
+      await deleteModel(selected.id);
+      await fetchModels();
+      setConfirmOpen(false); closePanel();
+    } catch (e: any) {
+      setDeleteError(e.message ?? "Delete failed."); setConfirmOpen(false);
+    } finally { setDeleting(false); }
   }
 
   // ── Save create ──────────────────────────────────────────────────────────
@@ -207,9 +226,15 @@ export default function ModelsPage() {
     // view
     if (selected) {
       return (
-        <CButton variant="outline" fullWidth onClick={() => navigate(`/models/${selected.id}/editor`)}>
-          <FaCode size={13} /> Open Editor
-        </CButton>
+        <div className="flex flex-col gap-2">
+          {deleteError && <CAlert variant="error" message={deleteError} />}
+          <CButton variant="outline" fullWidth onClick={() => navigate(`/models/${selected.id}/editor`)}>
+            <FaCode size={13} /> Open Editor
+          </CButton>
+          <CButton variant="danger" fullWidth onClick={() => { setDeleteError(""); setConfirmOpen(true); }}>
+            <FaTrash size={13} /> Delete Model
+          </CButton>
+        </div>
       );
     }
     return null;
@@ -299,6 +324,19 @@ export default function ModelsPage() {
       >
         {renderSidebarContent()}
       </CInfoSideBar>
+
+      {/* Delete confirmation */}
+      <CConfirmDialog
+        isOpen={confirmOpen}
+        title="Delete Model"
+        message={selected ? `Are you sure you want to delete "${selected.name}"? This will also delete all its definitions and datasets. This action cannot be undone.` : ""}
+        confirmLabel="Yes, Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

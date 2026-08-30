@@ -265,6 +265,14 @@ export async function getModels(): Promise<ModelResponse[]> {
   return handleResponse<ModelResponse[]>(res);
 }
 
+export async function deleteModel(modelId: string): Promise<void> {
+  const res = await fetch(`/api/v1/models/delete?model_id=${modelId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<void>(res);
+}
+
 // ── Connections ────────────────────────────────────────────────────────────
 
 export interface ConnectionPublicResponse {

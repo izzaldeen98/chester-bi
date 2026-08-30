@@ -221,7 +221,13 @@ export function generateCubeYaml(sources: WizardSource[]): string {
       // column name itself; an expression has no natural default so it needs one.
       const name = d.name.trim() || (d.mode === "column" ? sql : "");
       if (!name) continue;
-      dimensionEntries.push({ name, sql, type: d.type, format: d.format, isPrimaryKey: name === primaryKey });
+      // A bare column reference must be qualified with {CUBE} — left
+      // unqualified, Cube emits it as-is in the compiled SQL, and if this
+      // cube is joined to another one exposing the same raw column name
+      // (common with `SELECT *`-over-file sources), the query fails with a
+      // "Binder Error: Ambiguous reference to column" from the SQL engine.
+      const emittedSql = d.mode === "column" ? `{CUBE}.${sql}` : sql;
+      dimensionEntries.push({ name, sql: emittedSql, type: d.type, format: d.format, isPrimaryKey: name === primaryKey });
     }
     if (dimensionEntries.length) {
       lines.push("    dimensions:");
@@ -246,7 +252,8 @@ export function generateCubeYaml(sources: WizardSource[]): string {
           lines.push(`        sql: ${yamlStr(m.expression.trim())}`);
           lines.push(`        type: "number"`);
         } else {
-          lines.push(`        sql: ${yamlStr(m.field.trim())}`);
+          // Same ambiguous-column risk as dimensions — qualify with {CUBE}.
+          lines.push(`        sql: ${yamlStr(`{CUBE}.${m.field.trim()}`)}`);
           lines.push(`        type: ${yamlStr(m.fn)}`);
         }
         if (m.format) lines.push(`        format: ${yamlStr(m.format)}`);
@@ -279,6 +286,17 @@ function unquote(raw: string): string {
   } catch {
     return raw;
   }
+}
+
+/** Recognizes a bare column reference — either unqualified ("status") or
+ * {CUBE}-qualified ("{CUBE}.status", the form the generator now always
+ * writes) — and returns just the column name; null for anything else
+ * (function calls, operators, literals, cross-cube references). */
+function parseColumnRef(value: string): string | null {
+  const cubeQualified = value.match(/^\{CUBE\}\.([A-Za-z_][A-Za-z0-9_]*)$/);
+  if (cubeQualified) return cubeQualified[1];
+  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) return value;
+  return null;
 }
 
 /**
@@ -371,9 +389,8 @@ export function parseCubeYamlToSources(text: string): WizardSource[] {
         const dim = current.dimensions[current.dimensions.length - 1];
         if (!dim) continue;
         if (pair.key === "sql") {
-          // A bare identifier is a plain column reference — anything else
-          // (function calls, operators, literals) is a computed expression.
-          if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) { dim.mode = "column"; dim.field = value; }
+          const columnRef = parseColumnRef(value);
+          if (columnRef) { dim.mode = "column"; dim.field = columnRef; }
           else { dim.mode = "expression"; dim.expression = value; }
         }
         else if (pair.key === "type" && DIMENSION_TYPE_VALUES.has(value as DimensionType)) dim.type = value as DimensionType;
@@ -392,7 +409,7 @@ export function parseCubeYamlToSources(text: string): WizardSource[] {
           m.fn = value as AggFn;
         } else if (pair.key === "sql") {
           if (m.kind === "expression") m.expression = value;
-          else m.field = value;
+          else m.field = parseColumnRef(value) ?? value;
         } else if (pair.key === "format" && MEASURE_FORMAT_VALUES.has(value as MeasureFormat)) {
           m.format = value as MeasureFormat;
         }
