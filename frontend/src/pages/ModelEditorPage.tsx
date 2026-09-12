@@ -6,6 +6,7 @@ import { VscJson } from "react-icons/vsc";
 import { GoPackage } from "react-icons/go";
 import CodeMirror from "@uiw/react-codemirror";
 import { json } from "@codemirror/lang-json";
+import { yaml } from "@codemirror/lang-yaml";
 import { vscodeDark } from "@uiw/codemirror-theme-vscode";
 import { EditorView } from "@codemirror/view";
 import CSpinner from "../components/CSpinner";
@@ -494,7 +495,11 @@ export default function ModelEditorPage() {
                       ".cm-scroller": { fontFamily: "ui-monospace, Consolas, monospace" },
                     })}
                     extensions={
-                      activeFile.file.endsWith(".json") ? [json()] : []
+                      activeFile.file.endsWith(".json")
+                        ? [json()]
+                        : activeFile.file.endsWith(".yml") || activeFile.file.endsWith(".yaml")
+                        ? [yaml()]
+                        : []
                     }
                     basicSetup={{ lineNumbers: true, foldGutter: true, highlightActiveLine: true, highlightSelectionMatches: true }}
                   />
