@@ -13,7 +13,12 @@ from models.artifact import Artifact
 from models.ai_provider import AIProvider
 from models.user import User
 from routes.ai import _model_scope, _require, resolve_provider
-from schema.artifacts import ArtifactCreateRequest, ArtifactRefineRequest, ArtifactResponse
+from schema.artifacts import (
+    ArtifactCreateRequest,
+    ArtifactQueryRequest,
+    ArtifactRefineRequest,
+    ArtifactResponse,
+)
 from security import get_current_user
 from utils.config_files import storage
 from utils.init_database import get_db
@@ -69,12 +74,13 @@ def _queries_for_version(row: Artifact, version: int | None) -> list:
     return row.queries or []
 
 
-async def _artifact_data(db: Session, user: User, row: Artifact,
-                         version: int | None = None) -> tuple[dict, dict]:
-    """(rows by query id, label by query id) for the version being rendered."""
-    queries = _queries_for_version(row, version)
-    data = artifact_agent.fetch_data(db, user, queries)
-    return data, {q["id"]: q.get("label") or q["id"] for q in queries}
+def _manifest(row: Artifact, version: int | None = None) -> dict:
+    """What the page is allowed to ask for. Columns are advisory — the page
+    reads them to lay out, but the authoritative shape arrives with the rows."""
+    return {
+        q["id"]: {"name": q.get("label") or q["id"], "columns": q.get("columns") or []}
+        for q in _queries_for_version(row, version)
+    }
 
 
 async def _read_markup(row: Artifact, version: int | None = None) -> str:
@@ -192,12 +198,44 @@ async def render_artifact(
     _require(current_user, *READ)
     row = _artifact_or_404(db, current_user, artifact_id)
     markup = await _read_markup(row, version)
+    # No Cube call here: the page asks for each component's rows itself, so a
+    # model change or new data is picked up without regenerating anything.
+    return HTMLResponse(
+        artifact_agent.render_page(markup, _manifest(row, version), row.theme, row.name)
+    )
+
+
+@router.post("/query/{artifact_id}")
+async def query_artifact(
+    artifact_id: UUID,
+    payload: ArtifactQueryRequest,
+    version: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Run ONE of an artifact's stored queries, with the dashboard's currently
+    applied filters merged in.
+
+    This is the whole live-data story: the saved page holds no rows, so every
+    chart calls here on open and again whenever a filter changes. Only the
+    components whose effective query actually changed will miss the cache."""
+    _require(current_user, *READ)
+    row = _artifact_or_404(db, current_user, artifact_id)
+
+    queries = _queries_for_version(row, version)
+    entry = next((q for q in queries if q["id"] == payload.query_id), None)
+    if entry is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"This artifact has no query '{payload.query_id}'")
+
     try:
-        data, labels = await _artifact_data(db, current_user, row, version)
+        rows, cached = artifact_agent.run_query(
+            db, current_user, entry["cube_query"], payload.filters
+        )
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY,
-                            detail=f"Failed to load artifact data: {exc}")
-    return HTMLResponse(artifact_agent.render_page(markup, data, labels, row.theme, row.name))
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+
+    return {"id": entry["id"], "rows": rows, "cached": cached, "count": len(rows)}
 
 
 @router.post("/refine/{artifact_id}", response_model=ArtifactResponse)
@@ -228,6 +266,10 @@ async def refine_artifact(
 
     version = (row.current_version or len(row.prompts or []) or 1) + 1
     await _write_markup(row, markup, version)
+    # The edit may have rewritten a component's query; drop the stale entries
+    # so the next open does not serve rows for a query that no longer exists.
+    for q in (row.queries or []) + result["queries"]:
+        artifact_agent.invalidate_query(current_user.account.public_key, q.get("cube_query") or {})
     row.queries = result["queries"]
     row.prompts = (row.prompts or []) + [
         {"version": version, "instruction": payload.instruction, "model": llm_model,

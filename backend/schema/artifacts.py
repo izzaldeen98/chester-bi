@@ -20,6 +20,13 @@ class ArtifactRefineRequest(BaseModel):
     instruction: str = Field(..., min_length=3)
 
 
+class ArtifactQueryRequest(BaseModel):
+    """One component's request for its rows. `filters` are the dashboard's
+    currently applied cross-filters, merged over the stored cube_query."""
+    query_id: str = Field(..., min_length=1, max_length=64)
+    filters: Optional[list[dict]] = None
+
+
 class ArtifactResponse(BaseModel):
     id: UUID = Field(validation_alias="public_key")
     name: str

@@ -13,6 +13,7 @@ import {
   getAIThemes,
   getArtifact,
   getModels,
+  queryArtifact,
   refineArtifact,
   renderArtifact,
   restoreArtifactVersion,
@@ -116,7 +117,34 @@ export default function ArtifactWorkspace() {
   const [error, setError] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
   const [notesOpen, setNotesOpen] = useState(true);
+  const [queriesRun, setQueriesRun] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+
+  /* The page runs on an opaque origin and cannot reach the API. It asks
+     here; this component is authenticated, so it answers. That is what lets
+     every chart be a live query without ever giving the sandbox a token. */
+  useEffect(() => {
+    async function onMessage(e: MessageEvent) {
+      const msg = e.data;
+      if (!msg || msg.source !== "chester-page" || !artifactId) return;
+      const frame = frameRef.current;
+      if (!frame || e.source !== frame.contentWindow) return;
+
+      const reply = (body: Record<string, unknown>) =>
+        frame.contentWindow?.postMessage({ source: "chester-host", rid: msg.rid, ...body }, "*");
+
+      try {
+        const result = await queryArtifact(artifactId, msg.queryId, msg.filters ?? undefined, viewing);
+        setQueriesRun((n) => n + 1);
+        reply({ rows: result.rows });
+      } catch (err: any) {
+        reply({ error: err?.message ?? "Query failed" });
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [artifactId, viewing]);
 
   useEffect(() => {
     Promise.all([getAIModels(), getAIThemes(), getModels()])
@@ -138,6 +166,7 @@ export default function ArtifactWorkspace() {
         setArtifact(meta);
         setSrcDoc(html);
         setViewing(version ?? meta.current_version);
+        setQueriesRun(0);
         setTheme((t) => t || meta.theme);
       } catch (e: any) {
         setError(e.message);
@@ -381,7 +410,7 @@ export default function ArtifactWorkspace() {
 
         <div className="ml-auto flex items-center gap-2">
           <Status signal={busy ? "live" : "ok"} live={busy}>
-            {busy ? "Building" : "Live data"}
+            {busy ? "Building" : queriesRun > 0 ? `Live · ${queriesRun} queries` : "Live data"}
           </Status>
           <CButton variant="outline" disabled={busy || loading} onClick={() => load(viewing)}>
             <FaSyncAlt size={10} /> Refresh
@@ -419,6 +448,7 @@ export default function ArtifactWorkspace() {
                 allow-scripts WITHOUT allow-same-origin — generated JS runs on an
                 opaque origin and cannot reach this app's session. */}
             <iframe
+              ref={frameRef}
               title={artifact?.name ?? "Artifact"}
               srcDoc={srcDoc}
               sandbox="allow-scripts"

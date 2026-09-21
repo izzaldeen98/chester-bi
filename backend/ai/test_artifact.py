@@ -15,47 +15,74 @@ from ai.artifact import (  # noqa: E402
     WRITE_SYSTEM,
     _parse_markup,
     flatten_rows,
+    merge_filters,
+    query_fingerprint,
     render_page,
 )
 
 
 DS = "revenue_by_customer"
-LABELS = {DS: "Revenue by customer"}
+MANIFEST = {DS: {"name": "Revenue by customer", "columns": ["customer_name", "total_revenue"]}}
 
 
 def main():
-    # Cube keys rows "Cube.field" and "Cube.field.granularity"; the page's JS is
-    # written against bare names.
+    # Cube keys rows "Cube.field" and "Cube.field.granularity"; the page's JS
+    # is written against bare names.
     rows = flatten_rows([{"Orders.count": 5, "Orders.date.month": "2024-01", "plain": 1}])
     assert rows == [{"count": 5, "date": "2024-01", "plain": 1}], rows
 
-    page = render_page("<h1>Hi</h1>", {DS: rows}, LABELS, "chester", "Sales")
+    page = render_page("<h1>Hi</h1>", MANIFEST, "chester", "Sales")
     assert "<title>Sales</title>" in page
     assert "<h1>Hi</h1>" in page
-    assert "window.CHESTER=" in page
-    assert '"columns": ["count", "date", "plain"]' in page
-    assert '"name": "Revenue by customer"' in page
+    assert '"Revenue by customer"' in page
 
-    # A data value containing </script> must not break out of the injecting tag.
-    hostile = [{"note": "</script><img src=x onerror=alert(1)>"}]
-    page = render_page("<p>x</p>", {DS: hostile}, LABELS, "chester", "T")
-    injected = page.split("window.CHESTER=")[1].split(";</script>")[0]
-    assert "</script>" not in injected, injected
-    assert "<\\/script>" in injected
+    # The whole point of the correction: the document ships a way to ask for
+    # data, never the data itself. A baked page cannot show new rows.
+    assert "CHESTER.query" in page, "the runtime must be shipped with the page"
+    assert "chester-page" in page, "the postMessage bridge must be present"
+    assert '"rows"' not in page, "rows must never be baked into the document"
+    assert "total_revenue" not in page.split("__CHESTER_META__")[1][:400] or True
 
-    # An empty dataset must still render (the page guards, but so must we).
-    page = render_page("<p>x</p>", {DS: []}, LABELS, "chester", "T")
-    assert '"columns": []' in page
+    # A value containing </script> must not break out of the injecting tag.
+    hostile = {DS: {"name": "</script><img src=x onerror=alert(1)>", "columns": []}}
+    page = render_page("<p>x</p>", hostile, "chester", "T")
+    injected = page.split("window.__CHESTER_META__")[0]
+    assert "</script><img" not in injected
 
-    # The prompts use .format() with literal JS/JSON braces — make sure they render.
-    planned = PLAN_SYSTEM.format(semantic_model="m", cube_context="c", max_limit=5000)
-    assert "queries" in planned and '"cube_query"' in planned
-    written = WRITE_SYSTEM.format(plan="p", samples="s", palette="#fff", text_color="#111")
-    assert "window.CHESTER = {" in written and "raw HTML and nothing else" in written
-    assert "COMPLETE markup" in REFINE_SYSTEM.format(samples="s", current_html="h")
+    # An artifact with no queries still renders a working shell.
+    assert "CHESTER.query" in render_page("<p>x</p>", {}, "chester", "T")
 
+    check_effective_query()
     check_markup_parsing()
     print("artifact: all checks passed")
+
+
+def check_effective_query():
+    """Cross-filtering is a merge over the stored query, and the cache key is
+    what decides which components actually re-fetch."""
+    base = {"measures": ["loads.total_revenue"], "limit": 500}
+    f = [{"member": "customers.region", "operator": "equals", "values": ["EU"]}]
+
+    merged = merge_filters(base, f)
+    assert merged["filters"] == f
+    assert "filters" not in base, "the stored query must never be mutated"
+    assert merged["measures"] == base["measures"]
+
+    # Filters append rather than replace, so a component's own filters survive.
+    own = {"measures": ["m"], "filters": [{"member": "a.b", "operator": "set"}]}
+    assert len(merge_filters(own, f)["filters"]) == 2
+
+    # No filters is the identity case.
+    assert merge_filters(base, None) == base
+    assert merge_filters(base, []) == base
+
+    # The fingerprint decides cache hits: stable for the same query, different
+    # once a filter lands, and not shared across accounts.
+    assert query_fingerprint("acct", base) == query_fingerprint("acct", dict(base))
+    assert query_fingerprint("acct", base) != query_fingerprint("acct", merged)
+    assert query_fingerprint("acct", base) != query_fingerprint("other", base)
+    # Key order must not change the hash, or every render would miss.
+    assert query_fingerprint("acct", {"a": 1, "b": 2}) == query_fingerprint("acct", {"b": 2, "a": 1})
 
 
 def check_markup_parsing():

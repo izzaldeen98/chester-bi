@@ -669,6 +669,24 @@ export async function deleteArtifact(artifactId: string): Promise<void> {
   return handleResponse<void>(res);
 }
 
+/** Run one of an artifact's stored queries with the dashboard's active
+ *  cross-filters merged in. The sandboxed page cannot call this itself — the
+ *  workspace relays on its behalf. */
+export async function queryArtifact(
+  artifactId: string,
+  queryId: string,
+  filters?: unknown[],
+  version?: number,
+): Promise<{ id: string; rows: Record<string, unknown>[]; cached: boolean; count: number }> {
+  const q = version ? `?version=${version}` : "";
+  const res = await fetch(`/api/v1/artifacts/query/${artifactId}${q}`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ query_id: queryId, filters: filters ?? null }),
+  });
+  return handleResponse(res);
+}
+
 export async function restoreArtifactVersion(
   artifactId: string,
   version: number,
