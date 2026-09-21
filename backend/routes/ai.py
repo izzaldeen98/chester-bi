@@ -1,5 +1,3 @@
-from io import BytesIO
-from json import dumps, loads
 from typing import List
 from uuid import UUID
 
@@ -7,25 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
-from ai import agent
 from ai.adapters import ADAPTERS, MODELS, get_adapter
 from ai.grounding import PALETTE
-from models.ai_provider import AIProvider, DashboardAgentEdit
-from models.dashboard import Dashboard
-from models.datasets import Dataset
+from models.ai_provider import AIProvider
 from models.models import Model
 from models.user import User
-from schema.ai import (
-    AIProviderCreate,
-    AIProviderResponse,
-    AIProviderUpdate,
-    ElementPromptRequest,
-    ElementPromptResponse,
-    GenerateRequest,
-    GenerateResponse,
-)
+from schema.ai import AIProviderCreate, AIProviderResponse, AIProviderUpdate
 from security import check_permissions, decrypt_password, encrypt_password, get_current_user
-from utils.config_files import storage
 from utils.cube import extract_cube_names
 from utils.init_database import get_db
 
@@ -119,23 +105,6 @@ async def _model_scope(db: Session, user: User, semantic_model_id: UUID | None):
         if content:
             cube_names |= extract_cube_names(content.getvalue().decode("utf-8"))
     return model, (cube_names or None)
-
-
-def _semantic_model_of_element(db: Session, user: User, element: dict) -> UUID | None:
-    """Which model an existing component belongs to — read off its dataset, so
-    editing never needs the user to re-pick one. Returns None for filter
-    elements, which map across models on purpose (see FilterRule.mappings)."""
-    dataset_id = (element.get("meta") or {}).get("datasetId")
-    if not dataset_id:
-        return None
-    try:
-        dataset_key = UUID(str(dataset_id))   # public_key is a UUID column, not a string
-    except ValueError:
-        return None
-    dataset = db.query(Dataset).filter(Dataset.public_key == dataset_key).first()
-    if not dataset or dataset.definition.model.account_id != user.account_id:
-        return None
-    return dataset.definition.model.public_key
 
 
 # ── Providers ──────────────────────────────────────────────────────────────
@@ -234,8 +203,8 @@ async def test_provider(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """One cheap round-trip so a bad key fails here, not halfway through a
-    dashboard generation."""
+    """One cheap round-trip so a bad key fails here, not halfway through
+    generating an artifact."""
     _require(current_user, *MANAGE)
     row, model = resolve_provider(db, current_user, provider_id)
     adapter = get_adapter(row.provider, decrypt_password(row.api_key_enc), row.base_url)
@@ -304,200 +273,3 @@ async def known_models(current_user: User = Depends(get_current_user)):
 @router.get("/themes")
 async def list_themes(current_user: User = Depends(get_current_user)):
     return [{"name": name, "colors": colors} for name, colors in PALETTE.items()]
-
-
-# ── Dashboard generation / editing ─────────────────────────────────────────
-
-def _config_path(user: User) -> str:
-    return f"cube_data/{str(user.account.public_key)}/dashboards"
-
-
-async def _read_config(dashboard: Dashboard) -> dict:
-    content = await storage.get_file(dashboard.config_file, f"{dashboard.public_key}.json")
-    if not content:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dashboard config file not found")
-    return loads(content.getvalue().decode("utf-8"))
-
-
-async def _write_config(dashboard: Dashboard, config: dict) -> None:
-    await storage.upload_file(
-        BytesIO(dumps(config).encode("utf-8")), dashboard.config_file, f"{dashboard.public_key}.json"
-    )
-
-
-def _unique_name(db: Session, account_id: int, name: str) -> str:
-    base, n = name[:120], 1
-    candidate = base
-    while db.query(Dashboard).filter(
-        and_(Dashboard.name == candidate, Dashboard.account_id == account_id)
-    ).first():
-        n += 1
-        candidate = f"{base} ({n})"
-    return candidate
-
-
-@router.post("/dashboards/generate", response_model=GenerateResponse, status_code=status.HTTP_201_CREATED)
-async def generate_dashboard(
-    payload: GenerateRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    _require(current_user, "*", "dashboards:*", "dashboards:create")
-    provider_row, llm_model = resolve_provider(db, current_user, payload.provider_id)
-
-    semantic_model, cube_names = await _model_scope(db, current_user, payload.semantic_model_id)
-    try:
-        result = agent.generate(
-            db, current_user, provider_row, llm_model, payload.brief, payload.theme,
-            semantic_model, cube_names,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
-
-    if not result["elements"]:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="The model produced no valid components: " + "; ".join(result["errors"][:5]),
-        )
-
-    name = _unique_name(db, current_user.account_id, payload.name or result["name"])
-    folder = _config_path(current_user)
-    dashboard = Dashboard(
-        name=name,
-        description=(result["description"] or payload.brief)[:127],
-        config_file=folder,
-        account_id=current_user.account_id,
-        created_by=current_user.id,
-        updated_by=current_user.id,
-    )
-    db.add(dashboard)
-    db.commit()
-    db.refresh(dashboard)
-
-    config = {
-        "version": "1.0.0",
-        "name": name,
-        "description": dashboard.description,
-        "gridRows": result["gridRows"],
-        "elements": result["elements"],
-    }
-    try:
-        await _write_config(dashboard, config)
-    except Exception as exc:
-        db.delete(dashboard)
-        db.commit()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f"Failed to write dashboard config: {exc}")
-
-    db.add(DashboardAgentEdit(
-        dashboard_id=dashboard.id,
-        element_id=None,
-        instruction=payload.brief,
-        before_json=None,
-        after_json=result["elements"],
-        provider=provider_row.provider,
-        model=llm_model,
-        created_by=current_user.id,
-    ))
-    db.commit()
-
-    return GenerateResponse(
-        dashboard_id=dashboard.public_key,
-        name=name,
-        element_count=len(result["elements"]),
-        unmet=result["unmet"],
-        errors=result["errors"],
-    )
-
-
-@router.post("/dashboards/{dashboard_id}/elements/{element_id}/prompt",
-             response_model=ElementPromptResponse)
-async def prompt_element(
-    dashboard_id: UUID,
-    element_id: str,
-    payload: ElementPromptRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """The per-component 'Prompt' button. Returns the updated element and
-    persists it into the dashboard's config file — or returns the untouched
-    element plus the reasons it could not be changed, saving nothing."""
-    _require(current_user, "*", "dashboards:*", "dashboards:edit")
-    provider_row, llm_model = resolve_provider(db, current_user, payload.provider_id)
-
-    dashboard = (
-        db.query(Dashboard)
-        .filter(and_(Dashboard.public_key == dashboard_id, Dashboard.account_id == current_user.account_id))
-        .first()
-    )
-    if not dashboard:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dashboard not found")
-
-    config = await _read_config(dashboard)
-    elements = config.get("elements") or []
-    index = next((i for i, el in enumerate(elements) if el.get("id") == element_id), None)
-    if index is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Component not found on this dashboard")
-    before = elements[index]
-
-    semantic_model, cube_names = await _model_scope(
-        db, current_user,
-        payload.semantic_model_id or _semantic_model_of_element(db, current_user, before),
-    )
-    try:
-        result = agent.edit_component(
-            db, current_user, provider_row, llm_model, before, payload.instruction,
-            payload.theme, semantic_model, cube_names,
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
-
-    if result["errors"]:
-        return ElementPromptResponse(element=before, errors=result["errors"], saved=False)
-
-    elements[index] = result["element"]
-    config["elements"] = elements
-    await _write_config(dashboard, config)
-
-    dashboard.updated_by = current_user.id
-    db.add(DashboardAgentEdit(
-        dashboard_id=dashboard.id,
-        element_id=element_id,
-        instruction=payload.instruction,
-        before_json=before,
-        after_json=result["element"],
-        provider=provider_row.provider,
-        model=llm_model,
-        created_by=current_user.id,
-    ))
-    db.commit()
-
-    return ElementPromptResponse(element=result["element"], errors=[], saved=True)
-
-
-@router.get("/dashboards/{dashboard_id}/edits")
-async def list_edits(
-    dashboard_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    _require(current_user, "*", "dashboards:*", "dashboards:list")
-    dashboard = (
-        db.query(Dashboard)
-        .filter(and_(Dashboard.public_key == dashboard_id, Dashboard.account_id == current_user.account_id))
-        .first()
-    )
-    if not dashboard:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dashboard not found")
-    edits = (
-        db.query(DashboardAgentEdit)
-        .filter(DashboardAgentEdit.dashboard_id == dashboard.id)
-        .order_by(DashboardAgentEdit.created_at.desc())
-        .all()
-    )
-    return [
-        {"id": e.id, "element_id": e.element_id, "instruction": e.instruction,
-         "provider": e.provider, "model": e.model, "created_at": e.created_at,
-         "before": e.before_json, "after": e.after_json}
-        for e in edits
-    ]

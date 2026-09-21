@@ -5,16 +5,10 @@ import LoginPage from './pages/LoginPage'
 import LandingPage from './pages/LandingPage'
 import HomePage from './pages/HomePage'
 import UsersPage from './pages/UsersPage'
-import DashboardsPage from './pages/DashboardsPage'
 import ModelsPage from './pages/ModelsPage'
 import ConnectionsPage from './pages/ConnectionsPage'
 import ModelEditorPage from './pages/ModelEditorPage'
-import DatasetPage from './pages/DatasetPage'
-import DatasetsPage from './pages/DatasetsPage'
 import FilesPage from './pages/FilesPage'
-import DashboardWorkSpace from './pages/DashboardWorkSpace'
-import DashboardViewPage from './pages/DashboardViewPage'
-import AIBuilderPage from './pages/AIBuilderPage'
 import SettingsProvidersPage from './pages/SettingsProvidersPage'
 import ArtifactsPage from './pages/ArtifactsPage'
 import ArtifactWorkspace from './pages/ArtifactWorkspace'
@@ -43,13 +37,10 @@ export default function App() {
         {/* Protected — sidebar layout */}
         <Route element={<AppLayout />}>
           <Route path="/home"        element={<HomePage />} />
-          <Route path="/dashboard"   element={<DashboardsPage />} />
-          <Route path="/ai-builder"  element={<AIBuilderPage />} />
           <Route path="/artifacts"   element={<ArtifactsPage />} />
           <Route path="/artifacts/new" element={<ArtifactWorkspace />} />
           <Route path="/artifacts/:artifactId" element={<ArtifactWorkspace />} />
           <Route path="/settings/ai-providers" element={<SettingsProvidersPage />} />
-          <Route path="/datasets"    element={<DatasetsPage />} />
           <Route path="/files"       element={<FilesPage />} />
           <Route path="/connections" element={<ConnectionsPage />} />
           <Route path="/models"                    element={<ModelsPage />} />
@@ -59,11 +50,6 @@ export default function App() {
 
         {/* Fullscreen — no app sidebar */}
         <Route element={<FullscreenLayout />}>
-          <Route path="/datasets/new"              element={<DatasetPage />} />
-          <Route path="/datasets/:datasetId/edit"  element={<DatasetPage />} />
-          <Route path="/workspace"                element={<DashboardWorkSpace />} />
-          <Route path="/workspace/:dashboardId"   element={<DashboardWorkSpace />} />
-          <Route path="/view/:dashboardId"         element={<DashboardViewPage />} />
         </Route>
 
         {/* Fallback */}

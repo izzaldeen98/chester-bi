@@ -108,7 +108,7 @@ def _headers(token: str) -> dict:
 def _request(method: str, path: str, token: str, **kwargs):
     """Every call to Cube goes through here so a stopped/unreachable engine reads
     as one clear sentence instead of a requests connection stack — the failure
-    mode every caller (datasets, definitions, dashboards, artifacts) hits first
+    mode every caller (definitions, artifacts) hits first
     when the cube service isn't up."""
     try:
         return requests.request(method, f"{CUBE_URL}{path}", headers=_headers(token), **kwargs)
@@ -123,7 +123,7 @@ def load(token: str, query: dict) -> dict:
     """POST /cubejs-api/v1/load — runs a Cube query, returns its result rows."""
     response = _request("POST", "/cubejs-api/v1/load", token, json={"query": query})
     if response.status_code != 200:
-        raise Exception(f"Failed to query dataset: {response.text}")
+        raise Exception(f"Cube query failed: {response.text}")
     return response.json()
 
 

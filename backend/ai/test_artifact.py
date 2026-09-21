@@ -55,7 +55,6 @@ def main():
     assert "COMPLETE markup" in REFINE_SYSTEM.format(samples="s", current_html="h")
 
     check_markup_parsing()
-    check_dataset_lookup()
     print("artifact: all checks passed")
 
 
@@ -78,45 +77,6 @@ def check_markup_parsing():
         raise AssertionError("prose should be rejected")
     except Exception as exc:
         assert "did not return HTML" in str(exc)
-
-
-def check_dataset_lookup():
-    """Artifact.dataset_ids is JSON (strings); Dataset.public_key is a UUID
-    column. SQLAlchemy raises "'str' object has no attribute 'hex'" if the two
-    are compared directly, which broke every artifact render — so look the
-    datasets up for real, against a throwaway in-memory database."""
-    import uuid
-
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-
-    from utils.init_database import Base
-    import models  # noqa: F401  — registers every mapper before create_all
-    from models.artifact import Artifact
-    from models.datasets import Dataset
-    import routes.artifacts as R
-
-    engine = create_engine("sqlite://", connect_args={"check_same_thread": False})
-    Base.metadata.create_all(bind=engine)
-    db = sessionmaker(bind=engine)()
-
-    keys = [uuid.uuid4(), uuid.uuid4()]
-    for n, key in enumerate(keys):
-        db.add(Dataset(public_key=key, name=f"DS{n}", aggregation_fields=[], source="s",
-                       cube_query={}, definition_id=1, created_by=1, updated_by=1))
-    db.commit()
-
-    # Stored the way the create endpoint stores them: strings, reversed order.
-    artifact = Artifact(dataset_ids=[str(keys[1]), str(keys[0])], account_id=1, name="a",
-                        theme="chester", provider="openai", llm_model="m", file_path="p",
-                        prompts=[], created_by=1, updated_by=1)
-    found = R._datasets_of(db, artifact)
-    assert [d.name for d in found] == ["DS1", "DS0"], [d.name for d in found]
-
-    # A junk id is skipped, not fatal.
-    artifact.dataset_ids = ["not-a-uuid", str(keys[0])]
-    assert [d.name for d in R._datasets_of(db, artifact)] == ["DS0"]
-    assert R._datasets_of(db, Artifact(dataset_ids=[])) == []
 
 
 if __name__ == "__main__":

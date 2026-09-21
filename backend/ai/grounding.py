@@ -1,28 +1,16 @@
-"""Builds the three grounding blocks every agent call is given:
+"""Builds the grounding the artifact agent is given: the live Cube semantic
+model, rendered for an LLM, plus the theme palettes.
 
-  1. the live Cube semantic model (from /meta, cached per definition version)
-  2. the account's saved datasets — the ONLY things a chart may reference
-  3. the generated component/filter spec (backend/grounding/visual_component_spec.md)
-
-The component spec is generated from the frontend's ChartsSchemas.ts by
-grounding/gen_component_spec.py, so it cannot drift from what the renderer
-accepts. The Cube block is never cached across definition edits: its key
-includes utils.cube._definition_version(), which already changes whenever an
-account's .yml definitions change.
+The Cube block is never cached across definition edits — its key includes
+utils.cube._definition_version(), which already changes whenever an account's
+.yml definitions change.
 """
-import json
 from hashlib import sha256
-from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from models.datasets import Dataset
-from models.definitions import Definition
-from models.models import Model
 from utils.cube import _definition_version, meta_raw, mint_token
 from utils.redis_handler import cache_query, get_cached_query
-
-SPEC_PATH = Path(__file__).resolve().parent.parent / "grounding" / "visual_component_spec.md"
 
 # ponytail: one palette constant instead of a theme system — lib/theme.jsx is a
 # binary light/dark class toggle with no named themes or design tokens, so
@@ -35,14 +23,6 @@ PALETTE = {
     "mono": ["#111827", "#4b5563", "#9ca3af", "#6b7280", "#374151", "#d1d5db"],
 }
 DEFAULT_TEXT_COLOR = "#111827"
-
-
-def component_spec() -> str:
-    if not SPEC_PATH.exists():
-        raise Exception(
-            f"{SPEC_PATH} is missing — run `python backend/grounding/gen_component_spec.py`"
-        )
-    return SPEC_PATH.read_text()
 
 
 def cube_grounding(db: Session, account_public_key, account_id: int,
@@ -104,49 +84,3 @@ def cube_grounding(db: Session, account_public_key, account_id: int,
     except Exception:
         pass
     return text, members
-
-
-def account_datasets(db: Session, account_id: int, semantic_model_id=None) -> list[Dataset]:
-    """Datasets the agent may reference. Scoped to one semantic model when the
-    user picked one on the builder page."""
-    query = (
-        db.query(Dataset)
-        .join(Definition, Dataset.definition_id == Definition.id)
-        .join(Model, Definition.model_id == Model.id)
-        .filter(Model.account_id == account_id)
-    )
-    if semantic_model_id is not None:
-        query = query.filter(Model.public_key == semantic_model_id)
-    return query.all()
-
-
-def dataset_block(datasets: list[Dataset]) -> str:
-    """Charts bind to a saved Dataset (meta.datasetId), never to an inline Cube
-    query — see frontend/src/lib/dashboardWidgetData.ts. So this list is the
-    agent's entire vocabulary of available data."""
-    if not datasets:
-        return "(this account has no saved datasets — no chart can be built)"
-    out = []
-    for d in datasets:
-        out.append(
-            json.dumps(
-                {
-                    "datasetId": str(d.public_key),
-                    "name": d.name,
-                    "description": d.description,
-                    "source": d.source,
-                    "measures": d.aggregation_fields or [],
-                    "dimensions": d.group_by_fields or [],
-                    "definitionId": str(d.definition.public_key),
-                    "definitionName": d.definition.name,
-                    "modelId": str(d.definition.model.public_key),
-                    "modelName": d.definition.model.name,
-                },
-                default=str,
-            )
-        )
-    return "\n".join(out)
-
-
-def dataset_fields(dataset: Dataset) -> set[str]:
-    return set(dataset.aggregation_fields or []) | set(dataset.group_by_fields or [])

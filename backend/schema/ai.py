@@ -40,35 +40,3 @@ class AIProviderResponse(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class GenerateRequest(BaseModel):
-    # Omit provider_id when the account has exactly one active provider — the
-    # model comes from that provider's default_model either way.
-    provider_id: Optional[UUID] = None
-    semantic_model_id: UUID         # the Chester BI Model the agent reads
-    theme: str = "chester"
-    brief: str = Field(..., min_length=10)
-    name: Optional[str] = Field(None, max_length=127)
-
-
-class GenerateResponse(BaseModel):
-    dashboard_id: UUID
-    name: str
-    element_count: int
-    unmet: list[str] = []
-    errors: list[str] = []
-
-
-class ElementPromptRequest(BaseModel):
-    provider_id: Optional[UUID] = None
-    instruction: str = Field(..., min_length=3)
-    theme: str = "chester"
-    # Defaults to the model the edited component's dataset belongs to.
-    semantic_model_id: Optional[UUID] = None
-
-
-class ElementPromptResponse(BaseModel):
-    element: dict[str, Any]
-    errors: list[str] = []
-    saved: bool

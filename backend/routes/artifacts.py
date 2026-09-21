@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 
 from ai import artifact as artifact_agent
 from models.artifact import Artifact
-from models.datasets import Dataset
 from models.ai_provider import AIProvider
 from models.user import User
 from routes.ai import _model_scope, _require, resolve_provider
@@ -21,21 +20,10 @@ from utils.init_database import get_db
 
 router = APIRouter(prefix="/api/v1/artifacts", tags=["artifacts"])
 
-# Artifacts are dashboards-by-another-name for access control, so they reuse the
-# dashboards:* permissions rather than inventing a parallel set.
-CREATE = ["*", "dashboards:*", "dashboards:create"]
-READ = ["*", "dashboards:*", "dashboards:list"]
-EDIT = ["*", "dashboards:*", "dashboards:edit"]
-DELETE = ["*", "dashboards:*", "dashboards:delete"]
-
-
-def _as_uuid(value) -> UUID | None:
-    if isinstance(value, UUID):
-        return value
-    try:
-        return UUID(str(value))
-    except (ValueError, AttributeError, TypeError):
-        return None
+CREATE = ["*", "artifacts:*", "artifacts:create"]
+READ = ["*", "artifacts:*", "artifacts:list"]
+EDIT = ["*", "artifacts:*", "artifacts:edit"]
+DELETE = ["*", "artifacts:*", "artifacts:delete"]
 
 
 def _provider_for(db: Session, user: User, row: Artifact, asked: UUID | None):
@@ -83,28 +71,10 @@ def _queries_for_version(row: Artifact, version: int | None) -> list:
 
 async def _artifact_data(db: Session, user: User, row: Artifact,
                          version: int | None = None) -> tuple[dict, dict]:
-    """(rows by key, label by key). Artifacts carry their own Cube queries; ones
-    created before that read from saved datasets, so both paths stay live."""
+    """(rows by query id, label by query id) for the version being rendered."""
     queries = _queries_for_version(row, version)
-    if queries:
-        data = artifact_agent.fetch_data(db, user, queries)
-        labels = {q["id"]: q.get("label") or q["id"] for q in queries}
-        return data, labels
-    datasets = _datasets_of(db, row)
-    data = artifact_agent.fetch_dataset_data(db, user, datasets)
-    return data, {str(d.public_key): d.name for d in datasets}
-
-
-def _datasets_of(db: Session, row: Artifact) -> list[Dataset]:
-    """dataset_ids is a JSON list of strings; public_key is a UUID column, and
-    SQLAlchemy will not coerce one to the other — compare real UUIDs."""
-    ids = [_as_uuid(i) for i in (row.dataset_ids or [])]
-    ids = [i for i in ids if i is not None]
-    if not ids:
-        return []
-    found = db.query(Dataset).filter(Dataset.public_key.in_(ids)).all()
-    order = {str(i): n for n, i in enumerate(ids)}
-    return sorted(found, key=lambda d: order.get(str(d.public_key), 0))
+    data = artifact_agent.fetch_data(db, user, queries)
+    return data, {q["id"]: q.get("label") or q["id"] for q in queries}
 
 
 async def _read_markup(row: Artifact, version: int | None = None) -> str:

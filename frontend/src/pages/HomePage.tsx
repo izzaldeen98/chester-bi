@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MdDashboard, MdOutlineCloud, MdOpenInNew } from "react-icons/md";
+import { MdAutoAwesome, MdOutlineCloud, MdOpenInNew } from "react-icons/md";
 import { GoPackage } from "react-icons/go";
 import { FaUser } from "react-icons/fa";
 import { FaArrowRight, FaPlus } from "react-icons/fa6";
 import CLogo from "../components/CLogo";
 import {
-  getDashboards,
+  getArtifacts,
   getConnections,
   getModels,
   getUsers,
-  type DashboardPublicResponse,
+  type ArtifactResponse,
   type ConnectionPublicResponse,
 } from "../lib/Api";
 import { getUser } from "../lib/auth";
@@ -120,8 +120,8 @@ function ConnectionRow({ conn }: { conn: ConnectionPublicResponse }) {
   );
 }
 
-// ── Dashboard row ──────────────────────────────────────────────────────────
-function DashboardRow({ d, onView }: { d: DashboardPublicResponse; onView: () => void }) {
+// ── Artifact row ──────────────────────────────────────────────────────────
+function ArtifactRow({ d, onView }: { d: ArtifactResponse; onView: () => void }) {
   return (
     <li
       className="group flex items-center gap-3 py-3"
@@ -131,7 +131,7 @@ function DashboardRow({ d, onView }: { d: DashboardPublicResponse; onView: () =>
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
         style={{ background: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--accent-ring)" }}
       >
-        <MdDashboard size={15} />
+        <MdAutoAwesome size={15} />
       </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold" style={{ color: "var(--text-h)" }}>{d.name}</p>
@@ -158,7 +158,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const user = getUser();
 
-  const [dashboards, setDashboards] = useState<DashboardPublicResponse[] | null>(null);
+  const [artifacts, setArtifacts] = useState<ArtifactResponse[] | null>(null);
   const [connections, setConnections] = useState<ConnectionPublicResponse[] | null>(null);
   const [modelCount, setModelCount] = useState<number | null>(null);
   const [userCount, setUserCount] = useState<number | null>(null);
@@ -170,7 +170,7 @@ export default function HomePage() {
 
     async function fetchAll() {
       const results = await Promise.allSettled([
-        getDashboards(),
+        getArtifacts(),
         getConnections(),
         getModels(),
         getUsers(),
@@ -180,8 +180,8 @@ export default function HomePage() {
 
       const errs: string[] = [];
 
-      if (results[0].status === "fulfilled") setDashboards(results[0].value);
-      else errs.push("dashboards");
+      if (results[0].status === "fulfilled") setArtifacts(results[0].value);
+      else errs.push("artifacts");
 
       if (results[1].status === "fulfilled") setConnections(results[1].value);
       else setConnections([]);
@@ -200,8 +200,8 @@ export default function HomePage() {
     return () => { cancelled = true; };
   }, []);
 
-  const sortedDashboards = dashboards
-    ? [...dashboards].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+  const sortedArtifacts = artifacts
+    ? [...artifacts].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
     : [];
 
   const firstName = user?.first_name ?? user?.username ?? "back";
@@ -222,7 +222,7 @@ export default function HomePage() {
         </div>
 
         <button
-          onClick={() => navigate("/workspace")}
+          onClick={() => navigate("/artifacts/new")}
           className="flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors"
           style={{
             background: "var(--accent)",
@@ -231,7 +231,7 @@ export default function HomePage() {
           onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
           onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
         >
-          <FaPlus size={12} /> New Dashboard
+          <FaPlus size={12} /> New Artifact
         </button>
       </div>
 
@@ -248,10 +248,10 @@ export default function HomePage() {
       {/* Metric cards */}
       <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
-          label="Dashboards"
-          value={dashboards?.length ?? null}
-          icon={<MdDashboard size={20} />}
-          href="/dashboard"
+          label="Artifacts"
+          value={artifacts?.length ?? null}
+          icon={<MdAutoAwesome size={20} />}
+          href="/artifacts"
           loading={loading}
         />
         <MetricCard
@@ -280,17 +280,17 @@ export default function HomePage() {
       {/* Bottom row */}
       <div className="grid gap-6 lg:grid-cols-2">
 
-        {/* Recent dashboards */}
+        {/* Recent artifacts */}
         <div
           className="rounded-2xl p-6"
           style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}
         >
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold" style={{ color: "var(--text-h)" }}>
-              Recent Dashboards
+              Recent Artifacts
             </h2>
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/artifacts")}
               className="flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-70"
               style={{ color: "var(--accent)" }}
             >
@@ -302,16 +302,16 @@ export default function HomePage() {
             <div className="flex flex-col gap-3">
               {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
-          ) : sortedDashboards.length === 0 ? (
+          ) : sortedArtifacts.length === 0 ? (
             <div
               className="flex flex-col items-center gap-3 rounded-xl py-12 text-center"
               style={{ border: "1px dashed var(--border)" }}
             >
               <CLogo size={32} style={{ opacity: 0.4 }} />
               <p className="text-sm" style={{ color: "var(--text)" }}>
-                No dashboards yet.{" "}
+                No artifacts yet.{" "}
                 <button
-                  onClick={() => navigate("/workspace")}
+                  onClick={() => navigate("/artifacts/new")}
                   className="font-semibold transition-opacity hover:opacity-70"
                   style={{ color: "var(--accent)" }}
                 >
@@ -321,11 +321,11 @@ export default function HomePage() {
             </div>
           ) : (
             <ul className="flex flex-col">
-              {sortedDashboards.slice(0, 6).map((d) => (
-                <DashboardRow
+              {sortedArtifacts.slice(0, 6).map((d) => (
+                <ArtifactRow
                   key={d.id}
                   d={d}
-                  onView={() => navigate(`/view/${d.id}`)}
+                  onView={() => navigate(`/artifacts/${d.id}`)}
                 />
               ))}
             </ul>
@@ -392,7 +392,7 @@ export default function HomePage() {
             </h2>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { label: "New Dashboard",   icon: <MdDashboard size={16} />,   href: "/workspace" },
+                { label: "New Artifact",    icon: <MdAutoAwesome size={16} />, href: "/artifacts/new" },
                 { label: "New Connection",  icon: <MdOutlineCloud size={16} />, href: "/connections" },
                 { label: "Browse Models", icon: <GoPackage size={15} />,      href: "/models" },
                 { label: "Manage Users",    icon: <FaUser size={14} />,         href: "/users" },

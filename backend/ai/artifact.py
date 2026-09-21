@@ -161,7 +161,7 @@ character is "<".
 Return the COMPLETE markup, not a diff or a fragment. Keep everything the request does
 not ask you to change: same structure, same data wiring, same working filters.
 
-The runtime contract is unchanged: `window.CHESTER.data["<datasetId>"]` holds the rows,
+The runtime contract is unchanged: `window.CHESTER.data["<queryId>"]` holds the rows,
 `echarts` is a loaded global, your markup goes inside <body>, and no external scripts,
 fetches or storage are available.
 
@@ -231,19 +231,6 @@ def fetch_data(db: Session, user: User, queries: list, limit: int | None = None)
         if limit:
             query["limit"] = limit
         out[entry["id"]] = flatten_rows(cube_load(token, query).get("data", []))
-    return out
-
-
-def fetch_dataset_data(db: Session, user: User, datasets: list) -> dict:
-    """Legacy path for artifacts created before the agent wrote its own queries:
-    their rows come from saved datasets, keyed by dataset id."""
-    token = mint_token(db, user.account.public_key, user.account_id)
-    out = {}
-    for dataset in datasets:
-        query = dict(dataset.cube_query or {})
-        if not dataset.limit_enabled:
-            query.pop("limit", None)
-        out[str(dataset.public_key)] = flatten_rows(cube_load(token, query).get("data", []))
     return out
 
 

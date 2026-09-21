@@ -12,7 +12,6 @@ import json
 from typing import List
 from uuid import UUID
 from models.definitions import Definition
-from models.datasets import Dataset
 from utils.cube import ensure_account_definition_dir
 
 
@@ -127,13 +126,11 @@ async def delete_model(
             detail="Model not found",
         )
 
-    # Every definition (and any dataset built on top of it) must go first —
-    # datasets.definition_id and definitions.model_id have no ON DELETE
+    # Every definition must go first — definitions.model_id has no ON DELETE
     # CASCADE, so deleting the model row first would fail (Postgres) or
     # leave orphaned rows behind (SQLite).
     definitions = db.query(Definition).filter(Definition.model_id == model.id).all()
     for definition in definitions:
-        db.query(Dataset).filter(Dataset.definition_id == definition.id).delete()
         await storage.delete_file(definition.file_path, definition.file_name)
         db.delete(definition)
 

@@ -136,115 +136,6 @@ export async function deleteUser(userId: string): Promise<void> {
   return handleResponse<void>(res);
 }
 
-// ── Dashboards ─────────────────────────────────────────────────────────────
-
-export interface DashboardPublicResponse {
-  id: string;
-  name: string;
-  description: string;
-  created_at: string;
-  updated_at: string;
-  created_by: string;
-  updated_by: string;
-  config_file: string;
-}
-
-export interface DashboardCreate {
-  name: string;
-  description: string;
-}
-
-export interface DashboardUpdate {
-  name?: string;
-  description?: string;
-  config_file?: string;
-}
-
-export async function getDashboards(): Promise<DashboardPublicResponse[]> {
-  const res = await fetch(`/api/v1/dashboards/list`, {
-    headers: { ...authHeaders() },
-  });
-  return handleResponse<DashboardPublicResponse[]>(res);
-}
-
-export async function createDashboard(data: DashboardCreate): Promise<void> {
-  const res = await fetch(`/api/v1/dashboards/create`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(data),
-  });
-  return handleResponse<void>(res);
-}
-
-export async function updateDashboard(dashboardId: string, data: DashboardUpdate): Promise<void> {
-  const res = await fetch(`/api/v1/dashboards/update?dashboard_id=${dashboardId}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(data),
-  });
-  return handleResponse<void>(res);
-}
-
-export async function deleteDashboard(dashboardId: string): Promise<void> {
-  const res = await fetch(`/api/v1/dashboards/delete?dashboard_id=${dashboardId}`, {
-    method: "DELETE",
-    headers: { ...authHeaders() },
-  });
-  return handleResponse<void>(res);
-}
-
-// ── Dashboard config (save/load widget layout + data) ─────────────────────
-
-export interface DashboardElementLayout {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  minW?: number;
-  minH?: number;
-}
-
-export interface DashboardElementMeta {
-  title: string;
-  query?: string;
-  datasetId?: string;
-  chartType?: string;
-  chartConfig?: Record<string, string>;
-  previewValue?: number | null;
-  previewRows?: Record<string, unknown>[] | null;
-  filterRule?: Record<string, unknown>;
-}
-
-export interface DashboardElement {
-  id: string;
-  layout: DashboardElementLayout;
-  meta: DashboardElementMeta;
-}
-
-export interface DashboardConfig {
-  version: string;
-  name: string;
-  gridRows?: number;
-  backgroundColor?: string;
-  elements: DashboardElement[];
-}
-
-export async function getDashboardConfig(dashboardId: string): Promise<DashboardConfig> {
-  const res = await fetch(`/api/v1/dashboards/config/${dashboardId}`, {
-    headers: { ...authHeaders() },
-  });
-  return handleResponse<DashboardConfig>(res);
-}
-
-export async function saveDashboardConfig(dashboardId: string, config: DashboardConfig): Promise<void> {
-  const res = await fetch(`/api/v1/dashboards/config/${dashboardId}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(config),
-  });
-  return handleResponse<void>(res);
-}
-
 // ── Models ─────────────────────────────────────────────────────────────────
 
 export interface ModelResponse {
@@ -480,7 +371,6 @@ export interface Model {
   definitions: DefinitionRef[];
 }
 
-
 export interface DefinitionSchema {
   sources: SourceInfo[];
 }
@@ -505,125 +395,6 @@ export async function runQuery(definitionId: string, query: CubeQuery): Promise<
     { headers: { ...authHeaders() } },
   );
   return handleResponse<any>(res);
-}
-
-
-// ── Datasets ─────────────────────────────────────────────────────────────
-
-export interface DatasetPublicResponse {
-  id: string;
-  name: string;
-  description: string | null;
-  source: string;
-  definition: DatasetDefinition;
-  created_at: string;
-  updated_at: string;
-  created_by: string;
-  updated_by: string;
-}
-
-export interface DatasetUpdate {
-  name?: string;
-  description?: string;
-  source?: string;
-  aggregation_fields?: string[];
-  group_by_fields?: string[];
-  filters?: Record<string, unknown>;
-  havings?: Record<string, unknown>;
-  calculated_fields?: unknown[];
-  order_by_fields?: Record<string, string>;
-  limit?: number;
-  limit_enabled?: boolean;
-  cube_query?: CubeQuery;
-  sql_query?: string;
-  definition_id?: string;
-}
-
-export interface DatasetCreate {
-  name: string;
-  description?: string;
-  source: string;
-  aggregation_fields: string[];
-  group_by_fields?: string[];
-  filters?: Record<string, unknown>;
-  havings?: Record<string, unknown>;
-  calculated_fields?: unknown[];
-  order_by_fields?: Record<string, string>;
-  limit?: number;
-  limit_enabled?: boolean;
-  cube_query: CubeQuery;
-  sql_query?: string;
-}
-
-export interface DatasetDefinition {
-  id: string;
-  name: string;
-  model: DatasetModel;
-}
-export interface DatasetModel {
-  id: string;
-  name: string;
-}
-export interface DatasetDetailedResponse {
-  id: string;
-  name: string;
-  source: string;
-  aggregation_fields: string[];
-  group_by_fields: string[] | null;
-  filters: unknown;
-  havings: unknown;
-  calculated_fields: unknown[] | null;
-  order_by_fields: Record<string, string> | null;
-  limit: number;
-  limit_enabled: boolean;
-  cube_query: CubeQuery;
-  sql_query: string;
-  definition: DatasetDefinition;
-  description: string;
-  created_at: string;
-  updated_at: string;
-  created_by: string;
-  updated_by: string;
-}
-
-export async function getDatasets(): Promise<DatasetPublicResponse[]> {
-  const res = await fetch(`/api/v1/datasets/list`, {
-    headers: { ...authHeaders() },
-  });
-  return handleResponse<DatasetPublicResponse[]>(res);
-}
-
-export async function getDataset(datasetId: string): Promise<DatasetDetailedResponse> {
-  const res = await fetch(`/api/v1/datasets/get?id=${datasetId}`, {
-    headers: { ...authHeaders() },
-  });
-  return handleResponse<DatasetDetailedResponse>(res);
-}
-
-export async function createDataset(definitionId: string, data: DatasetCreate): Promise<void> {
-  const res = await fetch(`/api/v1/datasets/create?definition_id=${definitionId}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(data),
-  });
-  return handleResponse<void>(res);
-}
-
-export async function updateDataset(datasetId: string, data: DatasetUpdate): Promise<void> {
-  const res = await fetch(`/api/v1/datasets/update?dataset_id=${datasetId}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...authHeaders() },
-    body: JSON.stringify(data),
-  });
-  return handleResponse<void>(res);
-}
-
-export async function deleteDataset(datasetId: string): Promise<void> {
-  const res = await fetch(`/api/v1/datasets/delete?dataset_id=${datasetId}`, {
-    method: "DELETE",
-    headers: { ...authHeaders() },
-  });
-  return handleResponse<void>(res);
 }
 
 // ── Files ──────────────────────────────────────────────────────────────────
@@ -719,7 +490,6 @@ export async function getFileSchema(fileId: string): Promise<FileSchemaResponse>
   });
   return handleResponse<FileSchemaResponse>(res);
 }
-
 
 // ── AI dashboard builder ───────────────────────────────────────────────────
 
@@ -826,54 +596,6 @@ export async function getAIThemes(): Promise<AITheme[]> {
   return handleResponse<AITheme[]>(res);
 }
 
-export interface AIGenerateResponse {
-  dashboard_id: string;
-  name: string;
-  element_count: number;
-  unmet: string[];
-  errors: string[];
-}
-
-export async function generateAIDashboard(data: {
-  provider_id?: string;      // omit when only one provider is active
-  semantic_model_id: string; // the Chester BI model the agent reads
-  theme: string;
-  brief: string;
-  name?: string;
-}): Promise<AIGenerateResponse> {
-  const res = await fetch(`/api/v1/ai/dashboards/generate`, {
-    method: "POST",
-    headers: { ...authHeaders(), "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  return handleResponse<AIGenerateResponse>(res);
-}
-
-export interface AIElementPromptResponse {
-  element: DashboardElement;
-  errors: string[];
-  saved: boolean;
-}
-
-/** Per-component "Prompt" button. The backend validates and saves the patched
- *  element into the dashboard's config file, so the caller only has to swap it
- *  into local state. */
-export async function promptDashboardElement(
-  dashboardId: string,
-  elementId: string,
-  data: { provider_id?: string; instruction: string; theme?: string },
-): Promise<AIElementPromptResponse> {
-  const res = await fetch(
-    `/api/v1/ai/dashboards/${dashboardId}/elements/${encodeURIComponent(elementId)}/prompt`,
-    {
-      method: "POST",
-      headers: { ...authHeaders(), "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    },
-  );
-  return handleResponse<AIElementPromptResponse>(res);
-}
-
 // ── Artifacts (LLM-authored HTML analysis pages) ───────────────────────────
 
 export interface ArtifactResponse {
@@ -884,7 +606,6 @@ export interface ArtifactResponse {
   provider: string;
   llm_model: string;
   queries: { id: string; label: string; cube_query: Record<string, unknown> }[];
-  dataset_ids: string[];   // legacy artifacts only
   /** One entry per version — the brief, then each refinement. */
   prompts: {
     version?: number;

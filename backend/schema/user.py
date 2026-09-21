@@ -8,12 +8,11 @@ from sqlalchemy.orm.writeonly import strategies
 from enum import StrEnum
 
 class UserPermissions(StrEnum):
-    DASHBOARDS_LIST = "dashboards:list"
-    DASHBOARDS_VIEW = "dashboards:view"
-    DASHBOARDS_EDIT = "dashboards:edit"
-    DASHBOARDS_DELETE = "dashboards:delete"
-    DASHBOARDS_CREATE = "dashboards:create"
-    DASHBOARDS_ALL = "dashboards:*"
+    ARTIFACTS_LIST = "artifacts:list"
+    ARTIFACTS_EDIT = "artifacts:edit"
+    ARTIFACTS_DELETE = "artifacts:delete"
+    ARTIFACTS_CREATE = "artifacts:create"
+    ARTIFACTS_ALL = "artifacts:*"
     USERS_LIST = "users:list"
     USERS_EDIT = "users:edit"
     USERS_CREATE = "users:create"

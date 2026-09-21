@@ -8,10 +8,10 @@ from utils.init_database import Base
 class Artifact(Base):
     """An LLM-authored, self-contained HTML analysis page.
 
-    Unlike a Dashboard (a config file the React grid renders), an artifact IS the
-    markup: the model writes its own charts, narrative and filter controls. The
-    file holds no data — rows are injected fresh on every render from the
-    datasets listed in `dataset_ids`, so an artifact never goes stale."""
+    The artifact IS the markup: the model writes its own charts, narrative and
+    filter controls. The file holds no data — on every render the backend
+    re-runs the Cube queries in `queries` and injects the rows, so an artifact
+    is never stale."""
     __tablename__ = "artifacts"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -26,9 +26,6 @@ class Artifact(Base):
     # [{"id": "revenue_by_customer", "label": "...", "cube_query": {...}}] — the
     # agent's own Cube queries, validated against /meta before being stored.
     queries = Column(JSON, nullable=False, default=list)
-    # Legacy: artifacts created before the agent wrote its own queries read from
-    # saved datasets instead. Kept so those still render.
-    dataset_ids = Column(JSON, nullable=False, default=list)
     file_path = Column(String, nullable=False)          # folder; file is <public_key>.html
     # One entry per version: [{"version": 1, "instruction": "...", "at": iso8601,
     # "model": "..."}] — the brief, then each refinement. Every version's markup
