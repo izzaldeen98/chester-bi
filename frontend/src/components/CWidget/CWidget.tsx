@@ -1,6 +1,6 @@
 import { useState, type MouseEvent, type ReactNode } from "react";
 import { IoBarChartSharp } from "react-icons/io5";
-import { MdDragIndicator, MdClose, MdEdit } from "react-icons/md";
+import { MdDragIndicator, MdClose, MdEdit, MdAutoAwesome } from "react-icons/md";
 import WidgetEditDialog, { type WidgetChartConfig, type WidgetSaveResult } from "../WidgetEditDialog";
 
 export type { WidgetChartConfig };
@@ -15,6 +15,8 @@ interface CWidgetProps {
   onConfigChange?: (result: WidgetSaveResult) => void;
   onDelete?: () => void;
   onEdit?: () => void;
+  /** Opens the per-component AI chat. Button is hidden when not provided. */
+  onPrompt?: () => void;
   onDrag?: (event: MouseEvent<HTMLDivElement>) => void;
 }
 
@@ -28,6 +30,7 @@ export default function CWidget({
   onConfigChange,
   onDelete,
   onEdit,
+  onPrompt,
 }: CWidgetProps) {
   const [editOpen, setEditOpen] = useState(false);
 
@@ -50,6 +53,20 @@ export default function CWidget({
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
+            {onPrompt && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPrompt();
+                }}
+                onMouseDown={(e) => e.stopPropagation()}
+                className="p-1 rounded transition hover:bg-gray-100"
+                title="Prompt this component"
+              >
+                <MdAutoAwesome size={16} className="text-gray-500" />
+              </button>
+            )}
             <button
               type="button"
               onClick={openEdit}

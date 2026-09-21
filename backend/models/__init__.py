@@ -6,6 +6,8 @@ from .files import File
 from .models import Model
 from .datasets import Dataset
 from .definitions import Definition
+from .ai_provider import AIProvider, DashboardAgentEdit
+from .artifact import Artifact
 
 
 __all__ = [
@@ -17,4 +19,7 @@ __all__ = [
     "Model",
     "Dataset",
     "Definition",
+    "AIProvider",
+    "DashboardAgentEdit",
+    "Artifact",
 ]

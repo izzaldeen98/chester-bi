@@ -720,3 +720,254 @@ export async function getFileSchema(fileId: string): Promise<FileSchemaResponse>
   return handleResponse<FileSchemaResponse>(res);
 }
 
+
+// ── AI dashboard builder ───────────────────────────────────────────────────
+
+export interface AIProviderResponse {
+  id: string;
+  provider: "openai" | "anthropic" | "gemini" | "deepseek" | "qwen";
+  label: string;
+  api_key_hint: string;   // the key itself never leaves the backend
+  base_url?: string | null;
+  default_model?: string | null;   // chosen once; every prompt uses it
+  models: string[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AIProviderCreate {
+  provider: string;
+  label: string;
+  api_key: string;
+  default_model: string;
+  base_url?: string;
+  models?: string[];
+}
+
+/** One configured provider and the model it will prompt with. */
+export interface AIModelOption {
+  provider_id: string;
+  provider: string;
+  label: string;
+  model: string | null;
+}
+
+export interface AITheme {
+  name: string;
+  colors: string[];
+}
+
+export async function getAIProviders(): Promise<AIProviderResponse[]> {
+  const res = await fetch(`/api/v1/ai/providers`, { headers: authHeaders() });
+  return handleResponse<AIProviderResponse[]>(res);
+}
+
+export async function createAIProvider(data: AIProviderCreate): Promise<AIProviderResponse> {
+  const res = await fetch(`/api/v1/ai/providers`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<AIProviderResponse>(res);
+}
+
+export async function updateAIProvider(
+  providerId: string,
+  data: Partial<AIProviderCreate> & { is_active?: boolean },
+): Promise<AIProviderResponse> {
+  const res = await fetch(`/api/v1/ai/providers/${providerId}`, {
+    method: "PUT",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<AIProviderResponse>(res);
+}
+
+export async function deleteAIProvider(providerId: string): Promise<void> {
+  const res = await fetch(`/api/v1/ai/providers/${providerId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  return handleResponse<void>(res);
+}
+
+export async function testAIProvider(providerId: string): Promise<{ message: string }> {
+  const res = await fetch(`/api/v1/ai/providers/${providerId}/test`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  return handleResponse<{ message: string }>(res);
+}
+
+/** Curated model ids per provider, for the Add-provider dialog (no key yet). */
+export async function getKnownModels(): Promise<Record<string, string[]>> {
+  const res = await fetch(`/api/v1/ai/known-models`, { headers: authHeaders() });
+  return handleResponse<Record<string, string[]>>(res);
+}
+
+/** Re-read the model list from the provider itself and store it. Curated lists
+ *  go stale — providers retire model ids. */
+export async function refreshAIProviderModels(providerId: string): Promise<AIProviderResponse> {
+  const res = await fetch(`/api/v1/ai/providers/${providerId}/refresh-models`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  return handleResponse<AIProviderResponse>(res);
+}
+
+export async function getAIModels(): Promise<AIModelOption[]> {
+  const res = await fetch(`/api/v1/ai/models`, { headers: authHeaders() });
+  return handleResponse<AIModelOption[]>(res);
+}
+
+export async function getAIThemes(): Promise<AITheme[]> {
+  const res = await fetch(`/api/v1/ai/themes`, { headers: authHeaders() });
+  return handleResponse<AITheme[]>(res);
+}
+
+export interface AIGenerateResponse {
+  dashboard_id: string;
+  name: string;
+  element_count: number;
+  unmet: string[];
+  errors: string[];
+}
+
+export async function generateAIDashboard(data: {
+  provider_id?: string;      // omit when only one provider is active
+  semantic_model_id: string; // the Chester BI model the agent reads
+  theme: string;
+  brief: string;
+  name?: string;
+}): Promise<AIGenerateResponse> {
+  const res = await fetch(`/api/v1/ai/dashboards/generate`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<AIGenerateResponse>(res);
+}
+
+export interface AIElementPromptResponse {
+  element: DashboardElement;
+  errors: string[];
+  saved: boolean;
+}
+
+/** Per-component "Prompt" button. The backend validates and saves the patched
+ *  element into the dashboard's config file, so the caller only has to swap it
+ *  into local state. */
+export async function promptDashboardElement(
+  dashboardId: string,
+  elementId: string,
+  data: { provider_id?: string; instruction: string; theme?: string },
+): Promise<AIElementPromptResponse> {
+  const res = await fetch(
+    `/api/v1/ai/dashboards/${dashboardId}/elements/${encodeURIComponent(elementId)}/prompt`,
+    {
+      method: "POST",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    },
+  );
+  return handleResponse<AIElementPromptResponse>(res);
+}
+
+// ── Artifacts (LLM-authored HTML analysis pages) ───────────────────────────
+
+export interface ArtifactResponse {
+  id: string;
+  name: string;
+  description?: string | null;
+  theme: string;
+  provider: string;
+  llm_model: string;
+  queries: { id: string; label: string; cube_query: Record<string, unknown> }[];
+  dataset_ids: string[];   // legacy artifacts only
+  /** One entry per version — the brief, then each refinement. */
+  prompts: {
+    version?: number;
+    instruction: string;
+    at: string;
+    model?: string;
+    /** Tokens this version cost. `reasoning` is invisible but billed as output. */
+    usage?: { in: number; out: number; reasoning: number } | null;
+  }[];
+  current_version: number;
+  /** Only on the create response: what the agent could not answer. */
+  warnings?: string[];
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string;
+}
+
+export async function getArtifacts(): Promise<ArtifactResponse[]> {
+  const res = await fetch(`/api/v1/artifacts/list`, { headers: authHeaders() });
+  return handleResponse<ArtifactResponse[]>(res);
+}
+
+export async function getArtifact(artifactId: string): Promise<ArtifactResponse> {
+  const res = await fetch(`/api/v1/artifacts/get/${artifactId}`, { headers: authHeaders() });
+  return handleResponse<ArtifactResponse>(res);
+}
+
+export async function createArtifact(data: {
+  provider_id?: string;
+  semantic_model_id: string;
+  theme: string;
+  brief: string;
+  name?: string;
+}): Promise<ArtifactResponse> {
+  const res = await fetch(`/api/v1/artifacts/create`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<ArtifactResponse>(res);
+}
+
+export async function refineArtifact(
+  artifactId: string,
+  data: { provider_id?: string; instruction: string },
+): Promise<ArtifactResponse> {
+  const res = await fetch(`/api/v1/artifacts/refine/${artifactId}`, {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<ArtifactResponse>(res);
+}
+
+export async function deleteArtifact(artifactId: string): Promise<void> {
+  const res = await fetch(`/api/v1/artifacts/delete/${artifactId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  return handleResponse<void>(res);
+}
+
+export async function restoreArtifactVersion(
+  artifactId: string,
+  version: number,
+): Promise<ArtifactResponse> {
+  const res = await fetch(`/api/v1/artifacts/restore/${artifactId}?version=${version}`, {
+    method: "POST",
+    headers: authHeaders(),
+  });
+  return handleResponse<ArtifactResponse>(res);
+}
+
+/** The rendered page, data freshly queried server-side. Feed it to an iframe's
+ *  srcdoc with sandbox="allow-scripts" — never allow-same-origin, or generated
+ *  JS could reach the app's session. */
+export async function renderArtifact(artifactId: string, version?: number): Promise<string> {
+  const query = version ? `?version=${version}` : "";
+  const res = await fetch(`/api/v1/artifacts/render/${artifactId}${query}`, { headers: authHeaders() });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data?.detail ?? `Request failed (${res.status})`);
+  }
+  return res.text();
+}

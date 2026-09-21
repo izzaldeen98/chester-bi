@@ -11,6 +11,7 @@ import DashboardWidgetChart from "../components/DashboardWidgetChart";
 import type { WidgetChartConfig, WidgetSaveResult } from "../components/WidgetEditDialog";
 import { type FilterRule, type AvailableChart } from "../components/FilterEditDialog";
 import DashboardFilterWidget from "../components/DashboardFilterWidget";
+import ComponentPromptDialog from "../components/ComponentPromptDialog";
 import {
   getDashboardConfig,
   saveDashboardConfig,
@@ -93,6 +94,8 @@ export default function DashboardWorkSpace() {
   const [gridRows, setGridRows] = useState(DEFAULT_GRID_ROWS);
   const [gridRowsInput, setGridRowsInput] = useState(String(DEFAULT_GRID_ROWS));
   const [bgColor, setBgColor] = useState("");
+  // Element id whose AI prompt dialog is open (null = closed)
+  const [promptingId, setPromptingId] = useState<string | null>(null);
 
   const { rowHeight, canvasWidth, canvasHeight, cellSize } = useMemo(
     () => getSquareGridMetrics(gridRows),
@@ -238,6 +241,30 @@ export default function DashboardWorkSpace() {
     }));
   }, []);
 
+  const handleAgentEdit = useCallback((el: DashboardElement) => {
+    setWidgetMeta((prev) => ({
+      ...prev,
+      [el.id]: {
+        title: el.meta.title,
+        query: el.meta.query,
+        datasetId: el.meta.datasetId,
+        chartType: el.meta.chartType as WidgetChartConfig["chartType"],
+        chartConfig: el.meta.chartConfig,
+        filterRule: el.meta.filterRule as FilterRule | undefined,
+      },
+    }));
+    setLayouts((prev) => {
+      const current = (prev.lg ?? []) as LayoutItem[];
+      return buildLayouts(
+        current.map((item) =>
+          item.i === el.id
+            ? { ...item, x: el.layout.x, y: el.layout.y, w: el.layout.w, h: el.layout.h }
+            : item,
+        ),
+      );
+    });
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (!dashboardId) return;
 
@@ -262,6 +289,13 @@ export default function DashboardWorkSpace() {
       elements,
     });
   }, [dashboardId, layoutItems, widgetMeta, gridRows, bgColor]);
+
+  const openPrompt = useCallback(async (id: string) => {
+    // The agent edits whatever is in the saved config file, so flush local
+    // layout/config changes before asking it to change anything.
+    await handleSave();
+    setPromptingId(id);
+  }, [handleSave]);
 
   const handlePreview = useCallback(async () => {
     if (!dashboardId) return;
@@ -415,6 +449,7 @@ export default function DashboardWorkSpace() {
                         }
                         onConfigChange={(result) => handleConfigChange(item.i, result)}
                         onDelete={() => handleDeleteWidget(item.i)}
+                        onPrompt={dashboardId ? () => openPrompt(item.i) : undefined}
                       />
                     )}
                   </div>
@@ -422,6 +457,17 @@ export default function DashboardWorkSpace() {
               })}
             </Responsive>
           </div>
+        )}
+
+        {promptingId && (
+          <ComponentPromptDialog
+            isOpen
+            dashboardId={dashboardId}
+            elementId={promptingId}
+            elementTitle={widgetMeta[promptingId]?.title ?? promptingId}
+            onClose={() => setPromptingId(null)}
+            onApplied={handleAgentEdit}
+          />
         )}
 
         {layoutItems.length === 0 && (

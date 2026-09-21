@@ -14,6 +14,10 @@ import DatasetsPage from './pages/DatasetsPage'
 import FilesPage from './pages/FilesPage'
 import DashboardWorkSpace from './pages/DashboardWorkSpace'
 import DashboardViewPage from './pages/DashboardViewPage'
+import AIBuilderPage from './pages/AIBuilderPage'
+import SettingsProvidersPage from './pages/SettingsProvidersPage'
+import ArtifactsPage from './pages/ArtifactsPage'
+import ArtifactWorkspace from './pages/ArtifactWorkspace'
 import RegisterPage from './pages/RegisterPage'
 
 // Placeholder for pages not yet built
@@ -40,6 +44,11 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/home"        element={<HomePage />} />
           <Route path="/dashboard"   element={<DashboardsPage />} />
+          <Route path="/ai-builder"  element={<AIBuilderPage />} />
+          <Route path="/artifacts"   element={<ArtifactsPage />} />
+          <Route path="/artifacts/new" element={<ArtifactWorkspace />} />
+          <Route path="/artifacts/:artifactId" element={<ArtifactWorkspace />} />
+          <Route path="/settings/ai-providers" element={<SettingsProvidersPage />} />
           <Route path="/datasets"    element={<DatasetsPage />} />
           <Route path="/files"       element={<FilesPage />} />
           <Route path="/connections" element={<ConnectionsPage />} />

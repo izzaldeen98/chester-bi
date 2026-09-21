@@ -26,7 +26,11 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:8989',
-        changeOrigin: true
+        changeOrigin: true,
+        // Artifact generation is two LLM turns and can run for minutes; the
+        // defaults would cut the proxied request before the backend answers.
+        timeout: 900000,
+        proxyTimeout: 900000
       }
     }
   },

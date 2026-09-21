@@ -105,13 +105,23 @@ def _headers(token: str) -> dict:
     return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
 
+def _request(method: str, path: str, token: str, **kwargs):
+    """Every call to Cube goes through here so a stopped/unreachable engine reads
+    as one clear sentence instead of a requests connection stack — the failure
+    mode every caller (datasets, definitions, dashboards, artifacts) hits first
+    when the cube service isn't up."""
+    try:
+        return requests.request(method, f"{CUBE_URL}{path}", headers=_headers(token), **kwargs)
+    except requests.exceptions.RequestException as exc:
+        raise Exception(
+            f"Cube Core is not reachable at {CUBE_URL} — start the `cube` service "
+            f"(docker compose up cube) or fix CUBE_URL in your .env. ({type(exc).__name__})"
+        ) from exc
+
+
 def load(token: str, query: dict) -> dict:
     """POST /cubejs-api/v1/load — runs a Cube query, returns its result rows."""
-    response = requests.post(
-        f"{CUBE_URL}/cubejs-api/v1/load",
-        json={"query": query},
-        headers=_headers(token),
-    )
+    response = _request("POST", "/cubejs-api/v1/load", token, json={"query": query})
     if response.status_code != 200:
         raise Exception(f"Failed to query dataset: {response.text}")
     return response.json()
@@ -160,7 +170,7 @@ def meta(token: str) -> dict:
     that powers the query-builder field tree, replacing Malloy's
     get_compiled_model(). Returns the normalize_meta() shape, not Cube's raw
     response."""
-    response = requests.get(f"{CUBE_URL}/cubejs-api/v1/meta", headers=_headers(token))
+    response = _request("GET", "/cubejs-api/v1/meta", token)
     if response.status_code != 200:
         raise Exception(f"Failed to get compiled definition: {response.text}")
     return normalize_meta(response.json())
@@ -180,3 +190,14 @@ def extract_cube_names(yaml_text: str) -> set:
     every definition — this lets a caller filter that account-wide result
     back down to just the cubes a single definition actually owns."""
     return {name.strip('"').strip("'") for name in _CUBE_NAME_RE.findall(yaml_text)}
+
+
+def meta_raw(token: str) -> dict:
+    """Cube's /meta exactly as Cube returns it — titles, descriptions, types,
+    segments and joins included. normalize_meta() throws all of that away to
+    match the query-builder's field-tree shape; the LLM grounding needs it,
+    so it reads this instead (see ai/grounding.py)."""
+    response = _request("GET", "/cubejs-api/v1/meta", token)
+    if response.status_code != 200:
+        raise Exception(f"Failed to get compiled definition: {response.text}")
+    return response.json()

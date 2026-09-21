@@ -34,6 +34,8 @@ class UserPermissions(StrEnum):
     MODELS_CREATE = "models:create"
     MODELS_LIST = "models:list"
     MODELS_ALL = "models:*"
+    AI_MANAGE = "ai:manage"      # configure LLM providers / API keys
+    AI_ALL = "ai:*"
 
 
 class UserBase(BaseModel):

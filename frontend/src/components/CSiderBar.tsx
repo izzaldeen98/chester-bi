@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { RiHomeLine, RiLogoutBoxLine } from "react-icons/ri";
-import { MdDashboard, MdOutlineCloud } from "react-icons/md";
+import { MdDashboard, MdOutlineCloud, MdAutoAwesome } from "react-icons/md";
 import { PiFileSqlFill } from "react-icons/pi";
-import { FaFileAlt, FaUser, FaArrowLeft, FaArrowRight } from "react-icons/fa";
+import { FaFileAlt, FaUser, FaArrowLeft, FaArrowRight, FaMagic, FaKey } from "react-icons/fa";
 import { GoPackage } from "react-icons/go";
 import { clearToken } from "../lib/auth";
 import { useTheme } from "../lib/theme";
@@ -19,11 +19,14 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Home",        path: "/home",        icon: <RiHomeLine size={18} /> },
   { label: "Dashboards",   path: "/dashboard",   icon: <MdDashboard size={18} /> },
+  { label: "Artifacts",   path: "/artifacts",   icon: <MdAutoAwesome size={18} /> },
+  { label: "AI Builder",  path: "/ai-builder",  icon: <FaMagic size={16} /> },
   { label: "Datasets",       path: "/datasets",       icon: <PiFileSqlFill size={18} /> },
   { label: "Files",       path: "/files",       icon: <FaFileAlt size={17} /> },
   { label: "Connections", path: "/connections", icon: <MdOutlineCloud size={18} /> },
   { label: "Models",    path: "/models",    icon: <GoPackage size={18} /> },
   { label: "Users",       path: "/users",       icon: <FaUser size={16} /> },
+  { label: "AI Providers", path: "/settings/ai-providers", icon: <FaKey size={15} /> },
 ];
 
 export default function CSiderBar() {
