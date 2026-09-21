@@ -38,7 +38,7 @@ export default function CTable({
 
   if (columns.length === 0 || rows.length === 0) {
     return (
-      <div className="flex items-center justify-center py-16 text-sm" style={{ color: "var(--text)" }}>
+      <div className="flex items-center justify-center py-16 text-sm" style={{ color: "var(--text-2)" }}>
         {emptyMessage}
       </div>
     );
@@ -48,14 +48,14 @@ export default function CTable({
     <div className="overflow-auto" style={{ maxHeight }}>
       <table className="w-full border-collapse text-xs">
         <thead>
-          <tr style={{ background: "var(--bg-subtle)", position: "sticky", top: 0, zIndex: 1 }}>
+          <tr style={{ background: "var(--surface-2)", position: "sticky", top: 0, zIndex: 1 }}>
             {columns.map((col) => (
               <th
                 key={col}
                 title={col}
                 className="px-3 py-2 text-left font-semibold whitespace-nowrap"
                 style={{
-                  color: "var(--text-h)",
+                  color: "var(--text)",
                   borderBottom: "2px solid var(--border)",
                   borderRight: "1px solid var(--border)",
                 }}
@@ -70,16 +70,16 @@ export default function CTable({
             <tr
               key={i}
               className="transition-colors"
-              style={{ background: i % 2 === 0 ? "var(--bg)" : "var(--bg-subtle)" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--accent-muted)"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? "var(--bg)" : "var(--bg-subtle)"; }}
+              style={{ background: i % 2 === 0 ? "var(--surface)" : "var(--surface-2)" }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--accent-soft)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = i % 2 === 0 ? "var(--surface)" : "var(--surface-2)"; }}
             >
               {columns.map((col) => (
                 <td
                   key={col}
                   className="px-3 py-1.5 font-mono whitespace-nowrap"
                   style={{
-                    color: "var(--text-h)",
+                    color: "var(--text)",
                     borderBottom: "1px solid var(--border)",
                     borderRight: "1px solid var(--border)",
                     maxWidth: "280px",
@@ -97,7 +97,7 @@ export default function CTable({
       </table>
       <div
         className="px-3 py-1.5 text-xs"
-        style={{ color: "var(--text)", borderTop: "1px solid var(--border)", background: "var(--bg-subtle)" }}
+        style={{ color: "var(--text-2)", borderTop: "1px solid var(--border)", background: "var(--surface-2)" }}
       >
         {rows.length} row{rows.length !== 1 ? "s" : ""}
       </div>

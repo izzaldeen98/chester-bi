@@ -1,9 +1,9 @@
-import CSpinner from "./CSpinner";
+import type { ReactNode } from "react";
 
 type ButtonVariant = "primary" | "outline" | "ghost" | "danger";
 
 interface CButtonProps {
-  children: React.ReactNode;
+  children: ReactNode;
   onClick?: () => void;
   loading?: boolean;
   disabled?: boolean;
@@ -13,15 +13,20 @@ interface CButtonProps {
   className?: string;
 }
 
-const variantStyles: Record<ButtonVariant, string> = {
-  primary:
-    "bg-[var(--accent)] text-[var(--accent-fg)] hover:brightness-105 active:scale-95 shadow-sm",
-  outline:
-    "bg-transparent border border-[var(--border)] text-[var(--text-h)] hover:bg-[var(--bg-subtle)] active:scale-95",
-  ghost:
-    "bg-transparent text-[var(--text)] hover:bg-[var(--bg-subtle)] active:scale-95",
-  danger:
-    "bg-red-600 text-white hover:bg-red-700 active:scale-95 shadow-sm dark:bg-red-700 dark:hover:bg-red-600",
+/* Primary is near-black (inverted in dark), not the brand colour — the
+   accent stays reserved for state and focus so it keeps its meaning. */
+const styles: Record<ButtonVariant, React.CSSProperties> = {
+  primary: { background: "var(--solid)", color: "var(--solid-ink)", border: "1px solid var(--solid)" },
+  outline: { background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border-strong)" },
+  ghost:   { background: "transparent", color: "var(--text-2)", border: "1px solid transparent" },
+  danger:  { background: "var(--surface)", color: "var(--danger)", border: "1px solid var(--border-strong)" },
+};
+
+const hover: Record<ButtonVariant, string> = {
+  primary: "hover:bg-[var(--solid-hover)]",
+  outline: "hover:bg-[var(--surface-2)]",
+  ghost:   "hover:bg-[var(--surface-2)] hover:text-[var(--text)]",
+  danger:  "hover:bg-[var(--danger-soft)] hover:border-[var(--danger)]",
 };
 
 export default function CButton({
@@ -34,24 +39,17 @@ export default function CButton({
   fullWidth = false,
   className = "",
 }: CButtonProps) {
-  const isDisabled = disabled || loading;
-
   return (
     <button
       type={type}
       onClick={onClick}
-      disabled={isDisabled}
-      className={`
-        inline-flex cursor-pointer items-center justify-center gap-2
-        rounded-xl px-5 py-2.5 text-sm font-semibold
-        transition-all duration-150
-        disabled:cursor-not-allowed disabled:opacity-50
-        ${variantStyles[variant]}
-        ${fullWidth ? "w-full" : ""}
-        ${className}
-      `}
+      disabled={disabled || loading}
+      className={`inline-flex items-center justify-center gap-1.5 whitespace-nowrap px-3 py-1.5 text-[13px]
+        font-medium transition-all duration-150 active:scale-[0.98]
+        disabled:pointer-events-none disabled:opacity-45
+        ${hover[variant]} ${fullWidth ? "w-full" : ""} ${className}`}
+      style={{ ...styles[variant], borderRadius: "var(--r-sm)", boxShadow: variant === "primary" ? "var(--shadow-1)" : undefined }}
     >
-      {loading && <CSpinner size={15} />}
       {children}
     </button>
   );

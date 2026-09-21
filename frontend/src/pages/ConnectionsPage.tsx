@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { MdOutlineCloud, MdBlock } from "react-icons/md";
-import { FaSearch, FaEdit, FaTrash, FaPlus, FaCheckCircle, FaPlug, FaVial } from "react-icons/fa";
+import { FaSearch, FaEdit, FaTrash, FaPlus, FaVial } from "react-icons/fa";
 import { RiLockPasswordFill } from "react-icons/ri";
 import CSelect from "../components/CSelect";
-import CMetricCard from "../components/CMetricCard";
 import CHCard from "../components/CHCard";
+import { BoardFill, BoardHead, EmptyBoard, Panel } from "../components/Board";
 import CInfoSideBar from "../components/CInfoSideBar";
 import CConfirmDialog from "../components/CConfirmDialog";
 import CButton from "../components/CButton";
@@ -111,10 +110,6 @@ export default function ConnectionsPage() {
   }
 
   // ── Derived metrics ──────────────────────────────────────────────────────
-  const total    = connections.length;
-  const active   = connections.filter((c) => c.is_active).length;
-  const inactive = total - active;
-  const types    = new Set(connections.map((c) => c.type)).size;
 
   // ── Search ───────────────────────────────────────────────────────────────
   const filtered = connections.filter((c) => {
@@ -253,15 +248,15 @@ export default function ConnectionsPage() {
         <div className="flex flex-col gap-4">
           {formError && <CAlert variant="error" message={formError} />}
 
-          <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
-            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>General</p>
+          <div className="rounded-[var(--r-sm)] p-4 flex flex-col gap-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>General</p>
             <CTextInput label="Name" value={cName} onChange={setCName} placeholder="e.g. Production DB" required />
             <CSelect label="Type" value={cType} onChange={setCType} options={CONNECTION_TYPES} placeholder="Select type…" required />
             <CTextInput label="Description" value={cDescription} onChange={setCDescription} placeholder="Optional" />
           </div>
           {(cType === "postgres" || cType === "mysql") && (
-            <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Connection Attributes</p>
+            <div className="rounded-[var(--r-sm)] p-4 flex flex-col gap-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>Connection Attributes</p>
               <CTextInput label="Host"     value={cHost}     onChange={setCHost}     placeholder="e.g. localhost" required />
               <CTextInput label="Port"     value={cPort}     onChange={setCPort}     placeholder="e.g. 5432" type="number" />
               <CTextInput label="Database" value={cDatabase} onChange={setCDatabase} placeholder="e.g. my_db" required />
@@ -270,8 +265,8 @@ export default function ConnectionsPage() {
             </div>
           )}
           {cType === "snowflake" && (
-            <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Connection Attributes</p>
+            <div className="rounded-[var(--r-sm)] p-4 flex flex-col gap-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>Connection Attributes</p>
               <CTextInput label="Account" value={cAccount} onChange={setCAccount} placeholder="e.g. my_account"  />
               <CTextInput label="Username" value={cUsername} onChange={setCUsername} placeholder="e.g. admin"  />
               <CTextInput label="Password" value={cPassword} onChange={setCPassword} type="password" icon={<RiLockPasswordFill size={15} />} autoComplete="new-password" />
@@ -284,8 +279,8 @@ export default function ConnectionsPage() {
             </div>
           )}
           {cType === "bigquery" && (
-            <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Connection Attributes</p>
+            <div className="rounded-[var(--r-sm)] p-4 flex flex-col gap-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>Connection Attributes</p>
               <CTextInput label="Project ID" value={cProjectId} onChange={setCProjectId} placeholder="e.g. my_project" required />
               <CTextInput label="Credentials" value={cCredentials} onChange={setCCredentials} type="text" placeholder='{"type": "service_account", "project_id": "my_project"}' />
             </div>
@@ -301,15 +296,15 @@ export default function ConnectionsPage() {
         <div className="flex flex-col gap-4">
           {formError && <CAlert variant="error" message={formError} />}
 
-          <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
-            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>General</p>
+          <div className="rounded-[var(--r-sm)] p-4 flex flex-col gap-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>General</p>
             <CTextInput label="Name"        value={fName}        onChange={setFName}        required />
             <CTextInput label="Description" value={fDescription} onChange={setFDescription} />
           </div>
 
-          <div className="rounded-xl p-4 flex flex-col gap-3" style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)" }}>
-            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>Connection Attributes</p>
-            <p className="text-xs" style={{ color: "var(--text)" }}>Leave a field blank to keep the existing value.</p>
+          <div className="rounded-[var(--r-sm)] p-4 flex flex-col gap-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>Connection Attributes</p>
+            <p className="text-xs" style={{ color: "var(--text-2)" }}>Leave a field blank to keep the existing value.</p>
             <CTextInput label="Host"     value={fHost}     onChange={setFHost}     placeholder="unchanged" />
             <CTextInput label="Port"     value={fPort}     onChange={setFPort}     placeholder="unchanged" type="number" />
             <CTextInput label="Database" value={fDatabase} onChange={setFDatabase} placeholder="unchanged" />
@@ -325,21 +320,21 @@ export default function ConnectionsPage() {
       <div>
         <div className="mb-6 flex flex-col items-center gap-2">
           <div
-            className="flex h-16 w-16 items-center justify-center rounded-2xl text-xl font-bold"
-            style={{ background: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--accent-ring)" }}
+            className="flex h-16 w-16 items-center justify-center rounded-[var(--r-sm)] text-xl font-bold"
+            style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--accent-line)" }}
           >
             {getInitials(selected.name)}
           </div>
-          <p className="text-base font-bold text-center" style={{ color: "var(--text-h)" }}>{selected.name}</p>
+          <p className="text-base font-bold text-center" style={{ color: "var(--text)" }}>{selected.name}</p>
           <div className="flex items-center gap-2">
-            <span className="rounded-full px-3 py-0.5 text-xs font-medium"
-              style={{ background: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--accent-ring)" }}>
+            <span className="rounded-[var(--r-sm)] px-3 py-0.5 text-xs font-medium"
+              style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--accent-line)" }}>
               {selected.type}
             </span>
-            <span className={`rounded-full px-3 py-0.5 text-xs font-medium ${
+            <span className={`rounded-[var(--r-sm)] px-3 py-0.5 text-xs font-medium ${
               selected.is_active
-                ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
-                : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                ? "text-[var(--ok)] bg-[var(--ok-soft)]"
+                : "text-[var(--danger)] bg-[var(--danger-soft)]"
             }`}>
               {selected.is_active ? "Active" : "Inactive"}
             </span>
@@ -359,7 +354,7 @@ export default function ConnectionsPage() {
         ) : detail ? (
           <>
             <div className="my-3">
-              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: "var(--text)" }}>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: "var(--text-2)" }}>
                 Connection Attributes
               </p>
             </div>
@@ -417,7 +412,7 @@ export default function ConnectionsPage() {
 
   // ── Sidebar meta ─────────────────────────────────────────────────────────
   const sidebarTitle =
-    mode === "create" ? "New Connection" :
+    mode === "create" ? "New connection" :
     mode === "edit"   ? "Edit Connection" :
     selected ? selected.name : "";
 
@@ -428,27 +423,26 @@ export default function ConnectionsPage() {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="flex-1 overflow-y-auto p-8">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>Connections</h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--text)" }}>Manage data source connections.</p>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <header
+        className="flex shrink-0 flex-wrap items-center gap-4 px-6 py-4"
+        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
+      >
+        <div className="min-w-0">
+          <h1 className="text-[18px] font-semibold leading-none tracking-[-0.02em]">Connections</h1>
+          <p className="mt-1.5 text-[13px] leading-none" style={{ color: "var(--text-3)" }}>Manage data source connections.</p>
         </div>
+        <div className="ml-auto flex items-center gap-3">
         <CButton variant="primary" onClick={openCreate}>
-          <FaPlus size={12} /> New Connection
+          <FaPlus size={12} /> New connection
         </CButton>
-      </div>
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
 
       {pageError && <CAlert variant="error" message={pageError} className="mb-6" />}
 
-      {/* Metrics */}
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <CMetricCard label="Total"    value={total}    icon={<MdOutlineCloud size={18} />} />
-        <CMetricCard label="Active"   value={active}   icon={<FaCheckCircle size={16} />} trend="currently active" up={active > 0} />
-        <CMetricCard label="Inactive" value={inactive} icon={<MdBlock size={18} />}        trend={inactive === 0 ? "all good" : "need attention"} up={inactive === 0} />
-        <CMetricCard label="Types"    value={types}    icon={<FaPlug size={15} />}          trend="distinct types" />
-      </div>
 
       {/* Search */}
       <div className="mb-5 max-w-sm">
@@ -456,17 +450,20 @@ export default function ConnectionsPage() {
       </div>
 
       {/* Connection grid */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20"><CSpinner size={28} /></div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <MdOutlineCloud size={36} style={{ color: "var(--border)" }} />
-          <p className="mt-3 text-sm" style={{ color: "var(--text)" }}>
-            {search ? "No connections match your search." : "No connections yet — add one above."}
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <Panel label="Connections" flush bodyClassName="flex flex-col">
+        {loading ? (
+        <div className="flex items-center justify-center gap-3 py-20" style={{ color: "var(--text-3)" }}><CSpinner size={18} /><span className=" text-[12px]">Loading…</span></div>
+        ) : filtered.length === 0 ? (
+        <EmptyBoard line={search ? "No match on this board" : "No sources connected"} hint={search ? "Try a different search." : "Connect a database or upload a file — everything downstream is modelled from it."}
+              action={search ? undefined : <CButton variant="primary" onClick={openCreate}><FaPlus size={10} /> Add connection</CButton>} />
+        ) : (
+          <>
+          <BoardHead cols="42px minmax(0,1fr) 140px 108px">
+            <span className="label"></span>
+            <span className="label">Connection</span>
+            <span className="label">Type</span>
+            <span className="label text-right">State</span>
+          </BoardHead>
           {filtered.map((c) => (
             <CHCard
               key={c.id}
@@ -479,8 +476,10 @@ export default function ConnectionsPage() {
               onClick={() => openView(c)}
             />
           ))}
-        </div>
-      )}
+          <BoardFill />
+          </>
+        )}
+      </Panel>
 
       {/* Sidebar */}
       <CInfoSideBar isOpen={isSidebarOpen} onClose={closePanel} title={sidebarTitle} subtitle={sidebarSubtitle} footer={renderSidebarFooter()}>
@@ -500,5 +499,5 @@ export default function ConnectionsPage() {
         onCancel={() => setConfirmOpen(false)}
       />
     </div>
-  );
+    </div>  );
 }

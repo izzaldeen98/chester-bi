@@ -1,12 +1,11 @@
-import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { RiHomeLine, RiLogoutBoxLine } from "react-icons/ri";
 import { MdOutlineCloud, MdAutoAwesome } from "react-icons/md";
-import { FaFileAlt, FaUser, FaArrowLeft, FaArrowRight, FaKey } from "react-icons/fa";
+import { FaFileAlt, FaUser, FaKey, FaBars } from "react-icons/fa";
 import { GoPackage } from "react-icons/go";
-import { clearToken } from "../lib/auth";
-import { useTheme } from "../lib/theme";
 import { HiSun, HiMoon } from "react-icons/hi";
+import { clearToken, getUser } from "../lib/auth";
+import { useTheme } from "../lib/theme";
 import CLogo from "./CLogo";
 
 interface NavItem {
@@ -15,113 +14,163 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
-const navItems: NavItem[] = [
-  { label: "Home",        path: "/home",        icon: <RiHomeLine size={18} /> },
-  { label: "Artifacts",   path: "/artifacts",   icon: <MdAutoAwesome size={18} /> },
-  { label: "Files",       path: "/files",       icon: <FaFileAlt size={17} /> },
-  { label: "Connections", path: "/connections", icon: <MdOutlineCloud size={18} /> },
-  { label: "Models",    path: "/models",    icon: <GoPackage size={18} /> },
-  { label: "Users",       path: "/users",       icon: <FaUser size={16} /> },
-  { label: "AI Providers", path: "/settings/ai-providers", icon: <FaKey size={15} /> },
+/* Ordered as the work runs, so the product's one path is legible from the
+   navigation alone: connect a source, model it, then ask. */
+const pipeline: NavItem[] = [
+  { label: "Overview", path: "/home", icon: <RiHomeLine size={15} /> },
+  { label: "Connections", path: "/connections", icon: <MdOutlineCloud size={15} /> },
+  { label: "Models", path: "/models", icon: <GoPackage size={14} /> },
+  { label: "Artifacts", path: "/artifacts", icon: <MdAutoAwesome size={15} /> },
 ];
 
-export default function CSiderBar() {
-  const [collapsed, setCollapsed] = useState(false);
-  const navigate = useNavigate();
+const workspace: NavItem[] = [
+  { label: "Files", path: "/files", icon: <FaFileAlt size={13} /> },
+  { label: "AI Providers", path: "/settings/ai-providers", icon: <FaKey size={12} /> },
+  { label: "Users", path: "/users", icon: <FaUser size={12} /> },
+];
 
-  function handleLogout() {
-    clearToken();
-    navigate("/login");
-  }
+const NARROW = "(max-width: 900px)";
+
+export default function CSiderBar({
+  onOpenPalette,
+  collapsed,
+  setCollapsed,
+}: {
+  onOpenPalette?: () => void;
+  collapsed: boolean;
+  setCollapsed: (fn: (c: boolean) => boolean) => void;
+}) {
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
+  const user = getUser();
+
+  function renderItem(item: NavItem) {
+    return (
+      <NavLink
+        key={item.path}
+        to={item.path}
+        title={collapsed ? item.label : undefined}
+        onClick={() => {
+          if (window.matchMedia(NARROW).matches) setCollapsed(() => true);
+        }}
+        className="mx-2 flex items-center gap-2.5 rounded-[var(--r-sm)] px-2.5 py-[7px] text-[13.5px] transition-colors"
+        style={({ isActive }) => ({
+          background: isActive ? "var(--surface-3)" : "transparent",
+          color: isActive ? "var(--text)" : "var(--text-2)",
+          fontWeight: isActive ? 500 : 400,
+        })}
+      >
+        {({ isActive }) => (
+          <>
+            <span className="shrink-0" style={{ color: isActive ? "var(--accent)" : "var(--text-3)" }}>
+              {item.icon}
+            </span>
+            {!collapsed && <span className="truncate">{item.label}</span>}
+          </>
+        )}
+      </NavLink>
+    );
+  }
 
   return (
     <aside
-      className="relative flex h-screen flex-shrink-0 flex-col transition-all duration-200"
+      className={`relative flex shrink-0 flex-col transition-[width] duration-200 ${
+        collapsed ? "rail-collapsed" : "rail-overlay"
+      }`}
       style={{
-        width: collapsed ? 64 : 220,
-        background: "var(--bg-subtle)",
+        width: collapsed ? 56 : 208,
+        background: "var(--surface)",
         borderRight: "1px solid var(--border)",
       }}
     >
-      {/* Logo */}
-      <div
-        className="flex items-center gap-2.5 px-4 py-5"
-        style={{ borderBottom: "1px solid var(--border)" }}
-      >
-        <CLogo size={32} className="shrink-0" />
+      <div className="flex shrink-0 items-center gap-2 px-3 py-3.5">
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!collapsed}
+          className="shrink-0 rounded-[var(--r-sm)] p-1.5 transition-colors hover:bg-[var(--surface-2)]"
+          style={{ color: "var(--text-3)" }}
+        >
+          <FaBars size={13} />
+        </button>
         {!collapsed && (
-          <span
-            className="truncate text-base font-bold tracking-tight"
-            style={{ color: "var(--text-h)" }}
-          >
-            Chester <span style={{ color: "var(--accent)" }}>BI</span>
-          </span>
+          <>
+            <CLogo size={18} />
+            <span className="text-[14px] font-semibold tracking-[-0.02em]" style={{ color: "var(--text)" }}>
+              Chester
+            </span>
+          </>
         )}
       </div>
 
-      {/* Nav items */}
-      <nav className="flex-1 overflow-y-auto py-3">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-[var(--accent-muted)] text-[var(--accent)]"
-                  : "text-[var(--text)] hover:bg-[var(--accent-muted)] hover:text-[var(--accent)]"
-              }`
-            }
-            title={collapsed ? item.label : undefined}
+      {/* Search doubles as the palette trigger — the fastest way around. */}
+      {!collapsed && onOpenPalette && (
+        <button
+          type="button"
+          onClick={onOpenPalette}
+          className="mx-2 mb-2 flex items-center gap-2 rounded-[var(--r-sm)] px-2.5 py-[7px] text-[13px] transition-colors hover:bg-[var(--surface-2)]"
+          style={{ background: "var(--surface-2)", color: "var(--text-3)", border: "1px solid var(--border)" }}
+        >
+          <span className="flex-1 text-left">Search…</span>
+          <kbd
+            className="mono rounded-[4px] px-1 py-0.5 text-[10px]"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text-3)" }}
           >
-            <span className="shrink-0">{item.icon}</span>
-            {!collapsed && <span className="truncate">{item.label}</span>}
-          </NavLink>
-        ))}
+            ⌘K
+          </kbd>
+        </button>
+      )}
+
+      <nav className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pb-2">
+        {pipeline.map(renderItem)}
+        <div className="mx-4 my-2.5 h-px shrink-0" style={{ background: "var(--border)" }} />
+        {workspace.map(renderItem)}
       </nav>
 
-      {/* Logout */}
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 mx-3 my-2">
-        <span className={`text-xs font-medium ${collapsed ? "sr-only" : ""}`}>
-          {theme === "dark" ? "Dark mode" : "Light mode"}
-        </span>
-        <button
-          onClick={toggleTheme}
-          aria-label="Toggle theme"
-          className="rounded-full p-2"
-        >
-          {theme === "dark" ? <HiSun size={20} /> : <HiMoon size={20} />}
-        </button>
-      </div>
- 
-   
-      <div style={{ borderTop: "1px solid var(--border)" }} className="py-3">
-        <button
-          onClick={handleLogout}
-          title={collapsed ? "Logout" : undefined}
-          className="flex w-full items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
-          style={{ color: "var(--text)" }}
-        >
-          <RiLogoutBoxLine size={18} className="shrink-0" />
-          {!collapsed && <span>Logout</span>}
-        </button>
-      </div>
+      <div className="shrink-0 px-2 py-2" style={{ borderTop: "1px solid var(--border)" }}>
+        {!collapsed && user && (
+          <div className="mb-1 flex items-center gap-2 px-2.5 py-1.5">
+            <span
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-medium"
+              style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+            >
+              {(user.first_name?.[0] ?? user.username?.[0] ?? "?").toUpperCase()}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[12.5px]" style={{ color: "var(--text-2)" }}>
+              {user.first_name ?? user.username}
+            </span>
+          </div>
+        )}
 
-      {/* Collapse toggle */}
-      <button
-        onClick={() => setCollapsed((c) => !c)}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        className="absolute -right-3 top-[72px] flex h-6 w-6 items-center justify-center rounded-full transition-colors hover:brightness-105"
-        style={{
-          background: "var(--accent)",
-          color: "var(--accent-fg)",
-          border: "2px solid var(--bg)",
-          boxShadow: "var(--shadow-sm)",
-        }}
-      >
-        {collapsed ? <FaArrowRight size={9} /> : <FaArrowLeft size={9} />}
-      </button>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="flex w-full items-center gap-2.5 rounded-[var(--r-sm)] px-2.5 py-[7px] text-[13px] transition-colors hover:bg-[var(--surface-2)]"
+          style={{ color: "var(--text-2)" }}
+          aria-label={theme === "dark" ? "Switch to light" : "Switch to dark"}
+        >
+          <span className="shrink-0" style={{ color: "var(--text-3)" }}>
+            {theme === "dark" ? <HiSun size={15} /> : <HiMoon size={15} />}
+          </span>
+          {!collapsed && <span>{theme === "dark" ? "Light" : "Dark"}</span>}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            clearToken();
+            navigate("/login");
+          }}
+          className="flex w-full items-center gap-2.5 rounded-[var(--r-sm)] px-2.5 py-[7px] text-[13px] transition-colors hover:bg-[var(--surface-2)]"
+          style={{ color: "var(--text-2)" }}
+        >
+          <span className="shrink-0" style={{ color: "var(--text-3)" }}>
+            <RiLogoutBoxLine size={15} />
+          </span>
+          {!collapsed && <span>Sign out</span>}
+        </button>
+      </div>
     </aside>
   );
 }

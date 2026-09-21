@@ -1,78 +1,224 @@
 @import "tailwindcss";
 
-/* ── Dark mode: toggled by .dark class on <html> ──────────── */
-@custom-variant dark (&:where(.dark, .dark *));
+/* Self-hosted: a self-hosted BI tool must not fetch fonts from a CDN. */
+@import "@fontsource/geist-sans/400.css";
+@import "@fontsource/geist-sans/500.css";
+@import "@fontsource/geist-sans/600.css";
+@import "@fontsource/geist-mono/400.css";
+@import "@fontsource/geist-mono/500.css";
 
-/* ── Light tokens ─────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════
+   CHESTER BI — design tokens
+
+   Light is the primary theme; dark is a full companion, not a filter.
+   Craft bar: Linear / Vercel / Raycast — quiet surfaces, one warm accent,
+   restrained depth, and type doing most of the work.
+
+   Amber is the brand (it is already the logo) used the modern way:
+   primary actions are near-black, inverted in dark, and amber is kept for
+   state, focus, active navigation and brand moments. An interface where
+   the accent is everywhere has no accent.
+   ═══════════════════════════════════════════════════════════════════ */
+
 :root {
-  --text:           #57534e;   /* stone-600  */
-  --text-h:         #1c1917;   /* stone-900  */
-  --bg:             #ffffff;
-  --bg-subtle:      #fafaf9;   /* stone-50   */
-  --border:         #e7e5e4;   /* stone-200  */
-  --accent:         #eab308;   /* yellow-500 */
-  --accent-fg:      #000000;
-  --accent-subtle:  #fef9c3;   /* yellow-100 */
-  --accent-muted:   rgba(234,179,8,0.12);
-  --accent-ring:    rgba(234,179,8,0.45);
-  --shadow-sm:      0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md:      0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  /* ── Surfaces: warm neutrals, not cold grey ─────────────────────── */
+  --bg:            #fbfbfa;
+  --surface:       #ffffff;
+  --surface-2:     #f5f5f3;
+  --surface-3:     #eeeeec;
 
-  --sans:    system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono:    ui-monospace, Consolas, monospace;
+  --border:        #e7e6e2;
+  --border-strong: #d6d4ce;
 
-  font-family: var(--sans);
-  font-size: 16px;
-  line-height: 1.5;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* ── Ink ─────────────────────────────────────────────────────────── */
+  --text:          #171614;
+  --text-2:        #5f5d57;
+  --text-3:        #716e68;   /* AA on --bg, --surface and --surface-2 */
+
+  /* ── Accent: the logo's amber, tuned per job ────────────────────── */
+  --accent:        #b45309;
+  --accent-bold:   #f59e0b;
+  --accent-soft:   #fef6e7;
+  --accent-line:   #f3d9a4;
+
+  /* ── Primary action: near-black ─────────────────────────────────── */
+  --solid:         #171614;
+  --solid-hover:   #2d2b27;
+  --solid-ink:     #ffffff;
+
+  /* ── Status ──────────────────────────────────────────────────────── */
+  --ok:            #10804a;
+  --ok-soft:       #e8f6ee;
+  --warn:          #b45309;
+  --warn-soft:     #fef6e7;
+  --danger:        #c02626;
+  --danger-soft:   #fdedec;
+
+  /* ── Depth: offset and blur, never a flat halo ──────────────────── */
+  --shadow-1: 0 1px 2px rgba(23, 22, 20, 0.05);
+  --shadow-2: 0 1px 2px rgba(23, 22, 20, 0.05), 0 4px 12px -2px rgba(23, 22, 20, 0.08);
+  --shadow-3: 0 2px 4px rgba(23, 22, 20, 0.06), 0 16px 36px -8px rgba(23, 22, 20, 0.14);
+
+  /* ── Shape: soft, not pill ──────────────────────────────────────── */
+  --r-sm: 6px;
+  --r:    8px;
+  --r-lg: 12px;
+
+  color-scheme: light;
 }
 
-/* ── Dark tokens ──────────────────────────────────────────── */
 .dark {
-  --text:           #a8a29e;   /* stone-400  */
-  --text-h:         #fafaf9;   /* stone-50   */
-  --bg:             #1c1917;   /* stone-900  */
-  --bg-subtle:      #292524;   /* stone-800  */
-  --border:         #3f3b38;   /* stone-700  */
-  --accent:         #facc15;   /* yellow-400 */
-  --accent-fg:      #000000;
-  --accent-subtle:  #422006;   /* yellow-950 */
-  --accent-muted:   rgba(250,204,21,0.12);
-  --accent-ring:    rgba(250,204,21,0.45);
-  --shadow-sm:      0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-  --shadow-md:      0 4px 12px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.2);
+  --bg:            #0b0b0c;
+  --surface:       #131314;
+  --surface-2:     #1a1a1c;
+  --surface-3:     #242427;
+
+  --border:        #232326;
+  --border-strong: #34343a;
+
+  --text:          #f4f4f2;
+  --text-2:        #a5a39d;
+  --text-3:        #86847e;
+
+  --accent:        #f5b544;
+  --accent-bold:   #f59e0b;
+  --accent-soft:   rgba(245, 158, 11, 0.12);
+  --accent-line:   rgba(245, 158, 11, 0.30);
+
+  --solid:         #f4f4f2;
+  --solid-hover:   #ffffff;
+  --solid-ink:     #171614;
+
+  --ok:            #3ecf8e;
+  --ok-soft:       rgba(62, 207, 142, 0.13);
+  --warn:          #f5b544;
+  --warn-soft:     rgba(245, 181, 68, 0.13);
+  --danger:        #f87171;
+  --danger-soft:   rgba(248, 113, 113, 0.13);
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px -2px rgba(0, 0, 0, 0.5);
+  --shadow-3: 0 2px 4px rgba(0, 0, 0, 0.4), 0 16px 36px -8px rgba(0, 0, 0, 0.6);
+
+  color-scheme: dark;
 }
 
-/* ── Base resets ──────────────────────────────────────────── */
+/* ── Base ─────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
-body  { margin: 0; background: var(--bg); color: var(--text); }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text-2);
+  font-family: "Geist Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
 #root { min-height: 100svh; display: flex; flex-direction: column; }
 
-/* ── Landing: the pipeline draws ──────────────────────────────
-   One authored moment on the whole page: a rail that draws down
-   the ask → query → page sequence as it scrolls, so the section
-   performs the flow it describes.
-
-   The rail is decoration, never content — the stages themselves
-   are always visible, with or without animation. Progressive
-   enhancement, no JS; reduced motion leaves the rail fully drawn. */
-@media (prefers-reduced-motion: no-preference) {
-  @supports (animation-timeline: view()) {
-    .pipeline-rail {
-      transform-origin: top;
-      animation: pipeline-draw linear both;
-      animation-timeline: view();
-      animation-range: entry 15% cover 55%;
-    }
-  }
+h1, h2, h3, h4 {
+  color: var(--text);
+  font-weight: 600;
+  letter-spacing: -0.021em;
+  margin: 0;
 }
 
-@keyframes pipeline-draw {
-  from { transform: scaleY(0);   opacity: 0.25; }
-  to   { transform: scaleY(1);   opacity: 1;    }
+.tnum, table, input, output { font-variant-numeric: tabular-nums; }
+
+.mono {
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.92em;
+}
+
+/* One small label per region, not one per section. */
+.label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-3);
+}
+
+/* ── Focus: one ring, everywhere ────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* ── Scrollbars: present, not loud ──────────────────────────────────── */
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+*::-webkit-scrollbar { width: 11px; height: 11px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 99px;
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--text-3); background-clip: content-box; }
+
+select option { background: var(--surface); color: var(--text); }
+
+/* ── Motion ───────────────────────────────────────────────────────────
+   Surfaces settle in; they never fly. Exponential ease-out from an
+   already-visible default, so nothing depends on animation to be read. */
+@keyframes settle {
+  from { opacity: 0; transform: translateY(4px) scale(0.995); }
+  to   { opacity: 1; transform: none; }
+}
+
+.settle { animation: settle 220ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* Rows arrive in sequence on first paint, capped so a long list never
+   staircases: past the eighth row everything lands together. */
+.settle-row { animation: settle 240ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.settle-row:nth-child(1) { animation-delay: 12ms; }
+.settle-row:nth-child(2) { animation-delay: 24ms; }
+.settle-row:nth-child(3) { animation-delay: 36ms; }
+.settle-row:nth-child(4) { animation-delay: 48ms; }
+.settle-row:nth-child(5) { animation-delay: 60ms; }
+.settle-row:nth-child(6) { animation-delay: 72ms; }
+.settle-row:nth-child(7) { animation-delay: 84ms; }
+.settle-row:nth-child(n+8) { animation-delay: 96ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .settle, .settle-row { animation: none; }
+  * { transition-duration: 1ms !important; }
+}
+
+/* ── Grid paper ───────────────────────────────────────────────────────
+   A faint measured field behind empty states and the landing hero: this
+   is a tool for measuring things. */
+.grid-paper {
+  background-image:
+    linear-gradient(to right, var(--border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  background-size: 28px 28px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 0%, transparent 78%);
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 0%, transparent 78%);
+}
+
+/* ── Narrow ───────────────────────────────────────────────────────────
+   Under 900px the sidebar overlays rather than occupying. */
+@media (max-width: 900px) {
+  /* A collapsed rail takes no layout at all here — 56px out of 390px is
+     the difference between a readable row and a truncated one. */
+  .rail-collapsed { display: none; }
+
+  .rail-overlay {
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    z-index: 40;
+    box-shadow: var(--shadow-3);
+  }
+  .col-secondary { display: none; }
+}
+
+.list-grid { grid-template-columns: var(--cols); }
+@media (max-width: 900px) {
+  .list-grid { grid-template-columns: var(--cols-narrow, var(--cols)); }
 }

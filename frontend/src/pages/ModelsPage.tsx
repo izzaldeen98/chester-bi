@@ -1,10 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { GoPackage } from "react-icons/go";
-import { FaSearch, FaPlus, FaCalendarAlt, FaCheckCircle, FaFolderOpen, FaCode, FaTrash } from "react-icons/fa";
-import { MdBlock } from "react-icons/md";
-import CMetricCard from "../components/CMetricCard";
+import { FaSearch, FaPlus, FaCode, FaTrash } from "react-icons/fa";
 import CHCard from "../components/CHCard";
+import { BoardFill, BoardHead, EmptyBoard, Panel } from "../components/Board";
 import CInfoSideBar from "../components/CInfoSideBar";
 import CConfirmDialog from "../components/CConfirmDialog";
 import CButton from "../components/CButton";
@@ -29,11 +27,6 @@ function formatDate(iso: string) {
   });
 }
 
-function isThisMonth(iso: string) {
-  const d = new Date(iso);
-  const now = new Date();
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-}
 
 // ── Textarea ───────────────────────────────────────────────────────────────
 function CTextArea({
@@ -52,7 +45,7 @@ function CTextArea({
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label className="text-sm font-medium" style={{ color: "var(--text-h)" }}>
+        <label className="text-sm font-medium" style={{ color: "var(--text)" }}>
           {label}
         </label>
       )}
@@ -61,10 +54,10 @@ function CTextArea({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className="w-full resize-none rounded-xl border bg-[var(--bg)] px-3.5 py-2.5 text-sm
-          text-[var(--text-h)] placeholder:text-[var(--text)]
+        className="w-full resize-none rounded-[var(--r-sm)] border bg-[var(--surface)] px-3.5 py-2.5 text-sm
+          text-[var(--text)] placeholder:text-[var(--text-2)]
           outline-none transition-all
-          focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-ring)]
+          focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-line)]
           border-[var(--border)]"
       />
     </div>
@@ -112,10 +105,6 @@ export default function ModelsPage() {
   }
 
   // ── Derived metrics ──────────────────────────────────────────────────────
-  const total     = models.length;
-  const active    = models.filter((p) => p.is_active).length;
-  const inactive  = total - active;
-  const thisMonth = models.filter((p) => isThisMonth(p.created_at)).length;
 
   // ── Search ───────────────────────────────────────────────────────────────
   const filtered = models.filter((p) => {
@@ -185,19 +174,19 @@ export default function ModelsPage() {
       <div>
         <div className="mb-6 flex flex-col items-center gap-2">
           <div
-            className="flex h-16 w-16 items-center justify-center rounded-2xl text-xl font-bold"
-            style={{ background: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--accent-ring)" }}
+            className="flex h-16 w-16 items-center justify-center rounded-[var(--r-sm)] text-xl font-bold"
+            style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--accent-line)" }}
           >
             {getModelInitials(selected.name)}
           </div>
-          <p className="text-base font-bold text-center" style={{ color: "var(--text-h)" }}>
+          <p className="text-base font-bold text-center" style={{ color: "var(--text)" }}>
             {selected.name}
           </p>
           <span
-            className={`rounded-full px-3 py-0.5 text-xs font-medium ${
+            className={`rounded-[var(--r-sm)] px-3 py-0.5 text-xs font-medium ${
               selected.is_active
-                ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
-                : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                ? "text-[var(--ok)] bg-[var(--ok-soft)]"
+                : "text-[var(--danger)] bg-[var(--danger-soft)]"
             }`}
           >
             {selected.is_active ? "Active" : "Inactive"}
@@ -251,29 +240,26 @@ export default function ModelsPage() {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="flex-1 overflow-y-auto p-8">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>Models</h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--text)" }}>
-            Manage analytics models and their definitions.
-          </p>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <header
+        className="flex shrink-0 flex-wrap items-center gap-4 px-6 py-4"
+        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
+      >
+        <div className="min-w-0">
+          <h1 className="text-[18px] font-semibold leading-none tracking-[-0.02em]">Models</h1>
+          <p className="mt-1.5 text-[13px] leading-none" style={{ color: "var(--text-3)" }}>Manage analytics models and their definitions.</p>
         </div>
+        <div className="ml-auto flex items-center gap-3">
         <CButton variant="primary" onClick={openCreate}>
           <FaPlus size={12} /> New Model
         </CButton>
-      </div>
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
 
       {pageError && <CAlert variant="error" message={pageError} className="mb-6" />}
 
-      {/* Metrics */}
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <CMetricCard label="Total"            value={total}     icon={<GoPackage size={18} />} />
-        <CMetricCard label="Active"           value={active}    icon={<FaCheckCircle size={16} />} trend="currently active" up={active > 0} />
-        <CMetricCard label="Inactive"         value={inactive}  icon={<MdBlock size={18} />}   trend={inactive === 0 ? "all good" : "need attention"} up={inactive === 0} />
-        <CMetricCard label="Created This Month" value={thisMonth} icon={<FaCalendarAlt size={16} />} trend="new this month" up={thisMonth > 0} />
-      </div>
 
       {/* Search */}
       <div className="mb-5 max-w-sm">
@@ -286,19 +272,21 @@ export default function ModelsPage() {
       </div>
 
       {/* Model grid */}
-      {loading ? (
+      <Panel label="Models" flush bodyClassName="flex flex-col">
+        {loading ? (
         <div className="flex items-center justify-center py-20">
           <CSpinner size={28} />
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <FaFolderOpen size={36} style={{ color: "var(--border)" }} />
-          <p className="mt-3 text-sm" style={{ color: "var(--text)" }}>
-            {search ? "No models match your search." : "No models yet — create one above."}
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        ) : filtered.length === 0 ? (
+        <EmptyBoard line={search ? "No match on this board" : "No models defined"} hint={search ? "Try a different search." : "A semantic model is the contract: it decides what an artifact can be asked."} />
+        ) : (
+          <>
+          <BoardHead cols="42px minmax(0,1fr) 140px 108px">
+            <span className="label"></span>
+            <span className="label">Model</span>
+            <span className="label">Location</span>
+            <span className="label text-right">State</span>
+          </BoardHead>
           {filtered.map((p) => (
             <CHCard
               key={p.id}
@@ -311,8 +299,10 @@ export default function ModelsPage() {
               onClick={() => openView(p)}
             />
           ))}
-        </div>
-      )}
+          <BoardFill />
+          </>
+        )}
+      </Panel>
 
       {/* Sidebar */}
       <CInfoSideBar
@@ -338,5 +328,5 @@ export default function ModelsPage() {
         onCancel={() => setConfirmOpen(false)}
       />
     </div>
-  );
+    </div>  );
 }

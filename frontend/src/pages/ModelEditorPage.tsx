@@ -28,10 +28,10 @@ type BuilderView = "code" | "wizard";
 
 // ── File icon ──────────────────────────────────────────────────────────────
 function FileIcon({ name, active }: { name: string; active: boolean }) {
-  const inv = active ? "var(--accent-fg)" : undefined;
+  const inv = active ? "var(--solid-ink)" : undefined;
   if (name.endsWith(".json"))          return <VscJson    size={14} style={{ color: active ? inv : "var(--accent)"  }} />;
-  if (name.endsWith(".yml") || name.endsWith(".yaml")) return <FaFileCode size={13} style={{ color: active ? inv : "#818cf8"        }} />;
-  return                                      <FaFileAlt  size={13} style={{ color: active ? inv : "var(--text)"    }} />;
+  if (name.endsWith(".yml") || name.endsWith(".yaml")) return <FaFileCode size={13} style={{ color: active ? inv : "var(--text-3)"        }} />;
+  return                                      <FaFileAlt  size={13} style={{ color: active ? inv : "var(--text-2)"    }} />;
 }
 
 // ── Add File Dialog ────────────────────────────────────────────────────────
@@ -57,10 +57,10 @@ function AddFileDialog({ onConfirm, onCancel, saving, error }: AddFileDialogProp
       />
       {/* Dialog */}
       <div
-        className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl p-6 shadow-xl flex flex-col gap-4"
-        style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)" }}
+        className="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-[var(--r-sm)] p-6 shadow-xl flex flex-col gap-4"
+        style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
       >
-        <h2 className="text-base font-bold" style={{ color: "var(--text-h)" }}>Add New File</h2>
+        <h2 className="text-base font-bold" style={{ color: "var(--text)" }}>Add New File</h2>
 
         {error && <CAlert variant="error" message={error} />}
 
@@ -90,7 +90,7 @@ function AddFileDialog({ onConfirm, onCancel, saving, error }: AddFileDialogProp
         />
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium" style={{ color: "var(--text-h)" }}>
+          <label className="text-sm font-medium" style={{ color: "var(--text)" }}>
             Initial Content
           </label>
           <textarea
@@ -99,10 +99,10 @@ function AddFileDialog({ onConfirm, onCancel, saving, error }: AddFileDialogProp
             rows={8}
             spellCheck={false}
             placeholder="# Write your Cube definition here (cubes: [...])"
-            className="w-full resize-y rounded-xl border bg-[var(--bg)] px-3.5 py-2.5 font-mono text-xs
-              text-[var(--text-h)] placeholder:text-[var(--text)]
+            className="w-full resize-y rounded-[var(--r-sm)] border bg-[var(--surface)] px-3.5 py-2.5 font-mono text-xs
+              text-[var(--text)] placeholder:text-[var(--text-2)]
               outline-none transition-all
-              focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-ring)]
+              focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-line)]
               border-[var(--border)]"
           />
         </div>
@@ -278,29 +278,29 @@ export default function ModelEditorPage() {
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-1 flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
+    <div className="flex flex-1 flex-col overflow-hidden" style={{ background: "var(--surface)" }}>
 
       {/* ── Top bar ─────────────────────────────────────────────────────── */}
       <header
         className="flex shrink-0 items-center gap-3 px-4 py-2.5"
-        style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-subtle)" }}
+        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface-2)" }}
       >
         <button
           onClick={() => navigate("/models")}
-          className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--accent-muted)] hover:text-[var(--accent)]"
-          style={{ color: "var(--text)" }}
+          className="flex items-center gap-1.5 rounded-[var(--r-sm)] px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+          style={{ color: "var(--text-2)" }}
         >
           <FaChevronLeft size={10} /> Models
         </button>
         <span style={{ color: "var(--border)" }}>/</span>
         <div className="flex items-center gap-2">
           <GoPackage size={15} style={{ color: "var(--accent)" }} />
-          <span className="text-sm font-semibold" style={{ color: "var(--text-h)" }}>Model Editor</span>
+          <span className="text-sm font-semibold" style={{ color: "var(--text)" }}>Model Editor</span>
         </div>
         {activeFile && (
           <>
             <span style={{ color: "var(--border)" }}>/</span>
-            <span className="text-xs" style={{ color: "var(--text)" }}>{activeFile.file}</span>
+            <span className="text-xs" style={{ color: "var(--text-2)" }}>{activeFile.file}</span>
             {isDirty && (
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--accent)" }} title="Unsaved changes" />
             )}
@@ -309,12 +309,12 @@ export default function ModelEditorPage() {
         <div className="flex-1" />
 
         {loadResult && (
-          <span className={`text-xs font-medium ${loadResult.ok ? "text-green-600 dark:text-green-400" : "text-red-500"}`}>
+          <span className={`text-xs font-medium ${loadResult.ok ? "text-[var(--ok)] dark:text-[var(--ok)]" : "text-[var(--danger)]"}`}>
             {loadResult.msg}
           </span>
         )}
-        {saveOk && <span className="text-xs font-medium text-green-600 dark:text-green-400">Saved!</span>}
-        {saveError && <span className="text-xs font-medium text-red-500">{saveError}</span>}
+        {saveOk && <span className="text-xs font-medium text-[var(--ok)] dark:text-[var(--ok)]">Saved!</span>}
+        {saveError && <span className="text-xs font-medium text-[var(--danger)]">{saveError}</span>}
 
         <CButton
           variant="outline"
@@ -340,21 +340,21 @@ export default function ModelEditorPage() {
         {/* ── File sidebar ────────────────────────────────────────────── */}
         <aside
           className="flex w-56 shrink-0 flex-col overflow-y-auto"
-          style={{ borderRight: "1px solid var(--border)", background: "var(--bg-subtle)" }}
+          style={{ borderRight: "1px solid var(--border)", background: "var(--surface-2)" }}
         >
           <div
             className="flex items-center justify-between px-3 py-2.5"
             style={{ borderBottom: "1px solid var(--border)" }}
           >
-            <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>
+            <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>
               Files
             </span>
             <button
               type="button"
               onClick={() => { setAddError(""); setShowAdd(true); }}
               title="Add new file"
-              className="flex items-center justify-center rounded-lg p-1 transition-colors hover:bg-[var(--accent-muted)] hover:text-[var(--accent)]"
-              style={{ color: "var(--text)" }}
+              className="flex items-center justify-center rounded-[var(--r-sm)] p-1 transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+              style={{ color: "var(--text-2)" }}
             >
               <FaPlus size={11} />
             </button>
@@ -366,7 +366,7 @@ export default function ModelEditorPage() {
             ) : listError ? (
               <div className="p-3"><CAlert variant="error" message={listError} /></div>
             ) : files.length === 0 ? (
-              <p className="px-3 py-4 text-xs" style={{ color: "var(--text)" }}>No files found.</p>
+              <p className="px-3 py-4 text-xs" style={{ color: "var(--text-2)" }}>No files found.</p>
             ) : (
               files.map((f) => {
                 const isActive = activeFile?.file === f.file;
@@ -377,15 +377,15 @@ export default function ModelEditorPage() {
                     onClick={() => openFile(f)}
                     title={f.location}
                     className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors"
-                    style={isActive ? { background: "var(--accent)", color: "var(--accent-fg)" } : { color: "var(--text-h)" }}
-                    onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "var(--accent-muted)"; }}
+                    style={isActive ? { background: "var(--solid)", color: "var(--solid-ink)" } : { color: "var(--text-2)" }}
+                    onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "var(--accent-soft)"; }}
                     onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = ""; }}
                   >
                     <span className="shrink-0"><FileIcon name={f.file} active={isActive} /></span>
                     <span className="truncate">{f.file}</span>
                     {f.definition_id && !isActive && (
                       <span className="ml-auto shrink-0 rounded px-1 py-0.5 text-[10px] font-medium"
-                        style={{ background: "var(--accent-muted)", color: "var(--accent)" }}>
+                        style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>
                         definition
                       </span>
                     )}
@@ -397,35 +397,35 @@ export default function ModelEditorPage() {
         </aside>
 
         {/* ── Editor area ─────────────────────────────────────────────── */}
-        <main className="flex flex-1 flex-col overflow-hidden" style={{ background: "var(--bg)" }}>
+        <main className="flex flex-1 flex-col overflow-hidden" style={{ background: "var(--surface)" }}>
           {!activeFile ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
               <FaFileCode size={40} style={{ color: "var(--border)" }} />
-              <p className="text-sm font-medium" style={{ color: "var(--text-h)" }}>Select a file to edit</p>
-              <p className="text-xs" style={{ color: "var(--text)" }}>Click a file in the sidebar to open it here.</p>
+              <p className="text-sm font-medium" style={{ color: "var(--text)" }}>Select a file to edit</p>
+              <p className="text-xs" style={{ color: "var(--text-2)" }}>Click a file in the sidebar to open it here.</p>
             </div>
           ) : (
             <>
               {/* File tab bar */}
               <div
                 className="flex shrink-0 items-center gap-3 px-4 py-2"
-                style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-subtle)" }}
+                style={{ borderBottom: "1px solid var(--border)", background: "var(--surface-2)" }}
               >
                 <FileIcon name={activeFile.file} active={false} />
-                <span className="text-xs font-medium" style={{ color: "var(--text-h)" }}>{activeFile.file}</span>
+                <span className="text-xs font-medium" style={{ color: "var(--text)" }}>{activeFile.file}</span>
                 {isDirty && <span className="text-xs" style={{ color: "var(--accent)" }}>● unsaved</span>}
 
                 {activeFile.definition_id && (
-                  <div className="ml-2 flex items-center gap-0.5 rounded-lg border p-0.5" style={{ borderColor: "var(--border)" }}>
+                  <div className="ml-2 flex items-center gap-0.5 rounded-[var(--r-sm)] border p-0.5" style={{ borderColor: "var(--border)" }}>
                     {(["code", "wizard"] as BuilderView[]).map((v) => (
                       <button
                         key={v}
                         type="button"
                         onClick={() => setBuilderView(v)}
-                        className="rounded-md px-2.5 py-1 text-[11px] font-medium capitalize transition-all"
+                        className="rounded-[var(--r-sm)] px-2.5 py-1 text-[11px] font-medium capitalize transition-all"
                         style={builderView === v
-                          ? { background: "var(--accent)", color: "#fff" }
-                          : { color: "var(--text)" }}
+                          ? { background: "var(--solid)", color: "var(--solid-ink)" }
+                          : { color: "var(--text-2)" }}
                       >
                         {v === "wizard" ? "Visual Builder" : "Code"}
                       </button>
@@ -433,7 +433,7 @@ export default function ModelEditorPage() {
                   </div>
                 )}
 
-                <span className="ml-auto text-xs truncate" style={{ color: "var(--text)" }}>{activeFile.location}</span>
+                <span className="ml-auto text-xs truncate" style={{ color: "var(--text-2)" }}>{activeFile.location}</span>
 
                 {activeFile.definition_id && (
                   <>
@@ -448,8 +448,8 @@ export default function ModelEditorPage() {
                       type="button"
                       onClick={() => importInputRef.current?.click()}
                       title="Import a .yml file into this editor"
-                      className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--accent-muted)] hover:text-[var(--accent)]"
-                      style={{ color: "var(--text)" }}
+                      className="flex shrink-0 items-center gap-1.5 rounded-[var(--r-sm)] px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+                      style={{ color: "var(--text-2)" }}
                     >
                       <FaFileUpload size={11} /> Import
                     </button>
@@ -457,8 +457,8 @@ export default function ModelEditorPage() {
                       type="button"
                       onClick={handleExport}
                       title="Export this definition as a .yml file"
-                      className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--accent-muted)] hover:text-[var(--accent)]"
-                      style={{ color: "var(--text)" }}
+                      className="flex shrink-0 items-center gap-1.5 rounded-[var(--r-sm)] px-2 py-1 text-xs font-medium transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+                      style={{ color: "var(--text-2)" }}
                     >
                       <FaFileDownload size={11} /> Export
                     </button>
@@ -475,7 +475,7 @@ export default function ModelEditorPage() {
                 ) : !activeFile.definition_id ? (
                   <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
                     <VscJson size={32} style={{ color: "var(--border)" }} />
-                    <p className="text-sm" style={{ color: "var(--text)" }}>Content preview is not available for this file.</p>
+                    <p className="text-sm" style={{ color: "var(--text-2)" }}>Content preview is not available for this file.</p>
                   </div>
                 ) : builderView === "wizard" ? (
                   <CubeDefinitionWizard initialCode={content} onChange={handleWizardChange} />
@@ -486,11 +486,11 @@ export default function ModelEditorPage() {
                     height="100%"
                     style={{ flex: 1, overflow: "hidden", fontSize: 13 }}
                     theme={theme === "dark" ? vscodeDark : EditorView.theme({
-                      "&": { background: "var(--bg)", color: "var(--text-h)" },
-                      ".cm-gutters": { background: "var(--bg-subtle)", borderRight: "1px solid var(--border)", color: "var(--text)" },
-                      ".cm-activeLine": { background: "var(--accent-muted)" },
-                      ".cm-activeLineGutter": { background: "var(--accent-muted)" },
-                      ".cm-selectionBackground, ::selection": { background: "var(--accent-ring) !important" },
+                      "&": { background: "var(--surface)", color: "var(--text)" },
+                      ".cm-gutters": { background: "var(--surface-2)", borderRight: "1px solid var(--border)", color: "var(--text-2)" },
+                      ".cm-activeLine": { background: "var(--accent-soft)" },
+                      ".cm-activeLineGutter": { background: "var(--accent-soft)" },
+                      ".cm-selectionBackground, ::selection": { background: "var(--accent-line) !important" },
                       ".cm-cursor": { borderLeftColor: "var(--accent)" },
                       ".cm-scroller": { fontFamily: "ui-monospace, Consolas, monospace" },
                     })}

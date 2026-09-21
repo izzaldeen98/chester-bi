@@ -123,81 +123,38 @@ export default function RegisterPage() {
 
   return (
     <div
-      className="relative flex min-h-screen flex-col items-center justify-center px-4 py-12"
+      className="relative flex min-h-screen flex-col items-center justify-center p-4"
       style={{ background: "var(--bg)" }}
     >
-      {/* Theme toggle */}
       <button
         onClick={toggleTheme}
-        aria-label="Toggle theme"
-        className="absolute right-5 top-5 rounded-lg p-2 transition-colors hover:bg-[var(--bg-subtle)]"
-        style={{ color: "var(--text)" }}
+        aria-label={theme === "dark" ? "Switch to daylight" : "Switch to night hall"}
+        className="absolute right-5 top-5 p-2 transition-colors hover:text-[var(--accent)]"
+        style={{ color: "var(--text-2)" }}
       >
-        {theme === "dark" ? <HiSun size={20} /> : <HiMoon size={20} />}
+        {theme === "dark" ? <HiSun size={18} /> : <HiMoon size={18} />}
       </button>
 
-      {/* Card */}
       <div
-        className="w-full max-w-md rounded-2xl p-8"
-        style={{
-          background: "var(--bg-subtle)",
-          border: "1px solid var(--border)",
-          boxShadow: "var(--shadow-md)",
-        }}
+        className="w-full max-w-sm"
+        style={{ border: "1px solid var(--border)", boxShadow: "0 24px 56px -16px rgba(0,0,0,0.7)" }}
       >
-        {/* Logo */}
-        <div className="mb-7 flex flex-col items-center gap-2">
-          <div
-            className="flex h-14 w-14 items-center justify-center rounded-2xl"
-            style={{
-              background: "var(--accent-muted)",
-              border: "1px solid var(--accent-ring)",
-            }}
-          >
-            <CLogo size={30} />
+        <div
+          className="flex items-center gap-2 px-4 py-2.5"
+          style={{ borderBottom: "1px solid var(--border)" }}
+        >
+          <CLogo size={18} />
+          <div className="min-w-0">
+            <p className="font-medium text-[13px] leading-none">Chester BI</p>
+            <p className="label mt-1 leading-none" style={{ color: "var(--accent)" }}>
+              Semantic BI
+            </p>
           </div>
-          <h1
-            className="text-2xl font-bold tracking-tight"
-            style={{ color: "var(--text-h)" }}
-          >
-            Chester <span style={{ color: "var(--accent)" }}>BI</span>
-          </h1>
-          <p className="text-sm" style={{ color: "var(--text)" }}>
-            Create your organisation account
-          </p>
         </div>
 
-        {/* Step indicator */}
-        <div className="mb-5 flex items-center gap-2">
-          {STEPS.map((label, i) => (
-            <div key={label} className="flex flex-1 items-center gap-2">
-              <div
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
-                style={{
-                  background: i <= step ? "var(--accent)" : "var(--bg)",
-                  color: i <= step ? "#fff" : "var(--text)",
-                  border: "1px solid var(--border)",
-                }}
-              >
-                {i + 1}
-              </div>
-              <span
-                className="text-xs font-medium"
-                style={{ color: i === step ? "var(--text-h)" : "var(--text)" }}
-              >
-                {label}
-              </span>
-              {i < STEPS.length - 1 && (
-                <div className="h-px flex-1" style={{ background: "var(--border)" }} />
-              )}
-            </div>
-          ))}
-        </div>
-
-        {/* Dummy examples for quick testing */}
-
-        {/* Form */}
-        <form
+        <div className="px-6 py-7">
+          <p className="font-medium mb-6 text-[17px] leading-none">Open an account</p>
+          <form
           onSubmit={step < STEPS.length - 1 ? handleNext : handleSubmit}
           className="flex flex-col gap-0"
           noValidate
@@ -319,7 +276,7 @@ export default function RegisterPage() {
                     autoComplete="new-password"
                   />
                   {passwordMismatch && (
-                    <p className="mt-1 text-xs" style={{ color: "var(--error, #ef4444)" }}>
+                    <p className="mt-1 text-xs" style={{ color: "var(--danger)" }}>
                       Passwords do not match.
                     </p>
                   )}
@@ -340,14 +297,14 @@ export default function RegisterPage() {
                   return (
                     <div
                       key={ex.value}
-                      className="flex items-center justify-between gap-3 rounded-xl px-4 py-3"
+                      className="flex items-center justify-between gap-3 rounded-[var(--r-sm)] px-4 py-3"
                       style={{ border: "1px solid var(--border)" }}
                     >
                       <div>
-                        <p className="text-sm font-semibold" style={{ color: "var(--text-h)" }}>
+                        <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
                           {ex.label}
                         </p>
-                        <p className="text-xs" style={{ color: "var(--text)" }}>
+                        <p className="text-xs" style={{ color: "var(--text-2)" }}>
                           {ex.description}
                         </p>
                       </div>
@@ -358,8 +315,8 @@ export default function RegisterPage() {
                           checked={selected}
                           onChange={() => toggleExample(ex.value)}
                         />
-                        <div className="h-6 w-11 rounded-full bg-[var(--border)] transition-colors peer-checked:bg-[var(--accent)]" />
-                        <div className="absolute left-1 h-4 w-4 rounded-full bg-white transition-transform peer-checked:translate-x-5" />
+                        <div className="h-6 w-11 rounded-[var(--r-sm)] bg-[var(--border)] transition-colors peer-checked:bg-[var(--accent)]" />
+                        <div className="absolute left-1 h-4 w-4 rounded-[var(--r-sm)] bg-white transition-transform peer-checked:translate-x-5" />
                       </label>
                     </div>
                   );
@@ -401,7 +358,7 @@ export default function RegisterPage() {
         {/* Footer */}
         <p
           className="mt-5 text-center text-sm"
-          style={{ color: "var(--text)" }}
+          style={{ color: "var(--text-2)" }}
         >
           Already have an account?{" "}
           <a
@@ -412,6 +369,7 @@ export default function RegisterPage() {
             Sign In
           </a>
         </p>
+      </div>
       </div>
     </div>
   );

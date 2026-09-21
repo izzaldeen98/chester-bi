@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { FaFileAlt, FaSearch, FaTrash, FaPlus, FaCalendarAlt, FaSyncAlt, FaFileCode } from "react-icons/fa";
-import CMetricCard from "../components/CMetricCard";
+import { FaSearch, FaTrash, FaPlus } from "react-icons/fa";
 import CInfoSideBar from "../components/CInfoSideBar";
 import CConfirmDialog from "../components/CConfirmDialog";
 import CButton from "../components/CButton";
 import CTextInput from "../components/CTextInput";
 import CAlert from "../components/CAlert";
 import CSpinner from "../components/CSpinner";
+import { BoardFill, EmptyBoard, Panel } from "../components/Board";
 import CDetailRow from "../components/CDetailRow";
 import {
   getFiles,
@@ -40,21 +40,7 @@ function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
-function isThisMonth(iso: string) {
-  const d = new Date(iso);
-  const now = new Date();
-  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-}
 
-function isToday(iso: string) {
-  const d = new Date(iso);
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  );
-}
 
 function CTextArea({
   label,
@@ -72,7 +58,7 @@ function CTextArea({
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label className="text-sm font-medium" style={{ color: "var(--text-h)" }}>
+        <label className="text-sm font-medium" style={{ color: "var(--text)" }}>
           {label}
         </label>
       )}
@@ -81,10 +67,10 @@ function CTextArea({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className="w-full resize-none rounded-xl border bg-[var(--bg)] px-3.5 py-2.5 text-sm
-          text-[var(--text-h)] placeholder:text-[var(--text)]
+        className="w-full resize-none rounded-[var(--r-sm)] border bg-[var(--surface)] px-3.5 py-2.5 text-sm
+          text-[var(--text)] placeholder:text-[var(--text-2)]
           outline-none transition-all
-          focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-ring)]
+          focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-line)]
           border-[var(--border)]"
       />
     </div>
@@ -134,10 +120,6 @@ export default function FilesPage() {
     }
   }
 
-  const total        = files.length;
-  const thisMonth    = files.filter((f) => isThisMonth(f.created_at)).length;
-  const updatedToday = files.filter((f) => isToday(f.updated_at)).length;
-  const extensionCount = new Set(files.map((f) => f.extension).filter(Boolean)).size;
 
   const filtered = files.filter((f) => {
     const term = search.toLowerCase();
@@ -240,7 +222,7 @@ export default function FilesPage() {
             rows={3}
           />
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium" style={{ color: "var(--text-h)" }}>
+            <label className="text-sm font-medium" style={{ color: "var(--text)" }}>
               Files <span className="text-[var(--accent)]">*</span>
             </label>
             {/* Resetting value after addFiles lets the same file be re-picked;
@@ -249,10 +231,10 @@ export default function FilesPage() {
               type="file"
               multiple
               onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }}
-              className="w-full rounded-xl border border-[var(--border)] bg-transparent
-                px-3 py-2 text-sm text-[var(--text-h)]
-                file:mr-3 file:rounded-lg file:border-0 file:bg-[var(--accent)]
-                file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-[var(--accent-fg)]
+              className="w-full rounded-[var(--r-sm)] border border-[var(--border)] bg-transparent
+                px-3 py-2 text-sm text-[var(--text)]
+                file:mr-3 file:rounded-[var(--r-sm)] file:border-0 file:bg-[var(--accent)]
+                file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-[var(--solid-ink)]
                 file:cursor-pointer cursor-pointer"
             />
 
@@ -261,14 +243,14 @@ export default function FilesPage() {
                 {cFiles.map((f, i) => (
                   <div
                     key={`${f.name}-${i}`}
-                    className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5"
-                    style={{ borderColor: "var(--border)", background: "var(--bg)" }}
+                    className="flex items-center justify-between gap-2 rounded-[var(--r-sm)] border px-2.5 py-1.5"
+                    style={{ borderColor: "var(--border)", background: "var(--surface)" }}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium" style={{ color: "var(--text-h)" }}>
+                      <p className="truncate text-xs font-medium" style={{ color: "var(--text)" }}>
                         {baseFileName(f.name)}
                       </p>
-                      <p className="truncate text-[10px]" style={{ color: "var(--text)" }}>
+                      <p className="truncate text-[10px]" style={{ color: "var(--text-2)" }}>
                         {f.name} · {formatFileSize(f.size)}
                       </p>
                     </div>
@@ -276,8 +258,8 @@ export default function FilesPage() {
                       type="button"
                       onClick={() => removeFile(i)}
                       title="Remove"
-                      className="shrink-0 rounded-md px-1.5 py-0.5 text-xs transition-colors hover:bg-[var(--bg-subtle)]"
-                      style={{ color: "var(--text)" }}
+                      className="shrink-0 rounded-[var(--r-sm)] px-1.5 py-0.5 text-xs transition-colors hover:bg-[var(--surface-2)]"
+                      style={{ color: "var(--text-2)" }}
                       disabled={saving}
                     >
                       <FaTrash size={11} />
@@ -288,7 +270,7 @@ export default function FilesPage() {
             )}
 
             {uploadProgress && (
-              <p className="text-xs" style={{ color: "var(--text)" }}>
+              <p className="text-xs" style={{ color: "var(--text-2)" }}>
                 Uploading {uploadProgress.done}/{uploadProgress.total}…
               </p>
             )}
@@ -303,18 +285,18 @@ export default function FilesPage() {
       <div>
         <div className="mb-6 flex flex-col items-center gap-2">
           <div
-            className="flex h-16 w-16 items-center justify-center rounded-2xl text-xl font-bold"
-            style={{ background: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--accent-ring)" }}
+            className="flex h-16 w-16 items-center justify-center rounded-[var(--r-sm)] text-xl font-bold"
+            style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--accent-line)" }}
           >
             {getFileInitials(selected.name)}
           </div>
-          <p className="text-base font-bold text-center" style={{ color: "var(--text-h)" }}>
+          <p className="text-base font-bold text-center" style={{ color: "var(--text)" }}>
             {selected.name}
           </p>
           {selected.extension && (
             <span
-              className="rounded-full px-2.5 py-0.5 text-xs font-medium uppercase"
-              style={{ background: "var(--bg-subtle)", color: "var(--text)", border: "1px solid var(--border)" }}
+              className="rounded-[var(--r-sm)] px-2.5 py-0.5 text-xs font-medium uppercase"
+              style={{ background: "var(--surface-2)", color: "var(--text-2)", border: "1px solid var(--border)" }}
             >
               {selected.extension}
             </span>
@@ -373,27 +355,26 @@ export default function FilesPage() {
     selected ? `${selected.file_name} · ${formatFileSize(selected.file_size)}` : "";
 
   return (
-    <div className="flex-1 overflow-y-auto p-8">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>Files</h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--text)" }}>
-            Upload and manage your workspace files.
-          </p>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <header
+        className="flex shrink-0 flex-wrap items-center gap-4 px-6 py-4"
+        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
+      >
+        <div className="min-w-0">
+          <h1 className="text-[18px] font-semibold leading-none tracking-[-0.02em]">Files</h1>
+          <p className="mt-1.5 text-[13px] leading-none" style={{ color: "var(--text-3)" }}>Upload and manage your workspace files.</p>
         </div>
+        <div className="ml-auto flex items-center gap-3">
         <CButton variant="primary" onClick={openCreate}>
           <FaPlus size={12} /> Upload Files
         </CButton>
-      </div>
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
 
       {pageError && <CAlert variant="error" message={pageError} className="mb-6" />}
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <CMetricCard label="Total"              value={total}            icon={<FaFileAlt size={18} />} />
-        <CMetricCard label="Created This Month" value={thisMonth}        icon={<FaCalendarAlt size={16} />} trend="new this month" up={thisMonth > 0} />
-        <CMetricCard label="Updated Today"      value={updatedToday}     icon={<FaSyncAlt size={16} />} trend={updatedToday > 0 ? "recently changed" : "no changes today"} up={updatedToday > 0} />
-        <CMetricCard label="File Types"         value={extensionCount}   icon={<FaFileCode size={16} />} />
-      </div>
 
       <div className="mb-5 max-w-sm">
         <CTextInput
@@ -405,26 +386,23 @@ export default function FilesPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <CSpinner size={28} />
+        <div className="flex items-center justify-center gap-3 py-20" style={{ color: "var(--text-3)" }}>
+          <CSpinner size={18} />
+          <span className=" text-[12px]">Loading…</span>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <FaFileAlt size={36} style={{ color: "var(--border)" }} />
-          <p className="mt-3 text-sm" style={{ color: "var(--text)" }}>
-            {search ? "No files match your search." : "No files yet — upload one above."}
-          </p>
-        </div>
+        <EmptyBoard line={search ? "No match on this board" : "No files uploaded"} hint={search ? "Try a different search." : "Upload a CSV or Parquet to model it as a cube."} />
       ) : (
-        <div>
+        <Panel label="Files" flush bodyClassName="flex flex-col">
+          <div className="overflow-x-auto">
           <table className="w-full border-collapse text-xs">
             <thead>
               <tr>
                 {columns.map((column) => (
                   <th
                     key={column}
-                    className="px-3 py-2 text-left font-semibold whitespace-nowrap"
-                    style={{ color: "var(--text-h)", borderBottom: "2px solid var(--border)", borderRight: "1px solid var(--border)" }}
+                    className="label px-3 py-2 text-left whitespace-nowrap"
+                    style={{ borderBottom: "1px solid var(--border)", background: "var(--surface-2)" }}
                   >
                     {column}
                   </th>
@@ -435,26 +413,26 @@ export default function FilesPage() {
               {filtered.map((file, index) => (
                 <tr
                   key={file.id}
-                  className="transition-colors group cursor-pointer"
-                  style={{ background: index % 2 === 0 ? "var(--bg)" : "var(--bg-subtle)" }}
+                  className="cursor-pointer transition-[filter] hover:brightness-[1.35]"
+                  style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
                   onClick={() => openView(file)}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--accent-muted)"; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = index % 2 === 0 ? "var(--bg)" : "var(--bg-subtle)"; }}
                 >
-                  <td className="px-3 py-2">{index + 1}</td>
-                  <td className="px-3 py-2 font-semibold" style={{ color: "var(--text-h)" }}>
-                    {file.name}
+                  <td className="mono px-3 py-2.5 text-[12px]" style={{ color: "var(--accent)" }}>
+                    {index + 1}
                   </td>
-                  <td className="px-3 py-2">{file.file_name}</td>
-                  <td className="px-3 py-2 uppercase">{file.extension || "—"}</td>
-                  <td className="px-3 py-2">{formatFileSize(file.file_size)}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">{formatDate(file.created_at)}</td>
-                  <td className="px-3 py-2">{file.created_by}</td>
+                  <td className="font-medium px-3 py-2.5 text-[13px]">{file.name}</td>
+                  <td className="px-3 py-2.5 text-[12px]" style={{ color: "var(--text-3)" }}>{file.file_name}</td>
+                  <td className=" px-3 py-2.5 text-[11px]" style={{ color: "var(--text-2)" }}>{file.extension || "—"}</td>
+                  <td className="mono px-3 py-2.5 text-[12px]">{formatFileSize(file.file_size)}</td>
+                  <td className="mono whitespace-nowrap px-3 py-2.5 text-[12px]">{formatDate(file.created_at)}</td>
+                  <td className=" px-3 py-2.5 text-[11px]" style={{ color: "var(--text-2)" }}>{file.created_by}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+          <BoardFill />
+        </Panel>
       )}
 
       <CInfoSideBar
@@ -484,5 +462,5 @@ export default function FilesPage() {
         onCancel={() => setConfirmOpen(false)}
       />
     </div>
-  );
+    </div>  );
 }

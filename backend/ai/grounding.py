@@ -12,17 +12,18 @@ from sqlalchemy.orm import Session
 from utils.cube import _definition_version, meta_raw, mint_token
 from utils.redis_handler import cache_query, get_cached_query
 
-# ponytail: one palette constant instead of a theme system — lib/theme.jsx is a
-# binary light/dark class toggle with no named themes or design tokens, so
-# "pick a theme" means "fill the color fields ChartsSchemas already exposes".
-# Swap for real theme tokens when the app grows them.
+# The generated page is the product's main content surface, so it wears the
+# app's own palette rather than framework defaults. Categorical series start
+# from the brand amber and stay in the app's warm range — no sky blue,
+# indigo or violet, which read as "some other design system" inside the
+# Chester shell. See frontend/src/index.css for the source tokens.
 PALETTE = {
-    "chester": ["#eab308", "#3b82f6", "#10b981", "#f97316", "#8b5cf6", "#ef4444"],
-    "ocean": ["#0ea5e9", "#14b8a6", "#6366f1", "#06b6d4", "#3b82f6", "#8b5cf6"],
-    "ember": ["#f97316", "#ef4444", "#eab308", "#dc2626", "#fb923c", "#a16207"],
-    "mono": ["#111827", "#4b5563", "#9ca3af", "#6b7280", "#374151", "#d1d5db"],
+    "chester": ["#f59e0b", "#0f766e", "#b45309", "#4d7c0f", "#a16207", "#115e59"],
+    "warm":    ["#b45309", "#c2410c", "#a16207", "#854d0e", "#9a3412", "#713f12"],
+    "cool":    ["#0f766e", "#115e59", "#3f6212", "#155e75", "#166534", "#134e4a"],
+    "mono":    ["#171614", "#44403c", "#78716c", "#a8a29e", "#d6d3d1", "#57534e"],
 }
-DEFAULT_TEXT_COLOR = "#111827"
+DEFAULT_TEXT_COLOR = "#171614"
 
 
 def cube_grounding(db: Session, account_public_key, account_id: int,

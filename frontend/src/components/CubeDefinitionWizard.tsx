@@ -433,13 +433,13 @@ export function parseCubeYamlToSources(text: string): WizardSource[] {
 // ── Shared row styling ───────────────────────────────────────────────────
 
 const rowInputCls =
-  "min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-xs outline-none transition-all " +
-  "focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]";
-const rowInputSty = { borderColor: "var(--border)", background: "var(--bg)", color: "var(--text-h)" };
+  "min-w-0 flex-1 rounded-[var(--r-sm)] border px-2.5 py-1.5 text-xs outline-none transition-all " +
+  "focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-line)]";
+const rowInputSty = { borderColor: "var(--border)", background: "var(--surface)", color: "var(--text)" };
 
 const selectCls =
-  "w-full rounded-xl border bg-[var(--bg)] px-3.5 py-2.5 text-sm outline-none transition-all " +
-  "focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-ring)]";
+  "w-full rounded-[var(--r-sm)] border bg-[var(--surface)] px-3.5 py-2.5 text-sm outline-none transition-all " +
+  "focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-line)]";
 
 /** Column picker for a dimension/measure's underlying field — a select when the
  * source's columns are known (from table/file introspection), else a plain
@@ -500,8 +500,8 @@ function FormatPicker<F extends string>({
 function RemoveRowButton({ onClick, title }: { onClick: () => void; title: string }) {
   return (
     <button type="button" onClick={onClick} title={title}
-      className="shrink-0 rounded-md p-1.5 transition-colors hover:bg-[var(--border)]">
-      <FaTrash size={10} style={{ color: "var(--text)" }} />
+      className="shrink-0 rounded-[var(--r-sm)] p-1.5 transition-colors hover:bg-[var(--border)]">
+      <FaTrash size={10} style={{ color: "var(--text-2)" }} />
     </button>
   );
 }
@@ -516,9 +516,9 @@ function SectionHeader({
 }) {
   return (
     <button type="button" onClick={onToggleCollapse}
-      className="mb-1.5 flex w-full items-center gap-1.5 rounded-md py-0.5 transition-colors hover:bg-[var(--border)]">
-      {collapsed ? <FaChevronRight size={8} style={{ color: "var(--text)" }} /> : <FaChevronDown size={8} style={{ color: "var(--text)" }} />}
-      <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>
+      className="mb-1.5 flex w-full items-center gap-1.5 rounded-[var(--r-sm)] py-0.5 transition-colors hover:bg-[var(--border)]">
+      {collapsed ? <FaChevronRight size={8} style={{ color: "var(--text-2)" }} /> : <FaChevronDown size={8} style={{ color: "var(--text-2)" }} />}
+      <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>
         {label}{count > 0 && <span className="ml-1 font-normal opacity-60">({count})</span>}
       </span>
     </button>
@@ -529,8 +529,8 @@ function SectionHeader({
 function AddRowButton({ onClick, label }: { onClick: () => void; label: string }) {
   return (
     <button type="button" onClick={onClick}
-      className="mt-1.5 flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:bg-[var(--accent-muted)] hover:text-[var(--accent)]"
-      style={{ color: "var(--text)" }}>
+      className="mt-1.5 flex items-center gap-1 rounded-[var(--r-sm)] px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)]"
+      style={{ color: "var(--text-2)" }}>
       <FaPlus size={8} /> {label}
     </button>
   );
@@ -596,11 +596,11 @@ function SourceCard({
   const [joinsOpen, setJoinsOpen] = useState(true);
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border p-4" style={{ borderColor: "var(--border)", background: "var(--bg-card, var(--bg))" }}>
+    <div className="flex flex-col gap-3 rounded-[var(--r-sm)] border p-4" style={{ borderColor: "var(--border)", background: "var(--bg-card, var(--surface))" }}>
       <div className="flex items-center justify-between">
         <button type="button" onClick={() => setCollapsed((v) => !v)} className="flex items-center gap-1.5">
-          {collapsed ? <FaChevronRight size={9} style={{ color: "var(--text)" }} /> : <FaChevronDown size={9} style={{ color: "var(--text)" }} />}
-          <span className="text-xs font-bold" style={{ color: "var(--text-h)" }}>
+          {collapsed ? <FaChevronRight size={9} style={{ color: "var(--text-2)" }} /> : <FaChevronDown size={9} style={{ color: "var(--text-2)" }} />}
+          <span className="text-xs font-bold" style={{ color: "var(--text)" }}>
             Source {index + 1}{source.name.trim() && ` — ${source.name.trim()}`}
           </span>
         </button>
@@ -614,15 +614,15 @@ function SourceCard({
         <CTextInput label="Cube Name" value={source.name} onChange={(v) => onUpdate({ name: v })} placeholder="e.g. orders" required />
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium" style={{ color: "var(--text-h)" }}>Reads from</label>
-          <div className="flex items-center gap-0.5 rounded-lg border p-0.5" style={{ borderColor: "var(--border)" }}>
+          <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Reads from</label>
+          <div className="flex items-center gap-0.5 rounded-[var(--r-sm)] border p-0.5" style={{ borderColor: "var(--border)" }}>
             {(["connection", "file"] as SourceType[]).map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => onSourceTypeChange(t)}
-                className="flex-1 rounded-md px-2.5 py-1.5 text-xs font-medium capitalize transition-all"
-                style={source.sourceType === t ? { background: "var(--accent)", color: "#fff" } : { color: "var(--text)" }}
+                className="flex-1 rounded-[var(--r-sm)] px-2.5 py-1.5 text-xs font-medium capitalize transition-all"
+                style={source.sourceType === t ? { background: "var(--accent)", color: "#fff" } : { color: "var(--text-2)" }}
               >
                 {t === "connection" ? "Database Connection" : "Uploaded File"}
               </button>
@@ -635,13 +635,13 @@ function SourceCard({
         <>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium" style={{ color: "var(--text-h)" }}>Connection</label>
+              <label className="text-sm font-medium" style={{ color: "var(--text)" }}>Connection</label>
               <select
                 value={source.connectionId}
                 onChange={(e) => onConnectionChange(e.target.value)}
                 disabled={connLoading}
                 className={selectCls}
-                style={{ borderColor: "var(--border)", color: "var(--text-h)" }}
+                style={{ borderColor: "var(--border)", color: "var(--text)" }}
               >
                 <option value="">{connLoading ? "Loading connections…" : "Select a connection"}</option>
                 {connections.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -649,7 +649,7 @@ function SourceCard({
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium" style={{ color: "var(--text-h)" }}>
+              <label className="text-sm font-medium" style={{ color: "var(--text)" }}>
                 Schema {schemaLoading && <CSpinner size={10} />}
               </label>
               {schemaOptions.length > 0 ? (
@@ -657,13 +657,13 @@ function SourceCard({
                   value={source.schema}
                   onChange={(e) => onSchemaChange(e.target.value)}
                   className={selectCls}
-                  style={{ borderColor: "var(--border)", color: "var(--text-h)" }}
+                  style={{ borderColor: "var(--border)", color: "var(--text)" }}
                 >
                   <option value="">Select a schema</option>
                   {schemaOptions.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               ) : (
-                <p className="rounded-xl border px-3.5 py-2.5 text-xs italic" style={{ borderColor: "var(--border)", color: "var(--text)" }}>
+                <p className="rounded-[var(--r-sm)] border px-3.5 py-2.5 text-xs italic" style={{ borderColor: "var(--border)", color: "var(--text-2)" }}>
                   {source.connectionId ? "No schemas found — enter the table path manually below." : "Pick a connection first."}
                 </p>
               )}
@@ -671,7 +671,7 @@ function SourceCard({
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium" style={{ color: "var(--text-h)" }}>
+            <label className="text-sm font-medium" style={{ color: "var(--text)" }}>
               Table {tableLoading && <CSpinner size={10} />}
             </label>
             {tableOptions.length > 0 ? (
@@ -679,13 +679,13 @@ function SourceCard({
                 value={source.tableRef}
                 onChange={(e) => onTableChange(e.target.value)}
                 className={selectCls}
-                style={{ borderColor: "var(--border)", color: "var(--text-h)" }}
+                style={{ borderColor: "var(--border)", color: "var(--text)" }}
               >
                 <option value="">Select a table</option>
                 {tableOptions.map((t) => <option key={t.resource} value={t.resource}>{t.resource}</option>)}
               </select>
             ) : (
-              <p className="rounded-xl border px-3.5 py-2.5 text-xs italic" style={{ borderColor: "var(--border)", color: "var(--text)" }}>
+              <p className="rounded-[var(--r-sm)] border px-3.5 py-2.5 text-xs italic" style={{ borderColor: "var(--border)", color: "var(--text-2)" }}>
                 {source.schema ? "No tables found — enter the table path manually below." : "Pick a schema first."}
               </p>
             )}
@@ -703,7 +703,7 @@ function SourceCard({
         </>
       ) : (
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium" style={{ color: "var(--text-h)" }}>
+          <label className="text-sm font-medium" style={{ color: "var(--text)" }}>
             File {filesLoading && <CSpinner size={10} />}
           </label>
           <select
@@ -711,13 +711,13 @@ function SourceCard({
             onChange={(e) => onFileChange(e.target.value)}
             disabled={filesLoading}
             className={selectCls}
-            style={{ borderColor: "var(--border)", color: "var(--text-h)" }}
+            style={{ borderColor: "var(--border)", color: "var(--text)" }}
           >
             <option value="">{filesLoading ? "Loading files…" : "Select an uploaded file"}</option>
             {files.map((f) => <option key={f.id} value={f.id}>{f.name} ({f.extension})</option>)}
           </select>
           {files.length === 0 && !filesLoading && (
-            <p className="text-[11px] italic opacity-60" style={{ color: "var(--text)" }}>
+            <p className="text-[11px] italic opacity-60" style={{ color: "var(--text-2)" }}>
               No files uploaded yet — upload one from the Files page first.
             </p>
           )}
@@ -725,8 +725,8 @@ function SourceCard({
       )}
 
       {source.tableRef && (
-        <p className="text-[11px]" style={{ color: "var(--text)" }}>
-          Reads: <span className="font-mono" style={{ color: "var(--text-h)" }}>
+        <p className="text-[11px]" style={{ color: "var(--text-2)" }}>
+          Reads: <span className="font-mono" style={{ color: "var(--text)" }}>
             {source.sourceType === "file" ? `read_${source.tableRef.toLowerCase().endsWith(".parquet") ? "parquet" : "csv"}('${source.tableRef}')` : source.tableRef}
           </span>
         </p>
@@ -737,9 +737,9 @@ function SourceCard({
           re-point joins/measures built against the old key, so a source
           that already has one must be removed and re-added instead. */}
       <div className="flex flex-col gap-1.5">
-        <label className="flex items-center gap-1.5 text-sm font-medium" style={{ color: "var(--text-h)" }}>
+        <label className="flex items-center gap-1.5 text-sm font-medium" style={{ color: "var(--text)" }}>
           Primary Key <span className="text-xs font-normal opacity-60">(optional)</span>
-          {source.existing && <FaLock size={10} title="Locked once saved — remove and re-add this source to change it." style={{ color: "var(--text)" }} />}
+          {source.existing && <FaLock size={10} title="Locked once saved — remove and re-add this source to change it." style={{ color: "var(--text-2)" }} />}
         </label>
         <select
           value={source.primaryKey}
@@ -759,7 +759,7 @@ function SourceCard({
           disabled={source.existing || postRenameColumns.length === 0}
           title={source.existing ? "Primary key is locked once saved — remove and re-add this source to change it." : undefined}
           className={selectCls}
-          style={{ borderColor: "var(--border)", color: "var(--text-h)" }}
+          style={{ borderColor: "var(--border)", color: "var(--text)" }}
         >
           <option value="">{postRenameColumns.length === 0 ? "Pick a table first" : "None"}</option>
           {postRenameColumns.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -778,12 +778,12 @@ function SourceCard({
                 const pkLockTitle = "This dimension backs the primary key and is locked once saved — remove and re-add the source to change it.";
                 return (
                 <div key={d.id} className="flex items-center gap-1.5">
-                  <div className="flex shrink-0 items-center gap-0.5 rounded-md border p-0.5" style={{ borderColor: "var(--border)" }}>
+                  <div className="flex shrink-0 items-center gap-0.5 rounded-[var(--r-sm)] border p-0.5" style={{ borderColor: "var(--border)" }}>
                     {(["column", "expression"] as DimensionMode[]).map((m) => (
                       <button key={m} type="button" onClick={() => onUpdateDimension(d.id, { mode: m })}
                         disabled={pkLocked} title={pkLocked ? pkLockTitle : undefined}
                         className="rounded px-1.5 py-0.5 text-[10px] font-medium capitalize transition-all"
-                        style={d.mode === m ? { background: "var(--accent-muted)", color: "var(--accent)" } : { color: "var(--text)" }}
+                        style={d.mode === m ? { background: "var(--accent-soft)", color: "var(--accent)" } : { color: "var(--text-2)" }}
                       >{m}</button>
                     ))}
                   </div>
@@ -793,14 +793,14 @@ function SourceCard({
                     <input value={d.expression} onChange={(e) => onUpdateDimension(d.id, { expression: e.target.value })}
                       placeholder="SQL expression, e.g. UPPER(status)" disabled={pkLocked} title={pkLocked ? pkLockTitle : undefined} className={rowInputCls} style={rowInputSty} />
                   )}
-                  <span className="shrink-0 text-[10px] opacity-60" style={{ color: "var(--text)" }}>as</span>
+                  <span className="shrink-0 text-[10px] opacity-60" style={{ color: "var(--text-2)" }}>as</span>
                   <input value={d.name} onChange={(e) => onUpdateDimension(d.id, { name: e.target.value })}
                     placeholder={d.mode === "column" ? "title (optional)" : "title"} disabled={pkLocked} title={pkLocked ? pkLockTitle : undefined} className={rowInputCls} style={{ ...rowInputSty, flex: "0 0 25%" }} />
                   <DimensionTypePicker value={d.type} onChange={(v) => onUpdateDimension(d.id, { type: v })} />
                   <FormatPicker value={d.format} onChange={(v) => onUpdateDimension(d.id, { format: v })} options={DIMENSION_FORMATS} title="Display format" />
                   {pkLocked ? (
-                    <span className="shrink-0 rounded-md p-1.5" title={pkLockTitle}>
-                      <FaLock size={10} style={{ color: "var(--text)" }} />
+                    <span className="shrink-0 rounded-[var(--r-sm)] p-1.5" title={pkLockTitle}>
+                      <FaLock size={10} style={{ color: "var(--text-2)" }} />
                     </span>
                   ) : (
                     <RemoveRowButton onClick={() => onRemoveDimension(d.id)} title="Remove dimension" />
@@ -809,7 +809,7 @@ function SourceCard({
                 );
               })}
               {source.dimensions.length === 0 && (
-                <p className="text-[11px] italic opacity-60" style={{ color: "var(--text)" }}>No dimensions yet.</p>
+                <p className="text-[11px] italic opacity-60" style={{ color: "var(--text-2)" }}>No dimensions yet.</p>
               )}
             </div>
             <AddRowButton onClick={onAddDimension} label="Add dimension" />
@@ -824,22 +824,22 @@ function SourceCard({
           <>
         <div className="flex flex-col gap-1.5">
           {source.measures.map((m) => (
-            <div key={m.id} className="flex flex-col gap-1 rounded-lg border p-1.5" style={{ borderColor: "var(--border)" }}>
+            <div key={m.id} className="flex flex-col gap-1 rounded-[var(--r-sm)] border p-1.5" style={{ borderColor: "var(--border)" }}>
               <div className="flex items-center gap-1.5">
                 <input value={m.name} onChange={(e) => onUpdateMeasure(m.id, { name: e.target.value })}
                   placeholder="name" className={rowInputCls} style={{ ...rowInputSty, flex: "0 0 40%" }} />
-                <div className="flex shrink-0 items-center gap-0.5 rounded-md border p-0.5" style={{ borderColor: "var(--border)" }}>
+                <div className="flex shrink-0 items-center gap-0.5 rounded-[var(--r-sm)] border p-0.5" style={{ borderColor: "var(--border)" }}>
                   {(["function", "expression"] as MeasureKind[]).map((k) => (
                     <button key={k} type="button" onClick={() => onUpdateMeasure(m.id, { kind: k })}
                       className="rounded px-1.5 py-0.5 text-[10px] font-medium capitalize transition-all"
-                      style={m.kind === k ? { background: "var(--accent-muted)", color: "var(--accent)" } : { color: "var(--text)" }}
+                      style={m.kind === k ? { background: "var(--accent-soft)", color: "var(--accent)" } : { color: "var(--text-2)" }}
                     >{k}</button>
                   ))}
                 </div>
                 <RemoveRowButton onClick={() => onRemoveMeasure(m.id)} title="Remove measure" />
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="shrink-0 text-[10px] opacity-60" style={{ color: "var(--text)" }}>is</span>
+                <span className="shrink-0 text-[10px] opacity-60" style={{ color: "var(--text-2)" }}>is</span>
                 {m.kind === "expression" ? (
                   <input value={m.expression} onChange={(e) => onUpdateMeasure(m.id, { expression: e.target.value })}
                     placeholder="e.g. {total_revenue} - {total_cost} — references other measure names" className={rowInputCls} style={rowInputSty} />
@@ -857,7 +857,7 @@ function SourceCard({
             </div>
           ))}
           {source.measures.length === 0 && (
-            <p className="text-[11px] italic opacity-60" style={{ color: "var(--text)" }}>No measures yet.</p>
+            <p className="text-[11px] italic opacity-60" style={{ color: "var(--text-2)" }}>No measures yet.</p>
           )}
         </div>
         <AddRowButton onClick={onAddMeasure} label="Add measure" />
@@ -880,14 +880,14 @@ function SourceCard({
                   </select>
                   <input value={j.targetSource} onChange={(e) => onUpdateJoin(j.id, { targetSource: e.target.value })}
                     placeholder="target cube name" className={rowInputCls} style={{ ...rowInputSty, flex: "0 0 25%" }} />
-                  <span className="shrink-0 text-[10px] opacity-60" style={{ color: "var(--text)" }}>on</span>
+                  <span className="shrink-0 text-[10px] opacity-60" style={{ color: "var(--text-2)" }}>on</span>
                   <input value={j.on} onChange={(e) => onUpdateJoin(j.id, { on: e.target.value })}
                     placeholder={`{CUBE}.id = {${j.targetSource || "target"}}.foreign_id`} className={rowInputCls} style={rowInputSty} />
                   <RemoveRowButton onClick={() => onRemoveJoin(j.id)} title="Remove join" />
                 </div>
               ))}
               {source.joins.length === 0 && (
-                <p className="text-[11px] italic opacity-60" style={{ color: "var(--text)" }}>No joins yet.</p>
+                <p className="text-[11px] italic opacity-60" style={{ color: "var(--text-2)" }}>No joins yet.</p>
               )}
             </div>
             <AddRowButton onClick={onAddJoin} label="Add join" />

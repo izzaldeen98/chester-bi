@@ -33,9 +33,9 @@ function Badge({ children }: { children: React.ReactNode }) {
     <span
       className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
       style={{
-        background: "var(--accent-muted)",
+        background: "var(--accent-soft)",
         color: "var(--accent)",
-        border: "1px solid var(--accent-ring)",
+        border: "1px solid var(--accent-line)",
       }}
     >
       {children}
@@ -58,7 +58,7 @@ function Navbar({ stars }: { stars: string | null }) {
     >
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-3.5">
         <CLogo size={26} />
-        <span className="text-base font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
+        <span className="text-base font-bold tracking-tight" style={{ color: "var(--text-2)" }}>
           Chester BI
         </span>
 
@@ -69,7 +69,7 @@ function Navbar({ stars }: { stars: string | null }) {
           target="_blank"
           rel="noopener noreferrer"
           className="hidden items-center gap-1.5 text-sm transition-opacity hover:opacity-70 sm:flex"
-          style={{ color: "var(--text)" }}
+          style={{ color: "var(--text-2)" }}
         >
           <FaGithub size={16} />
           {stars && (
@@ -82,8 +82,8 @@ function Navbar({ stars }: { stars: string | null }) {
         <button
           onClick={toggleTheme}
           aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-          className="rounded-lg p-2 transition-colors hover:bg-[var(--bg-subtle)]"
-          style={{ color: "var(--text)" }}
+          className="rounded-[var(--r-sm)] p-2 transition-colors hover:bg-[var(--surface-2)]"
+          style={{ color: "var(--text-2)" }}
         >
           {theme === "dark" ? <HiSun size={19} /> : <HiMoon size={19} />}
         </button>
@@ -106,23 +106,13 @@ function Hero({ stars }: { stars: string | null }) {
   return (
     <section className="relative overflow-hidden px-6 pb-24 pt-28 text-center">
       {/* Field of data points — the measures and dimensions a semantic model exposes. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-20"
-        style={{
-          backgroundImage:
-            "radial-gradient(color-mix(in srgb, var(--accent) 45%, transparent) 1.5px, transparent 1.5px)",
-          backgroundSize: "28px 28px",
-          maskImage: "radial-gradient(ellipse 70% 55% at 50% 10%, black 0%, transparent 75%)",
-          WebkitMaskImage: "radial-gradient(ellipse 70% 55% at 50% 10%, black 0%, transparent 75%)",
-        }}
-      />
+      <div aria-hidden className="grid-paper pointer-events-none absolute inset-0 -z-20" />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 -z-10"
         style={{
           background:
-            "radial-gradient(ellipse 80% 45% at 50% 0%, var(--accent-muted) 0%, transparent 70%)",
+            "radial-gradient(ellipse 80% 45% at 50% 0%, var(--accent-soft) 0%, transparent 70%)",
         }}
       />
 
@@ -143,23 +133,23 @@ function Hero({ stars }: { stars: string | null }) {
         </div>
 
         <h1
-          className="mb-6 text-balance text-5xl font-extrabold leading-[1.05] tracking-[-0.035em] md:text-[4.25rem]"
-          style={{ color: "var(--text-h)" }}
+          className="mb-6 text-balance text-5xl font-extrabold leading-[1.05] tracking-[-0.032em] md:text-[4.25rem]"
+          style={{ color: "var(--text-2)" }}
         >
-          Stop building dashboards.
+          <span style={{ color: "var(--text-3)" }}>Stop building dashboards.</span>
           <br />
-          <span style={{ color: "var(--accent)" }}>Describe the analysis.</span>
+          Describe the analysis.
         </h1>
 
         <p
           className="mx-auto mb-4 max-w-[62ch] text-lg leading-relaxed"
-          style={{ color: "var(--text)" }}
+          style={{ color: "var(--text-2)" }}
         >
           Chester BI reads your Cube semantic model and writes the whole page — charts,
           written analysis, and working filters — from a sentence. Self-hosted, with your
           own LLM key.
         </p>
-        <p className="mx-auto mb-10 max-w-[58ch] text-sm" style={{ color: "var(--text)" }}>
+        <p className="mx-auto mb-10 max-w-[58ch] text-sm" style={{ color: "var(--text-2)" }}>
           The model never sees your data or your credentials. It writes queries against your
           semantic layer, and every one is validated before it runs.
         </p>
@@ -189,14 +179,14 @@ function Pipeline() {
       <div className="mx-auto max-w-5xl">
         <div className="mb-16 max-w-2xl">
           <h2
-            className="text-balance text-4xl font-bold leading-tight tracking-[-0.03em]"
-            style={{ color: "var(--text-h)" }}
+            className="text-balance text-4xl font-bold leading-tight tracking-[-0.025em]"
+            style={{ color: "var(--text-2)" }}
           >
             You write one sentence.
             <br />
             Your semantic model decides what's answerable.
           </h2>
-          <p className="mt-5 max-w-[65ch] text-base leading-relaxed" style={{ color: "var(--text)" }}>
+          <p className="mt-5 max-w-[65ch] text-base leading-relaxed" style={{ color: "var(--text-2)" }}>
             Most tools bolt a text-to-SQL box onto a dashboard and hope. Chester's agent is
             handed your compiled Cube schema and nothing else — no rows, no connection
             string, no SQL. Here is a real run, start to finish.
@@ -216,21 +206,21 @@ function Pipeline() {
             <li className="relative grid gap-6 py-8 md:grid-cols-[13rem_1fr]">
             <div>
               <span
-                className="text-xs font-bold uppercase tracking-[0.12em]"
+                className="label"
                 style={{ color: "var(--accent)" }}
               >
                 You ask
               </span>
-              <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text)" }}>
+              <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>
                 Plain language, against one semantic model you pick.
               </p>
             </div>
             <blockquote
-              className="rounded-2xl px-6 py-5 text-lg leading-relaxed"
+              className="rounded-[var(--r-lg)] px-6 py-5 text-lg leading-relaxed"
               style={{
-                background: "var(--bg-subtle)",
+                background: "var(--surface-2)",
                 border: "1px solid var(--border)",
-                color: "var(--text-h)",
+                color: "var(--text-2)",
               }}
             >
               “Revenue by customer with the top five called out, a short written summary,
@@ -245,23 +235,23 @@ function Pipeline() {
             >
             <div>
               <span
-                className="text-xs font-bold uppercase tracking-[0.12em]"
+                className="label"
                 style={{ color: "var(--accent)" }}
               >
                 Chester writes the query
               </span>
-              <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text)" }}>
+              <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>
                 Against your measures and dimensions. Checked against the live schema before
                 it is allowed to run — a measure used as a dimension, an operator that does
                 not exist, a field you never defined: rejected and sent back.
               </p>
             </div>
             <pre
-              className="overflow-x-auto rounded-2xl px-6 py-5 text-[13px] leading-relaxed"
+              className="overflow-x-auto rounded-[var(--r-lg)] px-6 py-5 text-[13px] leading-relaxed"
               style={{
-                background: "var(--bg-subtle)",
+                background: "var(--surface-2)",
                 border: "1px solid var(--border)",
-                color: "var(--text-h)",
+                color: "var(--text-2)",
               }}
             >
 {`{
@@ -280,34 +270,34 @@ function Pipeline() {
             >
             <div>
               <span
-                className="text-xs font-bold uppercase tracking-[0.12em]"
+                className="label"
                 style={{ color: "var(--accent)" }}
               >
                 You get a page
               </span>
-              <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text)" }}>
+              <p className="mt-2 text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>
                 Not a widget in someone else's grid — a real page, written for this question.
               </p>
             </div>
             <div
-              className="rounded-2xl px-6 py-5"
-              style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)" }}
+              className="rounded-[var(--r-lg)] px-6 py-5"
+              style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
             >
-              <ul className="flex flex-col gap-3 text-sm leading-relaxed" style={{ color: "var(--text)" }}>
+              <ul className="flex flex-col gap-3 text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>
                 <li>
-                  <strong style={{ color: "var(--text-h)" }}>Charts it chose</strong> — the
+                  <strong style={{ color: "var(--text-2)" }}>Charts it chose</strong> — the
                   shape that fits the question, not the one you dragged in.
                 </li>
                 <li>
-                  <strong style={{ color: "var(--text-h)" }}>Analysis in sentences</strong> —
+                  <strong style={{ color: "var(--text-2)" }}>Analysis in sentences</strong> —
                   totals, movers and outliers, computed from the rows that came back.
                 </li>
                 <li>
-                  <strong style={{ color: "var(--text-h)" }}>Filters that work</strong> —
+                  <strong style={{ color: "var(--text-2)" }}>Filters that work</strong> —
                   instant, because the data is already in the page.
                 </li>
                 <li>
-                  <strong style={{ color: "var(--text-h)" }}>Live on every open</strong> — the
+                  <strong style={{ color: "var(--text-2)" }}>Live on every open</strong> — the
                   file stores no data; the queries run again each time you look.
                 </li>
               </ul>
@@ -327,17 +317,17 @@ function Iterate() {
       <div className="mx-auto grid max-w-5xl items-center gap-14 md:grid-cols-2">
         <div>
           <h2
-            className="text-balance text-4xl font-bold leading-tight tracking-[-0.03em]"
-            style={{ color: "var(--text-h)" }}
+            className="text-balance text-4xl font-bold leading-tight tracking-[-0.025em]"
+            style={{ color: "var(--text-2)" }}
           >
             Wrong chart? Say so.
           </h2>
-          <p className="mt-5 max-w-[60ch] text-base leading-relaxed" style={{ color: "var(--text)" }}>
+          <p className="mt-5 max-w-[60ch] text-base leading-relaxed" style={{ color: "var(--text-2)" }}>
             The page opens with a chat floating over it. Ask for a change and Chester replans
             the queries and rewrites the page — so “add a breakdown by region” pulls data the
             page never had, instead of rearranging what it did.
           </p>
-          <p className="mt-4 max-w-[60ch] text-base leading-relaxed" style={{ color: "var(--text)" }}>
+          <p className="mt-4 max-w-[60ch] text-base leading-relaxed" style={{ color: "var(--text-2)" }}>
             Every prompt saves a version. Scroll back through what you asked, reopen any
             earlier page, restore it if the new one was worse.
           </p>
@@ -345,8 +335,8 @@ function Iterate() {
 
         {/* A prompt thread: what you asked, and the version it produced. */}
         <div
-          className="flex flex-col gap-4 rounded-2xl p-6"
-          style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)" }}
+          className="flex flex-col gap-4 rounded-[var(--r-lg)] p-6"
+          style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
         >
           {[
             { v: 1, text: "Revenue by customer, top five called out, with a summary." },
@@ -355,8 +345,8 @@ function Iterate() {
           ].map((turn) => (
             <div key={turn.v} className="flex flex-col items-end gap-1.5">
               <p
-                className="max-w-[92%] rounded-2xl rounded-br-sm px-4 py-2.5 text-sm leading-relaxed"
-                style={{ background: "var(--accent)", color: "var(--accent-fg, #1c1917)" }}
+                className="max-w-[92%] rounded-[var(--r)] rounded-br-sm px-3.5 py-2.5 text-[13px] leading-relaxed"
+                style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}
               >
                 {turn.text}
               </p>
@@ -364,7 +354,7 @@ function Iterate() {
                 className="rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums"
                 style={{
                   background: "var(--bg)",
-                  color: "var(--text)",
+                  color: "var(--text-2)",
                   border: "1px solid var(--border)",
                 }}
               >
@@ -407,8 +397,8 @@ function Foundation() {
     <section className="px-6 py-24" style={{ borderTop: "1px solid var(--border)" }}>
       <div className="mx-auto max-w-5xl">
         <h2
-          className="mb-14 max-w-2xl text-balance text-4xl font-bold leading-tight tracking-[-0.03em]"
-          style={{ color: "var(--text-h)" }}
+          className="mb-14 max-w-2xl text-balance text-4xl font-bold leading-tight tracking-[-0.025em]"
+          style={{ color: "var(--text-2)" }}
         >
           Four things stay yours.
         </h2>
@@ -420,10 +410,10 @@ function Foundation() {
                 {p.icon}
               </span>
               <div>
-                <dt className="text-base font-semibold" style={{ color: "var(--text-h)" }}>
+                <dt className="text-base font-semibold" style={{ color: "var(--text-2)" }}>
                   {p.title}
                 </dt>
-                <dd className="mt-1.5 text-sm leading-relaxed" style={{ color: "var(--text)" }}>
+                <dd className="mt-1.5 text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>
                   {p.body}
                 </dd>
               </div>
@@ -449,8 +439,8 @@ function QuickStart() {
     <section className="px-6 py-24" style={{ borderTop: "1px solid var(--border)" }}>
       <div className="mx-auto max-w-4xl">
         <h2
-          className="mb-12 text-balance text-4xl font-bold tracking-[-0.03em]"
-          style={{ color: "var(--text-h)" }}
+          className="mb-12 text-balance text-4xl font-bold tracking-[-0.025em]"
+          style={{ color: "var(--text-2)" }}
         >
           Running in minutes.
         </h2>
@@ -465,10 +455,10 @@ function QuickStart() {
               >
                 {s.n}
               </span>
-              <h3 className="text-base font-semibold" style={{ color: "var(--text-h)" }}>
+              <h3 className="text-base font-semibold" style={{ color: "var(--text-2)" }}>
                 {s.title}
               </h3>
-              <p className="text-sm leading-relaxed" style={{ color: "var(--text)" }}>
+              <p className="text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>
                 {s.body}
               </p>
             </div>
@@ -476,8 +466,8 @@ function QuickStart() {
         </div>
 
         <div
-          className="mt-14 overflow-hidden rounded-2xl"
-          style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)" }}
+          className="mt-14 overflow-hidden rounded-[var(--r-lg)]"
+          style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
         >
           <div
             className="flex items-center gap-1.5 px-4 py-2.5"
@@ -489,7 +479,7 @@ function QuickStart() {
           </div>
           <div
             className="overflow-x-auto p-5 font-mono text-sm [&>p]:whitespace-pre"
-            style={{ color: "var(--text-h)" }}
+            style={{ color: "var(--text-2)" }}
           >
             <p><span style={{ color: "var(--accent)", opacity: 0.75 }}># 1. Clone the repo</span></p>
             <p>git clone https://github.com/izzaldeen98/chester-bi.git && cd chester-bi</p>
@@ -510,10 +500,10 @@ function CTABanner() {
   return (
     <section className="px-6 py-24" style={{ borderTop: "1px solid var(--border)" }}>
       <div
-        className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl p-12 text-center"
+        className="relative mx-auto max-w-4xl overflow-hidden rounded-[var(--r-lg)] p-12 text-center"
         style={{
-          background: "linear-gradient(135deg, #d97706 0%, #eab308 45%, #facc15 100%)",
-          boxShadow: "0 24px 60px -20px rgba(180, 120, 10, 0.45)",
+          background: "var(--solid)",
+          boxShadow: "var(--shadow-3)",
         }}
       >
         <div
@@ -521,14 +511,15 @@ function CTABanner() {
           className="pointer-events-none absolute inset-0"
           style={{
             background:
-              "radial-gradient(circle 220px at 15% 15%, rgba(255,255,255,0.35) 0%, transparent 70%), radial-gradient(circle 260px at 90% 100%, rgba(0,0,0,0.18) 0%, transparent 70%)",
+              "radial-gradient(circle 260px at 18% 10%, rgba(245,158,11,0.18) 0%, transparent 70%)",
           }}
         />
-        <CLogo size={44} color="rgba(0,0,0,0.55)" className="relative mx-auto mb-4" />
-        <h2 className="relative mb-3 text-balance text-4xl font-extrabold tracking-[-0.03em] text-black">
+        <CLogo size={36} className="relative mx-auto mb-5" />
+        <h2 className="relative mb-3 text-balance text-4xl font-semibold tracking-[-0.025em]" style={{ color: "var(--solid-ink)" }}>
           Your data. Your model. Your key.
         </h2>
-        <p className="relative mx-auto mb-8 max-w-lg leading-relaxed text-black/75">
+        <p className="relative mx-auto mb-8 max-w-lg leading-relaxed"
+          style={{ color: "var(--solid-ink)", opacity: 0.72 }}>
           Deploy Chester BI on your own server in minutes. No vendor lock-in, no per-seat
           pricing, and nothing leaving your infrastructure.
         </p>
@@ -536,14 +527,14 @@ function CTABanner() {
           <CButton
             variant="primary"
             onClick={() => navigate("/register")}
-            className="bg-black! px-7 py-3 text-yellow-400 hover:bg-stone-900!"
+            className="px-6 py-2.5"
           >
             Create Your Account <FaArrowRight size={13} />
           </CButton>
           <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
             <CButton
               variant="outline"
-              className="border-black/30! px-7 py-3 text-black! hover:bg-black/10!"
+              className="px-6 py-2.5"
             >
               <FaGithub size={15} /> Star on GitHub
             </CButton>
@@ -561,15 +552,15 @@ function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 md:flex-row">
         <div className="flex items-center gap-2">
           <CLogo size={20} />
-          <span className="font-semibold" style={{ color: "var(--text-h)" }}>Chester BI</span>
+          <span className="font-semibold" style={{ color: "var(--text-2)" }}>Chester BI</span>
           <span
             className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold"
-            style={{ background: "var(--accent-muted)", color: "var(--accent)" }}
+            style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
           >
             MIT
           </span>
         </div>
-        <p className="text-sm" style={{ color: "var(--text)" }}>
+        <p className="text-sm" style={{ color: "var(--text-2)" }}>
           Free and open source. Self-host with confidence.
         </p>
         <a
@@ -577,7 +568,7 @@ function Footer() {
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 text-sm transition-opacity hover:opacity-70"
-          style={{ color: "var(--text)" }}
+          style={{ color: "var(--text-2)" }}
         >
           <FaGithub size={16} /> GitHub
         </a>
@@ -590,7 +581,7 @@ function Footer() {
 export default function LandingPage() {
   const stars = useGitHubStars();
   return (
-    <div style={{ background: "var(--bg)", color: "var(--text)" }}>
+    <div style={{ background: "var(--bg)", color: "var(--text-2)" }}>
       <Navbar stars={stars} />
       <main>
         <Hero stars={stars} />

@@ -1,13 +1,22 @@
-function CDetailRow({ label, value }: { label: string; value?: string | null }) {
-    if (value == null || value === "") return null;
-    return (
-      <div className="flex flex-col gap-0.5 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
-        <span className="text-xs font-medium uppercase tracking-wide" style={{ color: "var(--text)" }}>
-          {label}
-        </span>
-        <span className="text-sm" style={{ color: "var(--text-h)" }}>{value}</span>
-      </div>
-    );
-  }
+import type { ReactNode } from "react";
 
-export default CDetailRow;
+interface CDetailRowProps {
+  label: string;
+  value?: ReactNode;
+  className?: string;
+}
+
+/* A line in a service record: painted label, value on the right. */
+export default function CDetailRow({ label, value, className = "" }: CDetailRowProps) {
+  return (
+    <div
+      className={`flex items-baseline justify-between gap-4 py-2 ${className}`}
+      style={{ borderBottom: "1px solid var(--border)" }}
+    >
+      <span className="label shrink-0">{label}</span>
+      <span className="min-w-0 truncate text-right text-[13px]" style={{ color: "var(--text)" }}>
+        {value ?? "—"}
+      </span>
+    </div>
+  );
+}

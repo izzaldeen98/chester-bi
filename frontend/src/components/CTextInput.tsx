@@ -1,7 +1,4 @@
-import { useState } from "react";
-import { RiLockPasswordFill } from "react-icons/ri";
-import { FaEye } from "react-icons/fa";
-
+import type { ReactNode } from "react";
 
 interface CTextInputProps {
   label?: string;
@@ -9,7 +6,7 @@ interface CTextInputProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
   error?: string;
   required?: boolean;
   disabled?: boolean;
@@ -30,67 +27,43 @@ export default function CTextInput({
   autoComplete,
   className = "",
 }: CTextInputProps) {
-  const [showPassword, setShowPassword] = useState(false);
-  const isPassword = type === "password";
-  const resolvedType = isPassword ? (showPassword ? "text" : "password") : type;
-
   return (
-    <div className={`flex flex-col gap-1.5 ${className}`}>
+    <label className={`block ${className}`}>
       {label && (
-        <label className="text-sm font-medium" style={{ color: "var(--text-h)" }}>
+        <span className="mb-1.5 block text-[13px] font-medium" style={{ color: "var(--text)" }}>
           {label}
-          {required && <span className="ml-0.5 text-[var(--accent)]">*</span>}
-        </label>
+          {required && <span style={{ color: "var(--text-3)" }}> *</span>}
+        </span>
       )}
-
-      <div className="relative flex items-center">
-        {/* Left icon */}
+      <span className="relative flex items-center">
         {icon && (
-          <span
-            className="pointer-events-none absolute left-3 text-base"
-            style={{ color: "var(--text)" }}
-          >
+          <span className="pointer-events-none absolute left-2.5 flex items-center" style={{ color: "var(--text-3)" }}>
             {icon}
           </span>
         )}
-
         <input
-          type={resolvedType}
+          type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          required={required}
           disabled={disabled}
           autoComplete={autoComplete}
-          className={`
-            w-full rounded-xl border bg-[var(--bg)] py-2.5 text-sm
-            text-[var(--text-h)] placeholder:text-[var(--text)]
-            outline-none transition-all
-            focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-ring)]
-            disabled:cursor-not-allowed disabled:opacity-50
-            ${error ? "border-red-400 focus:border-red-400 focus:ring-red-200" : "border-[var(--border)]"}
-            ${icon ? "pl-9" : "pl-3.5"}
-            ${isPassword ? "pr-10" : "pr-3.5"}
-          `}
+          className={`w-full px-2.5 py-1.5 text-[13.5px] outline-none transition-colors
+            placeholder:text-[var(--text-3)] focus:border-[var(--accent)] disabled:opacity-50
+            ${icon ? "pl-8" : ""}`}
+          style={{
+            background: "var(--surface)",
+            border: `1px solid ${error ? "var(--danger)" : "var(--border-strong)"}`,
+            borderRadius: "var(--r-sm)",
+            color: "var(--text)",
+          }}
         />
-
-        {/* Password toggle */}
-        {isPassword && (
-          <button
-            type="button"
-            onClick={() => setShowPassword((p) => !p)}
-            className="absolute right-3 cursor-pointer transition-colors"
-            style={{ color: "var(--text)" }}
-            aria-label={showPassword ? "Hide password" : "Show password"}
-          >
-            <FaEye size={16} />
-          </button>
-        )}
-      </div>
-
+      </span>
       {error && (
-        <p className="text-xs text-red-500 dark:text-red-400">{error}</p>
+        <span className="mt-1 block text-[12px]" style={{ color: "var(--danger)" }}>
+          {error}
+        </span>
       )}
-    </div>
+    </label>
   );
 }

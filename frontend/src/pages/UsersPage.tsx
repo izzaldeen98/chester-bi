@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { FaUsers, FaUser, FaSearch, FaEdit, FaShieldAlt, FaTrash } from "react-icons/fa";
-import { FaCheckCircle } from "react-icons/fa";
+import { FaUser, FaSearch, FaEdit, FaTrash } from "react-icons/fa";
 import { RiLockPasswordFill } from "react-icons/ri";
 import { IoMdMail } from "react-icons/io";
-import CMetricCard from "../components/CMetricCard";
 import CHCard from "../components/CHCard";
+import { BoardFill, BoardHead, EmptyBoard, Panel } from "../components/Board";
 import CInfoSideBar from "../components/CInfoSideBar";
 import CConfirmDialog from "../components/CConfirmDialog";
 import CButton from "../components/CButton";
@@ -16,7 +15,6 @@ import {
   getUsers,
   createUser,
   updateUser,
-  deleteUser,
   type UserPublicResponse,
 } from "../lib/Api";
 
@@ -69,27 +67,27 @@ function PermissionPicker({ value, onChange }: PermissionPickerProps) {
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs font-medium" style={{ color: "var(--text-h)" }}>Permissions</p>
-      <div className="rounded-xl p-3 flex flex-col gap-3" style={{ background: "var(--bg)", border: "1px solid var(--border)" }}>
+      <p className="text-xs font-medium" style={{ color: "var(--text)" }}>Permissions</p>
+      <div className="rounded-[var(--r-sm)] p-3 flex flex-col gap-3" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
         {Object.entries(PERMISSION_GROUPS).map(([resource, actions]) => (
           <div key={resource}>
-            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text)" }}>
+            <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>
               {resource}
             </p>
             <div className="flex flex-wrap gap-1.5">
               {actions.map((action) => {
                 const perm = `${resource}:${action}`;
                 const active = selected.has(perm);
-                return (
+              return (
                   <button
                     key={perm}
                     type="button"
                     onClick={() => toggle(perm)}
-                    className="rounded-lg px-2 py-0.5 text-xs font-medium transition-colors"
+                    className="rounded-[var(--r-sm)] px-2 py-0.5 text-xs font-medium transition-colors"
                     style={
                       active
-                        ? { background: "var(--accent)", color: "var(--accent-fg)", border: "1px solid var(--accent)" }
-                        : { background: "var(--bg-subtle)", color: "var(--text)", border: "1px solid var(--border)" }
+                        ? { background: "var(--accent)", color: "var(--solid-ink)", border: "1px solid var(--accent)" }
+                        : { background: "var(--surface-2)", color: "var(--text-2)", border: "1px solid var(--border)" }
                     }
                   >
                     {action === "*" ? "all *" : action}
@@ -101,7 +99,7 @@ function PermissionPicker({ value, onChange }: PermissionPickerProps) {
         ))}
       </div>
       {selected.size > 0 && (
-        <p className="text-xs" style={{ color: "var(--text)" }}>
+        <p className="text-xs" style={{ color: "var(--text-2)" }}>
           {selected.size} permission{selected.size !== 1 ? "s" : ""} selected
         </p>
       )}
@@ -124,17 +122,17 @@ function formatDate(iso: string) {
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-sm font-medium" style={{ color: "var(--text-h)" }}>{label}</span>
+      <span className="text-sm font-medium" style={{ color: "var(--text)" }}>{label}</span>
       <button
         type="button"
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className="relative h-6 w-11 rounded-full transition-colors duration-200"
+        className="relative h-6 w-11 rounded-[var(--r-sm)] transition-colors duration-200"
         style={{ background: checked ? "var(--accent)" : "var(--border)" }}
       >
         <span
-          className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200"
+          className="absolute top-0.5 h-5 w-5 rounded-[var(--r-sm)] bg-white shadow transition-transform duration-200"
           style={{ left: checked ? "calc(100% - 1.375rem)" : "0.125rem" }}
         />
       </button>
@@ -192,10 +190,6 @@ export default function UsersPage() {
   }
 
   // ── Derived metrics ────────────────────────────────────────────────────
-  const total    = users.length;
-  const active   = users.filter((u) => u.is_active).length;
-  const inactive = total - active;
-  const admins   = users.filter((u) => u.role?.toLowerCase() === "admin").length;
 
   // ── Search ─────────────────────────────────────────────────────────────
   const filtered = users.filter((u) => {
@@ -339,15 +333,15 @@ export default function UsersPage() {
       <div>
         <div className="mb-6 flex flex-col items-center gap-2">
           <div
-            className="flex h-16 w-16 items-center justify-center rounded-2xl text-xl font-bold"
-            style={{ background: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--accent-ring)" }}
+            className="flex h-16 w-16 items-center justify-center rounded-[var(--r-sm)] text-xl font-bold"
+            style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--accent-line)" }}
           >
             {getInitials(selected)}
           </div>
-          <p className="text-base font-bold" style={{ color: "var(--text-h)" }}>
+          <p className="text-base font-bold" style={{ color: "var(--text)" }}>
             {selected.first_name} {selected.last_name}
           </p>
-          <span className={`rounded-full px-3 py-0.5 text-xs font-medium ${selected.is_active ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400" : "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"}`}>
+          <span className={`rounded-[var(--r-sm)] px-3 py-0.5 text-xs font-medium ${selected.is_active ? "text-[var(--ok)] bg-[var(--ok-soft)]" : "text-[var(--danger)] bg-[var(--danger-soft)]"}`}>
             {selected.is_active ? "Active" : "Inactive"}
           </span>
         </div>
@@ -413,29 +407,26 @@ export default function UsersPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="flex-1 overflow-y-auto p-8">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>Users</h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--text)" }}>
-            Manage workspace members and their permissions.
-          </p>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <header
+        className="flex shrink-0 flex-wrap items-center gap-4 px-6 py-4"
+        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
+      >
+        <div className="min-w-0">
+          <h1 className="text-[18px] font-semibold leading-none tracking-[-0.02em]">Users</h1>
+          <p className="mt-1.5 text-[13px] leading-none" style={{ color: "var(--text-3)" }}>Manage workspace members and their permissions.</p>
         </div>
+        <div className="ml-auto flex items-center gap-3">
         <CButton variant="primary" onClick={openCreate}>
           <FaUser size={13} /> Add User
         </CButton>
-      </div>
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
 
       {pageError && <CAlert variant="error" message={pageError} className="mb-6" />}
 
-      {/* Metrics */}
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <CMetricCard label="Total Users" value={total}    icon={<FaUsers size={18} />} />
-        <CMetricCard label="Active"      value={active}   icon={<FaCheckCircle size={17} />} trend="currently active" up={true} />
-        <CMetricCard label="Inactive"    value={inactive} icon={<FaUser size={17} />} trend={inactive === 0 ? "all good" : "need attention"} up={inactive === 0} />
-        <CMetricCard label="Admins"      value={admins}   icon={<FaShieldAlt size={17} />} />
-      </div>
 
       {/* Search */}
       <div className="mb-5 max-w-sm">
@@ -448,19 +439,21 @@ export default function UsersPage() {
       </div>
 
       {/* User grid */}
-      {loading ? (
+      <Panel label="Users" flush bodyClassName="flex flex-col">
+        {loading ? (
         <div className="flex items-center justify-center py-20">
           <CSpinner size={28} />
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <FaUsers size={36} style={{ color: "var(--border)" }} />
-          <p className="mt-3 text-sm" style={{ color: "var(--text)" }}>
-            {search ? "No users match your search." : "No users yet — add one above."}
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        ) : filtered.length === 0 ? (
+        <EmptyBoard line={search ? "No match on this board" : "No operators"} hint={search ? "Try a different search." : "Invite the people who will run this board."} />
+        ) : (
+          <>
+          <BoardHead cols="42px minmax(0,1fr) 140px 108px">
+            <span className="label"></span>
+            <span className="label">Name</span>
+            <span className="label">Role</span>
+            <span className="label text-right">State</span>
+          </BoardHead>
           {filtered.map((u) => (
             <CHCard
               key={u.id}
@@ -473,8 +466,10 @@ export default function UsersPage() {
               onClick={() => openView(u)}
             />
           ))}
-        </div>
-      )}
+          <BoardFill />
+          </>
+        )}
+      </Panel>
 
       {/* Sidebar */}
       <CInfoSideBar
@@ -504,5 +499,5 @@ export default function UsersPage() {
         onCancel={() => setConfirmOpen(false)}
       />
     </div>
-  );
+    </div>  );
 }

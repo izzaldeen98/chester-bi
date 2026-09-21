@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MdAutoAwesome, MdOutlineCloud, MdOpenInNew } from "react-icons/md";
+import { MdAutoAwesome, MdOutlineCloud } from "react-icons/md";
 import { GoPackage } from "react-icons/go";
-import { FaUser } from "react-icons/fa";
-import { FaArrowRight, FaPlus } from "react-icons/fa6";
-import CLogo from "../components/CLogo";
+import { FaPlus, FaArrowRight } from "react-icons/fa";
+import { getUser } from "../lib/auth";
 import {
   getArtifacts,
   getConnections,
@@ -13,147 +12,58 @@ import {
   type ArtifactResponse,
   type ConnectionPublicResponse,
 } from "../lib/Api";
-import { getUser } from "../lib/auth";
+import { BoardFill, BoardHead, BoardRow, EmptyBoard, Flap, Lamp, Panel, Readout, Status } from "../components/Board";
+import CButton from "../components/CButton";
+import CAlert from "../components/CAlert";
+import CSpinner from "../components/CSpinner";
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const s = Math.floor(diff / 1000);
-  if (s < 60) return "just now";
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
-  return new Date(dateStr).toLocaleDateString();
+const COLS = "88px minmax(0,1fr) 150px 74px 108px";
+const COLS_NARROW = "62px minmax(0,1fr) 92px";
+
+function departureTime(iso: string) {
+  return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
-// ── Skeleton ──────────────────────────────────────────────────────────────
-function Skeleton({ className = "" }: { className?: string }) {
-  return (
-    <div
-      className={`animate-pulse rounded ${className}`}
-      style={{ background: "var(--border)" }}
-    />
-  );
-}
-
-// ── Metric card ───────────────────────────────────────────────────────────
-interface MetricCardProps {
+/* The pipeline is the product's one path. Showing it as an ordered run of
+   stages with live counts is what makes "where am I, what next" answerable
+   without a tutorial. */
+function PipelineStage({
+  n,
+  label,
+  count,
+  done,
+  icon,
+  onClick,
+}: {
+  n: string;
   label: string;
-  value: number | null;
+  count: number | null;
+  done: boolean;
   icon: React.ReactNode;
-  href: string;
-  loading: boolean;
-  accent?: boolean;
-}
-
-function MetricCard({ label, value, icon, href, loading, accent }: MetricCardProps) {
-  const navigate = useNavigate();
+  onClick: () => void;
+}) {
   return (
     <button
-      onClick={() => navigate(href)}
-      className="group flex w-full flex-col gap-3 rounded-2xl p-5 text-left transition-all"
-      style={{
-        background: accent ? "var(--accent-muted)" : "var(--bg-subtle)",
-        border: `1px solid ${accent ? "var(--accent-ring)" : "var(--border)"}`,
-        boxShadow: "var(--shadow-sm)",
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = "var(--accent-ring)";
-        e.currentTarget.style.boxShadow = "var(--shadow-md)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = accent ? "var(--accent-ring)" : "var(--border)";
-        e.currentTarget.style.boxShadow = "var(--shadow-sm)";
-      }}
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-[filter] hover:brightness-[1.4]"
+      style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
     >
-      <div className="flex items-center justify-between">
-        <span
-          className="flex h-10 w-10 items-center justify-center rounded-xl"
-          style={{ background: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--accent-ring)" }}
-        >
-          {icon}
-        </span>
-        <FaArrowRight
-          size={12}
-          className="opacity-0 transition-opacity group-hover:opacity-60"
-          style={{ color: "var(--accent)" }}
-        />
-      </div>
-      {loading ? (
-        <Skeleton className="h-8 w-16" />
-      ) : (
-        <p className="text-3xl font-extrabold tabular-nums" style={{ color: "var(--text-h)" }}>
-          {value ?? 0}
-        </p>
-      )}
-      <p className="text-sm font-medium" style={{ color: "var(--text)" }}>
+      <span className="mono text-[11px]" style={{ color: "var(--text-3)" }}>
+        {n}
+      </span>
+      <span style={{ color: done ? "var(--accent)" : "var(--text-3)" }}>{icon}</span>
+      <span className=" flex-1 text-[12px]" style={{ color: "var(--text)" }}>
         {label}
-      </p>
+      </span>
+      <span className="mono text-[15px]" style={{ color: done ? "var(--ok)" : "var(--text-3)" }}>
+        {count === null ? "—" : count}
+      </span>
+      <Lamp signal={done ? "ok" : "idle"} />
     </button>
   );
 }
 
-// ── Connection badge ───────────────────────────────────────────────────────
-function ConnectionRow({ conn }: { conn: ConnectionPublicResponse }) {
-  return (
-    <div className="flex items-center gap-3 py-2.5" style={{ borderBottom: "1px solid var(--border)" }}>
-      <span
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs font-bold uppercase"
-        style={{ background: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--accent-ring)" }}
-      >
-        {conn.type?.slice(0, 2) ?? "DB"}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium" style={{ color: "var(--text-h)" }}>{conn.name}</p>
-        <p className="truncate text-xs capitalize" style={{ color: "var(--text)" }}>{conn.type}</p>
-      </div>
-      <span
-        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-        style={{ background: "var(--accent-muted)", color: "var(--accent)" }}
-      >
-        active
-      </span>
-    </div>
-  );
-}
-
-// ── Artifact row ──────────────────────────────────────────────────────────
-function ArtifactRow({ d, onView }: { d: ArtifactResponse; onView: () => void }) {
-  return (
-    <li
-      className="group flex items-center gap-3 py-3"
-      style={{ borderBottom: "1px solid var(--border)" }}
-    >
-      <span
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl"
-        style={{ background: "var(--accent-muted)", color: "var(--accent)", border: "1px solid var(--accent-ring)" }}
-      >
-        <MdAutoAwesome size={15} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold" style={{ color: "var(--text-h)" }}>{d.name}</p>
-        <p className="truncate text-xs" style={{ color: "var(--text)" }}>{d.description || "No description"}</p>
-      </div>
-      <div className="flex shrink-0 items-center gap-2">
-        <span className="hidden text-xs sm:block" style={{ color: "var(--text)" }}>
-          {timeAgo(d.updated_at)}
-        </span>
-        <button
-          onClick={onView}
-          className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium opacity-0 transition-opacity group-hover:opacity-100"
-          style={{ background: "var(--accent-muted)", color: "var(--accent)" }}
-        >
-          View <MdOpenInNew size={11} />
-        </button>
-      </div>
-    </li>
-  );
-}
-
-// ── Page ───────────────────────────────────────────────────────────────────
 export default function HomePage() {
   const navigate = useNavigate();
   const user = getUser();
@@ -167,257 +77,177 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false;
-
-    async function fetchAll() {
-      const results = await Promise.allSettled([
-        getArtifacts(),
-        getConnections(),
-        getModels(),
-        getUsers(),
-      ]);
-
+    (async () => {
+      const results = await Promise.allSettled([getArtifacts(), getConnections(), getModels(), getUsers()]);
       if (cancelled) return;
-
       const errs: string[] = [];
-
       if (results[0].status === "fulfilled") setArtifacts(results[0].value);
       else errs.push("artifacts");
-
       if (results[1].status === "fulfilled") setConnections(results[1].value);
       else setConnections([]);
-
       if (results[2].status === "fulfilled") setModelCount(results[2].value.length);
       else setModelCount(0);
-
       if (results[3].status === "fulfilled") setUserCount(results[3].value.length);
       else setUserCount(0);
-
       setErrors(errs);
       setLoading(false);
-    }
-
-    fetchAll();
-    return () => { cancelled = true; };
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const sortedArtifacts = artifacts
-    ? [...artifacts].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+  const recent = artifacts
+    ? [...artifacts].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 7)
     : [];
-
-  const firstName = user?.first_name ?? user?.username ?? "back";
+  const firstName = user?.first_name ?? user?.username ?? "operator";
 
   return (
-    <div className="flex-1 overflow-y-auto p-8">
-      {/* Header */}
-      <div className="mb-8 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight" style={{ color: "var(--text-h)" }}>
-            Welcome back, {firstName} 👋
-          </h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--text)" }}>
-            {user?.account_name
-              ? `${user.account_name} · ${user.role}`
-              : "Chester BI workspace"}
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {/* Concourse header: who is on shift, and the one action that matters */}
+      <header
+        className="flex shrink-0 flex-wrap items-center gap-4 px-6 py-4"
+        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
+      >
+        <div className="min-w-0">
+          <h1 className="text-[18px] font-semibold leading-none tracking-[-0.02em]">Overview</h1>
+          <p className="mt-1.5 text-[13px] leading-none" style={{ color: "var(--text-3)" }}>
+            {firstName} · {user?.account_name ?? "—"} · {user?.role ?? "—"}
           </p>
         </div>
-
-        <button
-          onClick={() => navigate("/artifacts/new")}
-          className="flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors"
-          style={{
-            background: "var(--accent)",
-            color: "var(--bg)",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.85")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-        >
-          <FaPlus size={12} /> New Artifact
-        </button>
-      </div>
-
-      {/* Error banner */}
-      {errors.length > 0 && (
-        <div
-          className="mb-6 rounded-xl px-4 py-3 text-sm"
-          style={{ background: "var(--error-muted, #fee2e2)", color: "var(--error, #ef4444)", border: "1px solid var(--error-ring, #fca5a5)" }}
-        >
-          Could not load some data: {errors.join(", ")}. Check your connection.
+        <div className="ml-auto">
+          <CButton variant="primary" onClick={() => navigate("/artifacts/new")}>
+            <FaPlus size={10} /> New artifact
+          </CButton>
         </div>
-      )}
+      </header>
 
-      {/* Metric cards */}
-      <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          label="Artifacts"
-          value={artifacts?.length ?? null}
-          icon={<MdAutoAwesome size={20} />}
-          href="/artifacts"
-          loading={loading}
-        />
-        <MetricCard
-          label="Connections"
-          value={connections?.length ?? null}
-          icon={<MdOutlineCloud size={20} />}
-          href="/connections"
-          loading={loading}
-        />
-        <MetricCard
-          label="Models"
-          value={modelCount}
-          icon={<GoPackage size={19} />}
-          href="/models"
-          loading={loading}
-        />
-        <MetricCard
-          label="Team Members"
-          value={userCount}
-          icon={<FaUser size={17} />}
-          href="/users"
-          loading={loading}
-        />
-      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
+        {errors.length > 0 && (
+          <CAlert variant="error" message={`Could not reach: ${errors.join(", ")}.`} className="mb-3" />
+        )}
 
-      {/* Bottom row */}
-      <div className="grid gap-6 lg:grid-cols-2">
-
-        {/* Recent artifacts */}
-        <div
-          className="rounded-2xl p-6"
-          style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}
-        >
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-semibold" style={{ color: "var(--text-h)" }}>
-              Recent Artifacts
-            </h2>
-            <button
-              onClick={() => navigate("/artifacts")}
-              className="flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-70"
-              style={{ color: "var(--accent)" }}
-            >
-              View all <FaArrowRight size={10} />
-            </button>
-          </div>
-
-          {loading ? (
-            <div className="flex flex-col gap-3">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
-            </div>
-          ) : sortedArtifacts.length === 0 ? (
-            <div
-              className="flex flex-col items-center gap-3 rounded-xl py-12 text-center"
-              style={{ border: "1px dashed var(--border)" }}
-            >
-              <CLogo size={32} style={{ opacity: 0.4 }} />
-              <p className="text-sm" style={{ color: "var(--text)" }}>
-                No artifacts yet.{" "}
-                <button
-                  onClick={() => navigate("/artifacts/new")}
-                  className="font-semibold transition-opacity hover:opacity-70"
-                  style={{ color: "var(--accent)" }}
-                >
-                  Create one →
-                </button>
-              </p>
-            </div>
-          ) : (
-            <ul className="flex flex-col">
-              {sortedArtifacts.slice(0, 6).map((d) => (
-                <ArtifactRow
-                  key={d.id}
-                  d={d}
-                  onView={() => navigate(`/artifacts/${d.id}`)}
-                />
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Connections & Quick Actions */}
-        <div className="flex flex-col gap-6">
-
-          {/* Active connections */}
-          <div
-            className="rounded-2xl p-6"
-            style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-semibold" style={{ color: "var(--text-h)" }}>
-                Active Connections
-              </h2>
+        <div className="relative grid items-start gap-4 lg:grid-cols-[1fr_300px]">
+          {/* ── The board ────────────────────────────────────────────── */}
+          <Panel
+            label="Recent artifacts"
+            flush
+            bodyClassName="flex flex-col"
+            action={
               <button
-                onClick={() => navigate("/connections")}
-                className="flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-70"
-                style={{ color: "var(--accent)" }}
+                type="button"
+                onClick={() => navigate("/artifacts")}
+                className=" text-[11px] transition-colors hover:text-[var(--accent)]"
+                style={{ color: "var(--text-2)" }}
               >
-                Manage <FaArrowRight size={10} />
+                View all <FaArrowRight size={9} className="inline" />
               </button>
-            </div>
+            }
+          >
+            <BoardHead cols={COLS} colsNarrow={COLS_NARROW}>
+              <span className="label">Updated</span>
+              <span className="label">Artifact</span>
+              <span className="label col-secondary">Model</span>
+              <span className="label col-secondary text-right">Ver</span>
+              <span className="label text-right">Status</span>
+            </BoardHead>
 
             {loading ? (
-              <div className="flex flex-col gap-2">
-                {[1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+              <div className="flex items-center justify-center gap-3 py-16" style={{ color: "var(--text-3)" }}>
+                <CSpinner size={18} />
+                <span className=" text-[12px]">Loading…</span>
               </div>
-            ) : !connections || connections.length === 0 ? (
-              <p className="text-sm" style={{ color: "var(--text)" }}>
-                No connections configured.{" "}
-                <button
-                  onClick={() => navigate("/connections")}
-                  className="font-semibold transition-opacity hover:opacity-70"
-                  style={{ color: "var(--accent)" }}
-                >
-                  Add one →
-                </button>
-              </p>
+            ) : recent.length === 0 ? (
+              <EmptyBoard
+                line="No artifacts yet"
+                hint="Describe an analysis and Chester writes the page — charts, narrative and filters — from your semantic model."
+                action={
+                  <CButton variant="primary" onClick={() => navigate("/artifacts/new")}>
+                    <FaPlus size={10} /> Create your first artifact
+                  </CButton>
+                }
+              />
             ) : (
-              <div>
-                {connections.slice(0, 4).map((c) => (
-                  <ConnectionRow key={c.id} conn={c} />
-                ))}
-                {connections.length > 4 && (
-                  <p className="mt-2 text-xs" style={{ color: "var(--text)" }}>
-                    +{connections.length - 4} more
-                  </p>
-                )}
-              </div>
+              recent.map((a) => (
+                <BoardRow key={a.id} cols={COLS} colsNarrow={COLS_NARROW} onClick={() => navigate(`/artifacts/${a.id}`)}>
+                  <span className="mono text-[13px]" style={{ color: "var(--text)" }}>
+                    {departureTime(a.updated_at)}
+                  </span>
+                  <span className="font-medium truncate text-[14px]">
+                    <Flap>{a.name}</Flap>
+                  </span>
+                  <span className=" col-secondary truncate text-[11px]" style={{ color: "var(--text-3)" }}>
+                    {a.llm_model}
+                  </span>
+                  <span className="mono col-secondary text-right text-[13px]" style={{ color: "var(--text-3)" }}>
+                    v{a.current_version}
+                  </span>
+                  <span className="flex justify-end">
+                    <Status signal="ok">Ready</Status>
+                  </span>
+                </BoardRow>
+              ))
             )}
-          </div>
+            {!loading && recent.length > 0 && <BoardFill />}
+          </Panel>
 
-          {/* Quick actions */}
-          <div
-            className="rounded-2xl p-6"
-            style={{ background: "var(--bg-subtle)", border: "1px solid var(--border)", boxShadow: "var(--shadow-sm)" }}
-          >
-            <h2 className="mb-4 font-semibold" style={{ color: "var(--text-h)" }}>
-              Quick Actions
-            </h2>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { label: "New Artifact",    icon: <MdAutoAwesome size={16} />, href: "/artifacts/new" },
-                { label: "New Connection",  icon: <MdOutlineCloud size={16} />, href: "/connections" },
-                { label: "Browse Models", icon: <GoPackage size={15} />,      href: "/models" },
-                { label: "Manage Users",    icon: <FaUser size={14} />,         href: "/users" },
-              ].map((a) => (
-                <button
-                  key={a.label}
-                  onClick={() => navigate(a.href)}
-                  className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors"
-                  style={{ border: "1px solid var(--border)", color: "var(--text-h)" }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "var(--accent-ring)";
-                    e.currentTarget.style.background = "var(--accent-muted)";
-                    e.currentTarget.style.color = "var(--accent)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "var(--border)";
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "var(--text-h)";
-                  }}
-                >
-                  <span style={{ color: "var(--accent)" }}>{a.icon}</span>
-                  {a.label}
-                </button>
-              ))}
-            </div>
+          {/* ── Right rail ───────────────────────────────────────────── */}
+          <div className="flex flex-col gap-4">
+            <Panel label="Setup" flush bodyClassName="flex flex-col">
+              <PipelineStage
+                n="01"
+                label="Connections"
+                count={connections?.length ?? null}
+                done={Boolean(connections?.length)}
+                icon={<MdOutlineCloud size={15} />}
+                onClick={() => navigate("/connections")}
+              />
+              <PipelineStage
+                n="02"
+                label="Models"
+                count={modelCount}
+                done={Boolean(modelCount)}
+                icon={<GoPackage size={14} />}
+                onClick={() => navigate("/models")}
+              />
+              <PipelineStage
+                n="03"
+                label="Artifacts"
+                count={artifacts?.length ?? null}
+                done={Boolean(artifacts?.length)}
+                icon={<MdAutoAwesome size={15} />}
+                onClick={() => navigate("/artifacts")}
+              />
+            </Panel>
+
+            <Panel label="Workspace">
+              <div className="grid grid-cols-2 gap-2">
+                <Readout value={artifacts?.length ?? 0} label="Artifacts" />
+                <Readout value={userCount ?? 0} label="Team members" />
+              </div>
+            </Panel>
+
+            <Panel label="Quick actions">
+              <div className="flex flex-col gap-2.5">
+                {[
+                  { label: "New artifact", to: "/artifacts/new" },
+                  { label: "Add connection", to: "/connections" },
+                  { label: "Edit models", to: "/models" },
+                  { label: "AI Providers", to: "/settings/ai-providers" },
+                ].map((a) => (
+                  <button
+                    key={a.to}
+                    type="button"
+                    onClick={() => navigate(a.to)}
+                    className=" flex items-center justify-between border px-3 py-2 text-[11px] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    style={{ borderColor: "var(--border)", color: "var(--text-2)" }}
+                  >
+                    {a.label}
+                    <FaArrowRight size={8} />
+                  </button>
+                ))}
+              </div>
+            </Panel>
           </div>
         </div>
       </div>

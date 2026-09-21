@@ -139,8 +139,26 @@ larger and change. Always read `window.CHESTER.data`. Guard for an empty array.
 - Filters: working HTML controls (selects, date inputs, search boxes) that re-filter the
   arrays in JS and re-render the charts and the narrative. They must actually work.
 - Make it good-looking and responsive: a title, a summary line, a KPI row, a chart grid
-  that collapses to one column under 700px. Use only these colors: {palette}. Text color
-  "{text_color}". Light background.
+  that collapses to one column under 700px.
+
+## House style — the page is embedded in the Chester BI app, so it must match it
+
+- Background #fbfbfa. Cards and panels: #ffffff, 1px solid #e7e6e2, border-radius 12px,
+  box-shadow 0 1px 2px rgba(23,22,20,0.05). Never a coloured card background.
+- Text: #171614 for headings and figures, #5f5d57 for body, #716e68 for labels. Headings
+  use letter-spacing -0.021em and font-weight 600. Never pure black, never pure grey.
+- Font stack, on every element including inputs and buttons:
+  font-family: "Geist Sans", ui-sans-serif, system-ui, -apple-system, sans-serif.
+  Use tabular figures for every number: font-variant-numeric: tabular-nums.
+- Series colours, in this order: {palette}. Do not introduce any other hue.
+- Style every filter control yourself — a bare browser <select> or date input breaks the
+  page. Give them: appearance:none, background #ffffff, 1px solid #d6d4ce, radius 6px,
+  padding 6px 10px, font-size 13.5px, and a custom caret. Labels above them at 11px
+  #716e68. A date range is two text inputs with placeholder YYYY-MM-DD, not
+  <input type="date">.
+- Buttons: primary is background #171614 with #ffffff text, radius 6px, 13px, weight 500.
+  Secondary is white with a #d6d4ce border. No coloured buttons.
+- Spacing: 24px page padding, 16px between cards, 12px inside them.
 
 ## Output contract
 

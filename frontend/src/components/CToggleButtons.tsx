@@ -28,13 +28,13 @@ function renderIcon(icon: React.ReactNode | IconType, size: number) {
 
 const sizeStyles = {
   sm: {
-    track: "gap-0.5 rounded-xl p-0.5",
-    button: "gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium",
+    track: "gap-0.5 rounded-[var(--r-sm)] p-0.5",
+    button: "gap-1.5 rounded-[var(--r-sm)] px-3 py-1.5 text-xs font-medium",
     icon: 11,
   },
   md: {
-    track: "gap-1 rounded-xl p-1",
-    button: "gap-2 rounded-lg px-3.5 py-2.5 text-sm font-semibold",
+    track: "gap-1 rounded-[var(--r-sm)] p-1",
+    button: "gap-2 rounded-[var(--r-sm)] px-3.5 py-2.5 text-sm font-semibold",
     icon: 13,
   },
 } as const;
@@ -53,12 +53,12 @@ export default function CToggleButtons({
   return (
     <div className={`flex flex-col gap-1.5 ${fullWidth ? "w-full" : "w-auto"} ${className}`}>
       {label && (
-        <span className="text-sm font-medium text-[var(--text-h)]">{label}</span>
+        <span className="text-sm font-medium text-[var(--text)]">{label}</span>
       )}
 
       <div
         className={`
-          inline-flex items-center border border-[var(--border)] bg-[var(--bg-subtle)]
+          inline-flex items-center border border-[var(--border)] bg-[var(--surface-2)]
           ${fullWidth ? "flex w-full" : "w-auto"}
           ${styles.track}
         `}
@@ -78,13 +78,13 @@ export default function CToggleButtons({
               className={`
                 inline-flex flex-1 items-center justify-center
                 outline-none transition-all duration-150
-                focus-visible:ring-2 focus-visible:ring-[var(--accent-ring)]
+                focus-visible:ring-2 focus-visible:ring-[var(--accent-line)]
                 disabled:cursor-not-allowed disabled:opacity-50
                 ${styles.button}
                 ${
                   isSelected
-                    ? "bg-[var(--accent)] text-[var(--accent-fg)] shadow-sm active:scale-95"
-                    : "bg-transparent text-[var(--text)] hover:bg-[var(--bg)] hover:text-[var(--text-h)] active:scale-[0.98]"
+                    ? "bg-[var(--surface)] text-[var(--text)] shadow-[var(--shadow-1)] shadow-sm active:scale-95"
+                    : "bg-transparent text-[var(--text-2)] hover:bg-[var(--surface)] hover:text-[var(--text)] active:scale-[0.98]"
                 }
               `}
             >

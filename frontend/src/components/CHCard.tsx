@@ -1,3 +1,5 @@
+import { Lamp, type Signal } from "./Board";
+
 interface CHCardProps {
   title: string;
   subtitle?: string;
@@ -13,12 +15,22 @@ interface CHCardProps {
   className?: string;
 }
 
-const badgeStyles: Record<string, string> = {
-  green:  "bg-green-100  text-green-700  dark:bg-green-900/40  dark:text-green-400",
-  red:    "bg-red-100    text-red-700    dark:bg-red-900/40    dark:text-red-400",
-  yellow: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
-  gray:   "bg-stone-100  text-stone-600  dark:bg-stone-800     dark:text-stone-400",
-  blue:   "bg-blue-100   text-blue-700   dark:bg-blue-900/40   dark:text-blue-400",
+/* Was a card in a grid; now a row on the board. Same props, so every page
+   that lists things gets the board grammar without changing its logic.
+   Columns: reference · name · type · state. They never move. */
+const SIGNAL: Record<string, Signal> = {
+  green: "ok",
+  red: "fail",
+  yellow: "live",
+  blue: "idle",
+  gray: "idle",
+};
+
+const SIGNAL_INK: Record<Signal, string> = {
+  ok: "var(--ok)",
+  fail: "var(--danger)",
+  live: "var(--accent)",
+  idle: "var(--text-3)",
 };
 
 export default function CHCard({
@@ -26,83 +38,64 @@ export default function CHCard({
   subtitle,
   meta,
   initials,
-  avatarBg = "var(--accent-muted)",
   badge,
   isSelected = false,
   onClick,
   className = "",
 }: CHCardProps) {
+  const signal: Signal = badge ? SIGNAL[badge.variant] ?? "idle" : "idle";
   return (
     <div
-      onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
-      onKeyDown={(e) => e.key === "Enter" && onClick?.()}
-      className={`flex items-center gap-4 rounded-2xl p-4 transition-all ${
-        onClick ? "cursor-pointer" : ""
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className={`settle-row list-grid grid items-center gap-4 px-4 py-3 transition-colors ${
+        onClick ? "cursor-pointer hover:bg-[var(--surface-2)]" : ""
       } ${className}`}
       style={{
-        background: isSelected ? "var(--accent-muted)" : "var(--bg-subtle)",
-        border: isSelected
-          ? "1px solid var(--accent-ring)"
-          : "1px solid var(--border)",
-        boxShadow: "var(--shadow-sm)",
-      }}
-      onMouseEnter={(e) => {
-        if (!isSelected) {
-          e.currentTarget.style.borderColor = "var(--accent-ring)";
-          e.currentTarget.style.boxShadow = "var(--shadow-md)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isSelected) {
-          e.currentTarget.style.borderColor = "var(--border)";
-          e.currentTarget.style.boxShadow = "var(--shadow-sm)";
-        }
+        ["--cols" as string]: "44px minmax(0,1fr) 150px 120px",
+        ["--cols-narrow" as string]: "36px minmax(0,1fr) 100px",
+        borderBottom: "1px solid var(--border)",
+        background: isSelected ? "var(--surface-2)" : undefined,
+        boxShadow: isSelected ? "inset 2px 0 0 var(--accent)" : undefined,
       }}
     >
-      {/* Avatar */}
-      <div
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-sm font-bold"
-        style={{
-          background: avatarBg,
-          color: "var(--accent)",
-          border: "1px solid var(--accent-ring)",
-        }}
+      <span
+        className="flex h-7 w-7 items-center justify-center text-[11px] font-medium"
+        style={{ background: "var(--surface-2)", color: "var(--text-2)", borderRadius: "var(--r-sm)" }}
       >
         {initials}
-      </div>
+      </span>
 
-      {/* Text */}
-      <div className="min-w-0 flex-1">
-        <p
-          className="truncate text-sm font-semibold"
-          style={{ color: "var(--text-h)" }}
-        >
-          {title}
-        </p>
+      <span className="min-w-0">
+        <span className="block truncate text-[13.5px] font-medium leading-tight" style={{ color: "var(--text)" }}>{title}</span>
         {subtitle && (
-          <p className="truncate text-xs" style={{ color: "var(--text)" }}>
+          <span className="mt-0.5 block truncate text-[12px] leading-tight" style={{ color: "var(--text-3)" }}>
             {subtitle}
-          </p>
+          </span>
         )}
-        {meta && (
-          <p className="mt-0.5 truncate text-xs" style={{ color: "var(--text)" }}>
-            {meta}
-          </p>
-        )}
-      </div>
+      </span>
 
-      {/* Badge */}
-      {badge && (
-        <span
-          className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-            badgeStyles[badge.variant]
-          }`}
-        >
-          {badge.label}
-        </span>
-      )}
+      <span className="col-secondary truncate text-[12.5px]" style={{ color: "var(--text-3)" }}>
+        {meta ?? ""}
+      </span>
+
+      <span className="flex items-center justify-end gap-2">
+        {badge && (
+          <>
+            <Lamp signal={signal} />
+            <span className="text-[12.5px]" style={{ color: SIGNAL_INK[signal] }}>
+              {badge.label}
+            </span>
+          </>
+        )}
+      </span>
     </div>
   );
 }

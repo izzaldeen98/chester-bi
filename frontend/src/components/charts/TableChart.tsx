@@ -119,7 +119,7 @@ export default function TableChart({
   }
 
   const titleFontSize = title?.valueFontSize ?? 14;
-  const titleColor = title?.valueFontColor ?? "var(--text-h)";
+  const titleColor = title?.valueFontColor ?? "var(--text)";
 
   if (data.length === 0 || cols.length === 0) {
     return (
@@ -129,7 +129,7 @@ export default function TableChart({
             {title.value}
           </p>
         )}
-        <p className="text-xs" style={{ color: "var(--text)" }}>
+        <p className="text-xs" style={{ color: "var(--text-2)" }}>
           {cols.length === 0 ? "Configure columns and run query" : "No data"}
         </p>
       </div>
@@ -152,11 +152,11 @@ export default function TableChart({
       <div className="min-h-0 flex-1 overflow-auto pointer-events-auto">
         <table className="w-full border-collapse text-xs" style={{ tableLayout: "auto" }}>
           <thead>
-            <tr style={{ background: "var(--bg-subtle)", borderBottom: "2px solid var(--border)" }}>
+            <tr style={{ background: "var(--surface-2)", borderBottom: "2px solid var(--border)" }}>
               {doShowIndex && (
                 <th
                   className="px-3 py-2 text-left font-semibold select-none"
-                  style={{ color: "var(--text)", whiteSpace: "nowrap", width: 40 }}
+                  style={{ color: "var(--text-2)", whiteSpace: "nowrap", width: 40 }}
                 >
                   #
                 </th>
@@ -167,7 +167,7 @@ export default function TableChart({
                   <th
                     key={col}
                     className="px-3 py-2 text-left font-semibold cursor-pointer select-none transition-colors hover:brightness-95"
-                    style={{ color: active ? "var(--accent)" : "var(--text)", whiteSpace: "nowrap" }}
+                    style={{ color: active ? "var(--accent)" : "var(--text-2)", whiteSpace: "nowrap" }}
                     onClick={() => handleSort(col)}
                   >
                     <span className="flex items-center gap-1">
@@ -196,21 +196,21 @@ export default function TableChart({
                   key={globalIdx}
                   className="transition-colors"
                   style={{
-                    background: isStriped && !isEven ? "var(--bg-subtle)" : "var(--bg)",
+                    background: isStriped && !isEven ? "var(--surface-2)" : "var(--surface)",
                     borderBottom: "1px solid var(--border)",
                   }}
                   onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.background = "var(--accent-muted)";
+                    (e.currentTarget as HTMLElement).style.background = "var(--accent-soft)";
                   }}
                   onMouseLeave={(e) => {
                     (e.currentTarget as HTMLElement).style.background =
-                      isStriped && !isEven ? "var(--bg-subtle)" : "var(--bg)";
+                      isStriped && !isEven ? "var(--surface-2)" : "var(--surface)";
                   }}
                 >
                   {doShowIndex && (
                     <td
                       className="px-3 py-2 tabular-nums"
-                      style={{ color: "var(--text)", borderRight: "1px solid var(--border)" }}
+                      style={{ color: "var(--text-2)", borderRight: "1px solid var(--border)" }}
                     >
                       {globalIdx + 1}
                     </td>
@@ -223,7 +223,7 @@ export default function TableChart({
                         key={col}
                         className="px-3 py-2 tabular-nums"
                         style={{
-                          color: "var(--text-h)",
+                          color: "var(--text)",
                           textAlign: isNum ? "right" : "left",
                           maxWidth: 240,
                           overflow: "hidden",
@@ -245,9 +245,9 @@ export default function TableChart({
       {totalPages > 1 && (
         <div
           className="flex shrink-0 items-center justify-between gap-2 border-t px-3 py-1.5"
-          style={{ borderColor: "var(--border)", background: "var(--bg-subtle)" }}
+          style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}
         >
-          <span className="text-[11px]" style={{ color: "var(--text)" }}>
+          <span className="text-[11px]" style={{ color: "var(--text-2)" }}>
             {safePage * rowsPerPage + 1}–{Math.min(safePage * rowsPerPage + rowsPerPage, sorted.length)} of {sorted.length}
           </span>
           <div className="flex items-center gap-1">
@@ -256,11 +256,11 @@ export default function TableChart({
               disabled={safePage === 0}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               className="rounded px-2 py-0.5 text-[11px] font-medium transition-colors disabled:opacity-40"
-              style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text-h)" }}
+              style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}
             >
               ‹ Prev
             </button>
-            <span className="text-[11px]" style={{ color: "var(--text)" }}>
+            <span className="text-[11px]" style={{ color: "var(--text-2)" }}>
               {safePage + 1} / {totalPages}
             </span>
             <button
@@ -268,7 +268,7 @@ export default function TableChart({
               disabled={safePage >= totalPages - 1}
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               className="rounded px-2 py-0.5 text-[11px] font-medium transition-colors disabled:opacity-40"
-              style={{ background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text-h)" }}
+              style={{ background: "var(--surface)", border: "1px solid var(--border)", color: "var(--text)" }}
             >
               Next ›
             </button>
