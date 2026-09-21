@@ -52,3 +52,27 @@
 *, *::before, *::after { box-sizing: border-box; }
 body  { margin: 0; background: var(--bg); color: var(--text); }
 #root { min-height: 100svh; display: flex; flex-direction: column; }
+
+/* ── Landing: the pipeline draws ──────────────────────────────
+   One authored moment on the whole page: a rail that draws down
+   the ask → query → page sequence as it scrolls, so the section
+   performs the flow it describes.
+
+   The rail is decoration, never content — the stages themselves
+   are always visible, with or without animation. Progressive
+   enhancement, no JS; reduced motion leaves the rail fully drawn. */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .pipeline-rail {
+      transform-origin: top;
+      animation: pipeline-draw linear both;
+      animation-timeline: view();
+      animation-range: entry 15% cover 55%;
+    }
+  }
+}
+
+@keyframes pipeline-draw {
+  from { transform: scaleY(0);   opacity: 0.25; }
+  to   { transform: scaleY(1);   opacity: 1;    }
+}

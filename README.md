@@ -4,7 +4,7 @@
 
 <img src="assets/logo.svg" alt="Chester BI logo" width="88" />
 
-**Self-hosted, open-source Business Intelligence platform**
+**Self-hosted, open-source BI — describe the analysis, and the AI writes the page**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.11-blue?logo=python&logoColor=white)](https://www.python.org/)
@@ -38,20 +38,41 @@
 
 ## What is Chester BI?
 
-Chester BI is a fully self-hosted business intelligence platform you run on your **own infrastructure**. Connect your databases, model them as [Cube](https://cube.dev/) semantic cubes, build interactive drag-and-drop dashboards, and share insights with your team — with zero vendor lock-in and no data leaving your servers.
+Chester BI is a fully self-hosted business intelligence platform you run on your **own
+infrastructure**. Connect your databases, model them as [Cube](https://cube.dev/) semantic
+cubes, and then **describe the analysis you want in plain language**. An AI agent reads
+your semantic model, writes the queries, and generates a complete page — charts, written
+analysis, and working filters — that re-queries live data every time you open it.
 
-> Built on FastAPI, React, PostgreSQL, Redis, and the Cube Core query engine.
+> No dashboard canvas. No chart configuration. A semantic model and a sentence.
+
+**The semantic layer is the guardrail.** The LLM is handed your compiled Cube schema and
+nothing else — no rows, no connection string, no SQL. Every query it writes is validated
+against that live schema before it is allowed to run, so a hallucinated field or a measure
+used as a dimension is rejected and sent back rather than executed.
+
+Bring your own LLM key (OpenAI, Anthropic, Gemini, DeepSeek, or Qwen). Nothing leaves your
+servers except the prompt and your schema.
 
 ---
 
 ## Features
 
-- **Connections** — connect to your databases (PostgreSQL, MySQL, Snowflake, BigQuery) or upload CSV files directly
-- **Model Editor** — define Cube semantic models with a visual, form-based builder or edit the underlying YAML directly, side by side
-- **Dataset Builder** — a drag-and-drop query builder with dimension/measure pickers, filters, and live Table, JSON, Cube query, and generated SQL previews
-- **Dashboards** — assemble KPI tiles, charts, and tables on a drag-and-drop canvas, backed by saved datasets
-- **Cross-filtering** — configure a single filter, map it to model fields, and apply it across one or many charts at once
-- **Access Control** — per-user permissions across connections, models, datasets, and dashboards
+- **AI Artifacts** — describe an analysis; the agent writes a self-contained page with
+  charts, computed narrative and working filter controls
+- **Validated queries** — every Cube query the model writes is checked against the live
+  schema (real measures, real dimensions, real operators) before execution
+- **Always live** — the saved page stores no data; its queries run again on every open
+- **Versioned by prompt** — each change request creates a new version you can view,
+  compare and restore, with token usage recorded per version
+- **Bring your own model** — OpenAI, Anthropic Claude, Google Gemini, DeepSeek and Qwen,
+  with API keys encrypted at rest and never returned to the browser
+- **Connections** — PostgreSQL, MySQL, BigQuery, Snowflake, or uploaded CSV/Parquet files
+- **Model Editor** — define Cube semantic models in a visual, form-based builder or edit
+  the underlying YAML directly, side by side
+- **Sandboxed by design** — generated pages run in an isolated iframe with no access to
+  your session, storage or API
+- **Access Control** — per-user permissions across connections, models and artifacts
 
 ---
 
@@ -59,27 +80,21 @@ Chester BI is a fully self-hosted business intelligence platform you run on your
 
 <div align="center">
 
-<img src="assets/Dashobards.png" alt="Interactive dashboard with KPI tiles, line charts, bar charts, and a data table, filtered by date range and country" width="900" />
+<img src="assets/artifact-workspace.png" alt="An AI-generated artifact page showing a written summary, eleven filter controls, five KPI tiles and bar charts by segment, gender and age group, with the prompt history panel floating over it showing versions v1 and v2" width="900" />
 
-_Dashboards — KPI tiles, charts, and tables wired together with shared date/dimension filters_
-
-<br/>
-
-<img src="assets/Dataset%20Builder.png" alt="Dataset Builder showing the dimension and measure picker, filters, and a results table with Table, JSON, Cube, and SQL view tabs" width="900" />
-
-_Dataset Builder — pick dimensions and measures, filter results, and preview the Table, JSON, Cube query, and generated SQL side by side_
+_An artifact — narrative, filters, KPIs and charts the agent chose, with the prompt history floating over it. Every prompt saves a version._
 
 <br/>
 
-<img src="assets/Model%20builder.png" alt="Model Editor visual builder showing a cube's primary key, dimensions, and measures configured from an uploaded CSV file" width="900" />
+<img src="assets/artifact-new.png" alt="The new artifact composer: a large prompt field with model, data model and theme pickers beneath it" width="900" />
 
-_Model Editor — define cubes, dimensions, and measures visually, or edit the generated Cube YAML directly_
+_Creating one — describe the analysis, pick the semantic model to read and the LLM to use._
 
 <br/>
 
-<img src="assets/screenshot-dashboard-filter-browser.png" alt="Configure Filter dialog for mapping a dashboard filter to model fields and choosing which charts it affects" width="900" />
+<img src="assets/artifacts-index.png" alt="The artifacts index listing saved artifacts with their current version and last-updated date" width="900" />
 
-_Cross-filtering — map a filter to compatible model fields and choose exactly which charts it targets_
+_Saved artifacts, each at its current version._
 
 </div>
 
@@ -91,15 +106,16 @@ _Cross-filtering — map a filter to compatible model fields and choose exactly 
 - **[FastAPI](https://fastapi.tiangolo.com/)** + **Uvicorn** — async Python API
 - **SQLAlchemy 2** + **PostgreSQL 16** — relational data store
 - **[Cube Core](https://github.com/cube-js/cube)** — semantic query engine
-- **Redis 7** — query result caching
+- **Redis 7** — query result and schema-context caching
+- **OpenAI · Anthropic · Gemini · DeepSeek · Qwen** — pluggable LLM providers over plain
+  REST, one adapter each
 - **JWT + Bcrypt** — authentication & password hashing
 - **Fernet** — encryption for stored connection credentials
 - **boto3** — optional AWS S3 file storage
 
 ### Frontend
 - **React 18** + **TypeScript** + **Vite**
-- **React Grid Layout** — drag-and-drop dashboard canvas
-- **ECharts / echarts-for-react** — charting library
+- **ECharts** — charting, both in the app and inside generated artifact pages
 - **Tailwind CSS** — utility-first styling
 - **React Router v6** — client-side routing
 - **Nginx** — production static file server + reverse proxy
@@ -153,6 +169,10 @@ This spins up five containers:
 ### 4. Create your account
 Open [http://localhost:3000](http://localhost:3000) and click **Get Started** to register your organisation owner account.
 
+### 5. Add an LLM provider
+Go to **AI Providers**, add a provider with your own API key, and pick the model to use.
+Then: **Connections** → **Models** → **Artifacts**, and describe what you want to know.
+
 ---
 
 ## Local Development (without Docker)
@@ -205,6 +225,9 @@ Copy `.example.env` → `.env`. The full annotated reference is in that file. Ke
 | `REDIS_HOST` | No | Redis host (default: `host.docker.internal`) |
 | `REDIS_PORT` | No | Redis port (default: `6379`) |
 | `REDIS_CACHE_TTL` | No | Cache TTL in seconds (default: `1800`) |
+| `LLM_TIMEOUT` | No | Seconds to wait for an LLM response (default: `600`). Writing a whole page on a reasoning model takes minutes |
+| `LLM_LIST_TIMEOUT` | No | Seconds to wait when listing a provider's models (default: `30`) |
+| `ARTIFACT_CHART_CDN` | No | Chart library URL generated pages load; point at a self-hosted copy for air-gapped installs |
 | `POSTGRES_USER` | No | DB username (default: `bi_admin`) |
 | `POSTGRES_PASSWORD` | No | DB password (default: `changeme`) |
 | `POSTGRES_DB` | No | DB name (default: `bi_db`) |
@@ -216,11 +239,12 @@ Copy `.example.env` → `.env`. The full annotated reference is in that file. Ke
 ```
 chester-bi/
 ├── backend/                  # FastAPI application
+│   ├── ai/                    # LLM adapters, artifact agent, query validation
 │   ├── models/               # SQLAlchemy ORM models
 │   ├── routes/                # API route handlers
 │   ├── schema/                # Pydantic request/response schemas
 │   ├── utils/                 # Storage, config, Redis, Cube helpers
-│   ├── security.py           # JWT, hashing, encryption
+│   ├── security/              # JWT, hashing, encryption
 │   ├── main.py                # Application entry point
 │   ├── requirements.txt      # Python dependencies
 │   └── Dockerfile
@@ -280,7 +304,6 @@ Chester BI uses **Cube Core** under its own license. See [`LICENSES/LICENSE-THIR
 
 - [Cube](https://cube.dev/) — the semantic query engine powering Chester BI's query layer
 - [FastAPI](https://fastapi.tiangolo.com/) — the backend framework
-- [React Grid Layout](https://github.com/react-grid-layout/react-grid-layout) — dashboard drag-and-drop
 - [ECharts](https://echarts.apache.org/) — charting library
 
 ---
