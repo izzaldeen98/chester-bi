@@ -439,8 +439,16 @@ def refine(db: Session, user: User, provider_row, model: str, current_spec: dict
 
 
 _ASSETS = pathlib.Path(__file__).resolve().parent
-RUNTIME_JS = (_ASSETS / "runtime.js").read_text()
-RUNTIME_CSS = (_ASSETS / "runtime.css").read_text()
+
+
+def _asset(name: str) -> str:
+    """Read a runtime asset at render time, not at import.
+
+    Reading these once at import meant a change to runtime.js only took
+    effect after a process restart — easy to miss, and it silently served a
+    stale runtime. They are a few KB against a Cube round trip, so the read
+    costs nothing worth saving."""
+    return (_ASSETS / name).read_text()
 
 
 def render_page(spec: dict, theme: str, title: str = "Artifact") -> str:
@@ -463,11 +471,11 @@ def render_page(spec: dict, theme: str, title: str = "Artifact") -> str:
         "<!doctype html>\n<html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
         f"<title>{html_lib.escape(title)}</title>"
-        f"<style>{RUNTIME_CSS}</style>"
+        f"<style>{_asset('runtime.css')}</style>"
         f"<script src='{html_lib.escape(CHART_LIB_URL, quote=True)}'></script>"
         f"<script>window.__CHESTER_SPEC__={config};"
         f"window.__CHESTER_THEME__={theme_json};"
         f"window.__CHESTER_LIMITS__={limits_json};</script>"
         f"</head><body>\n{body}\n"
-        f"<script>{RUNTIME_JS}</script>\n</body></html>"
+        f"<script>{_asset('runtime.js')}</script>\n</body></html>"
     )

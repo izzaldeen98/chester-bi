@@ -62,6 +62,7 @@ def main():
     page = render_page(hostile, "chester", "T")
     assert "<img src=x" not in page and "bad()</script>" not in page
 
+    check_number_formatting()
     check_cube_name_parsing()
     check_row_packing()
     check_scope_never_falls_open()
@@ -70,6 +71,49 @@ def main():
     check_spec_validation()
     check_effective_query()
     print("artifact: all checks passed")
+
+
+def check_number_formatting():
+    """Every number and date the page prints goes through the runtime's
+    formatter. A warehouse measure arrives as a full float
+    (205657.07999999996) and a time dimension as an ISO timestamp; neither
+    may reach the page raw, on an axis, in a tooltip, a table cell or a KPI.
+
+    Exercised against the shipped runtime.js so the assertions track the file
+    the page actually loads."""
+    import pathlib
+    import re as _re
+    import subprocess
+
+    js = (pathlib.Path(__file__).resolve().parent / "runtime.js").read_text()
+    body = js[js.index("var fmt = {"):js.index("var BASE = {")]
+    probe = body + """
+    var cases = [
+      [format(205657.07999999996), "205,657"],
+      [format(9136680.179999989, "currency"), "$9,136,680"],
+      [format(36.241), "36"],
+      [format(0.4567, "percent"), "45.7%"],
+      [format(3896063.4599999, "decimal"), "3,896,063.46"],
+      [format(0.333333), "0.33"],
+      [format(null), "\u2014"],
+      [format(""), "\u2014"],
+      [format("text"), "text"],
+      [label("2025-01-01T00:00:00.000"), "Jan 2025"],
+      [label("ABC Corp"), "ABC Corp"]
+    ];
+    var bad = cases.filter(function (c) { return c[0] !== c[1]; });
+    console.log(bad.length ? "MISMATCH " + JSON.stringify(bad) : "ok");
+    """
+    out = subprocess.run(["node", "-e", probe], capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr[:400]
+    assert out.stdout.strip() == "ok", out.stdout
+
+    # No NUMBER path may fall through to a bare toLocaleString: it allows
+    # three decimal places, which is how the raw floats got out. Date calls
+    # legitimately carry no fraction digits, so they are excluded by shape.
+    for hit in _re.findall(r"toLocaleString\(([^)]*)\)", js):
+        is_date = any(k in hit for k in ("month:", "day:", "hour:", "year:"))
+        assert is_date or "FractionDigits" in hit, f"unbounded toLocaleString: {hit!r}"
 
 
 def check_cube_name_parsing():

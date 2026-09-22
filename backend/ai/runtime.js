@@ -61,13 +61,49 @@
     s.className = "cb-state" + (isError ? " cb-state-error" : "");
   }
 
+  /* Every number the page shows is rounded here. A measure comes back from
+     the warehouse as a full float (9136680.179999989); nothing downstream —
+     axis, tooltip, table cell or KPI — may print it raw. */
   var fmt = {
-    currency: function (n) { return n == null ? "—" : Number(n).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 }); },
-    percent:  function (n) { return n == null ? "—" : (Number(n) * 100).toFixed(1) + "%"; },
-    decimal:  function (n) { return n == null ? "—" : Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 }); },
-    number:   function (n) { return n == null ? "—" : Number(n).toLocaleString(); },
+    currency: function (n) {
+      return n.toLocaleString(undefined, { style: "currency", currency: "USD",
+                                           maximumFractionDigits: 0 });
+    },
+    percent: function (n) { return (n * 100).toFixed(1) + "%"; },
+    decimal: function (n) {
+      return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
+    number: function (n) {
+      // Whole numbers by default; a genuine fraction keeps two places so a
+      // ratio does not collapse to "0".
+      var abs = Math.abs(n);
+      var places = (abs > 0 && abs < 1) ? 2 : 0;
+      return n.toLocaleString(undefined, { minimumFractionDigits: places,
+                                           maximumFractionDigits: places });
+    },
   };
-  function format(v, kind) { return (fmt[kind] || fmt.number)(v); }
+
+  var ISO = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}|$)/;
+
+  /* A category label: dates become readable, everything else is text. The
+     granularity is inferred from the value itself, so a monthly series reads
+     "Jan 2025" and a daily one "1 Jan". */
+  function label(v) {
+    if (typeof v !== "string" || !ISO.test(v)) return String(v == null ? "" : v);
+    var d = new Date(v);
+    if (isNaN(d.getTime())) return v;
+    var midnight = /T00:00:00/.test(v) || v.length === 10;
+    if (!midnight) return d.toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+    if (d.getDate() === 1) return d.toLocaleDateString(undefined, { month: "short", year: "numeric" });
+    return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  function format(v, kind) {
+    if (v == null || v === "") return "—";
+    var n = typeof v === "number" ? v : Number(v);
+    if (!isFinite(n)) return String(v);
+    return (fmt[kind] || fmt.number)(n);
+  }
   function num(v) { var n = typeof v === "number" ? v : parseFloat(v); return isFinite(n) ? n : 0; }
 
   var BASE = {
@@ -104,11 +140,15 @@
     var rotate = rows.length > 8 && longest > 6 ? 35 : 0;
     return Object.assign({}, BASE, {
       color: THEME.colors,
+      tooltip: {
+        trigger: "axis", confine: true,
+        valueFormatter: function (v) { return format(v, c.format); },
+      },
       legend: ys.length > 1 ? { top: 0, icon: "roundRect", itemWidth: 10, itemHeight: 10 } : undefined,
       grid: { left: 8, right: 16, top: 24, bottom: rotate ? 28 : 8, containLabel: true },
       xAxis: {
         type: "category",
-        data: rows.map(function (r) { return r[c.x]; }),
+        data: rows.map(function (r) { return label(r[c.x]); }),
         axisLabel: { hideOverlap: true, rotate: rotate, interval: 0 },
         axisTick: { alignWithLabel: true },
         axisLine: { lineStyle: { color: "#e7e6e2" } },
@@ -132,11 +172,16 @@
   function pieOption(c, rows) {
     return Object.assign({}, BASE, {
       color: THEME.colors,
-      tooltip: { trigger: "item", confine: true },
+      tooltip: {
+        trigger: "item", confine: true,
+        formatter: function (p) {
+          return p.name + "<br/>" + format(p.value, c.format) + " (" + p.percent + "%)";
+        },
+      },
       series: [{
         type: "pie", radius: ["52%", "76%"], itemStyle: { borderRadius: 4, borderColor: "#fff", borderWidth: 2 },
         label: { show: false }, data: rows.map(function (r) {
-          return { name: String(r[c.category]), value: num(r[c.value]) };
+          return { name: label(r[c.category]), value: num(r[c.value]) };
         }),
       }],
     });
@@ -168,7 +213,7 @@
         var v = r[k];
         var isNum = v !== null && v !== "" && isFinite(Number(v));
         return '<td class="' + (isNum ? "cb-num" : "") + '">' +
-          (isNum ? format(Number(v), c.format) : (v == null ? "" : String(v))) + "</td>";
+          (isNum ? format(v, c.format) : (v == null || v === "" ? "—" : label(v))) + "</td>";
       }).join("") + "</tr>";
     }).join("");
     host.innerHTML = "<table><thead><tr>" + head + "</tr></thead><tbody>" + body + "</tbody></table>";
@@ -178,7 +223,7 @@
     var target = slot(c.id, "value");
     if (!target) return;
     var v = rows.length ? rows[0][c.value] : null;
-    target.textContent = v == null ? "—" : format(Number(v), c.format);
+    target.textContent = format(v, c.format);
   }
 
   function draw(c, rows) {
