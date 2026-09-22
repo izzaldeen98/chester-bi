@@ -62,11 +62,38 @@ def main():
     page = render_page(hostile, "chester", "T")
     assert "<img src=x" not in page and "bad()</script>" not in page
 
+    check_cube_name_parsing()
     check_row_packing()
     check_model_isolation()
     check_spec_validation()
     check_effective_query()
     print("artifact: all checks passed")
+
+
+def check_cube_name_parsing():
+    """Which cubes a model owns decides what its artifacts may touch, so this
+    has to read any model an author might write — not only the shape this
+    app's own wizard emits. The previous version required exactly two spaces
+    of indentation, so a hand-written model resolved to no cubes at all and
+    locked its artifacts out."""
+    from utils.cube import extract_cube_names as ex
+
+    assert ex("cubes:\n  - name: loads\n  - name: customers\n") == {"loads", "customers"}
+    assert ex("cubes:\n    - name: orders\n") == {"orders"}, "deeper indentation"
+    assert ex("cubes:\n- name: products\n") == {"products"}, "no indentation"
+    assert ex('cubes:\n  - name: "trips"\n  - name: \'drivers\'\n') == {"trips", "drivers"}
+    assert ex("cubes: [{name: facilities}]\n") == {"facilities"}, "flow style"
+    assert ex("# note\ncubes:\n\n  # fact\n  - name: events\n") == {"events"}, "comments"
+    assert ex("cubes:\n  - name: loads\nviews:\n  - name: rev\n") == {"loads", "rev"}
+    assert ex("cube('web', {});\nview(\"summary\", {});") == {"web", "summary"}, "javascript"
+    assert ex("") == set() and ex("   ") == set()
+
+    # A nested `name:` belongs to a dimension, not a cube.
+    assert ex("cubes:\n  - name: loads\n    dimensions:\n      - name: id\n") == {"loads"}
+
+    # Unparseable input degrades to best effort rather than "no cubes",
+    # which would lock every artifact on that model out of its own data.
+    assert ex("cubes:\n  - name: half\n   bad: [unclosed\n")
 
 
 def check_row_packing():

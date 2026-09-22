@@ -45,3 +45,8 @@ redis==8.0.0
 
 # ── Cube Core query engine client (thin REST calls, see utils/cube.py) ─────
 requests==2.34.2
+
+# ── Semantic model parsing ─────────────────────────────────────────────────
+# Cube definitions are YAML an author writes by hand, so they are parsed as
+# YAML rather than pattern-matched against one expected layout.
+PyYAML==6.0.3

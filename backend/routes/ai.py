@@ -13,7 +13,8 @@ from models.user import User
 from schema.ai import AIProviderCreate, AIProviderResponse, AIProviderUpdate
 from security import check_permissions, decrypt_password, encrypt_password, get_current_user
 from utils.config_files import storage
-from utils.cube import extract_cube_names
+from utils.cube import _definition_version, extract_cube_names
+from utils.redis_handler import cache_query, get_cached_query
 from utils.init_database import get_db
 
 router = APIRouter(prefix="/api/v1/ai", tags=["ai"])
@@ -100,12 +101,36 @@ async def _model_scope(db: Session, user: User, semantic_model_id: UUID | None):
     if not model:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Semantic model not found")
 
+    return model, (await _cube_names_for(user, model) or None)
+
+
+async def _cube_names_for(user: User, model) -> set:
+    """Which cubes a model owns, cached per definition version.
+
+    Resolving this means reading every definition file the model has, and it
+    is needed on every filtered query — so with many models, or many files
+    per model, the uncached version is a lot of storage I/O per interaction.
+    The key carries _definition_version(), which already changes whenever an
+    account's definitions change, so an edit invalidates this for free."""
+    key = f"model_cubes:{user.account.public_key}:{model.public_key}:{_definition_version(user.account.public_key)}"
+    try:
+        hit = get_cached_query(key)
+        if hit is not None:
+            return set(hit["cubes"])
+    except Exception:
+        pass  # no Redis here — resolve from storage every time
+
     cube_names: set[str] = set()
     for definition in model.definitions:
         content = await storage.get_file(definition.file_path, definition.file_name)
         if content:
             cube_names |= extract_cube_names(content.getvalue().decode("utf-8"))
-    return model, (cube_names or None)
+
+    try:
+        cache_query(key, {"cubes": sorted(cube_names)})
+    except Exception:
+        pass
+    return cube_names
 
 
 # ── Providers ──────────────────────────────────────────────────────────────

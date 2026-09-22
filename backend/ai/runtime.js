@@ -80,7 +80,8 @@
   /* A category axis with a hundred bars is unreadable. Keep the largest
      slice and say so — the model chose the query, the runtime owns how it
      is drawn. */
-  var MAX_CATEGORIES = 24;
+  var MAX_CATEGORIES = (window.__CHESTER_LIMITS__ || {}).categories || 24;
+  var MAX_SLICES = (window.__CHESTER_LIMITS__ || {}).slices || 12;
 
   function trim(c, rows, kind) {
     if (rows.length <= MAX_CATEGORIES) return { rows: rows, note: "" };
@@ -146,7 +147,8 @@
     if (!host || !window.echarts) return;
     if (!rows.length) { setState(c.id, "No data for the current filters"); return; }
     var cut = c.type === "pie"
-      ? { rows: rows.slice(0, 12), note: rows.length > 12 ? "Top 12 of " + rows.length : "" }
+      ? { rows: rows.slice(0, MAX_SLICES),
+          note: rows.length > MAX_SLICES ? "Top " + MAX_SLICES + " of " + rows.length : "" }
       : trim(c, rows, c.type);
     var chart = charts[c.id] || (charts[c.id] = echarts.init(host));
     chart.setOption(c.type === "pie" ? pieOption(c, cut.rows) : axisOption(c, cut.rows, c.type), true);

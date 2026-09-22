@@ -5,6 +5,7 @@ Nothing invalid is ever executed or stored: errors go back to the model for a
 bounded number of retries (see ai/artifact.py), and whatever still fails is
 dropped and reported.
 """
+import os
 import re
 
 CUBE_OPERATORS = {
@@ -18,7 +19,8 @@ VALUELESS_OPERATORS = {"set", "notSet"}
 GRANULARITIES = {"second", "minute", "hour", "day", "week", "month", "quarter", "year"}
 # The whole result is embedded in the page, so an unbounded query becomes a
 # multi-megabyte HTML document. Queries are capped, not trusted.
-MAX_LIMIT = 5000
+MAX_LIMIT = int(os.getenv("ARTIFACT_MAX_ROWS", "5000"))
+DEFAULT_QUERY_LIMIT = int(os.getenv("ARTIFACT_DEFAULT_ROWS", "500"))
 QUERY_ID_RE = re.compile(r"^[a-z][a-z0-9_]{1,48}$")
 
 

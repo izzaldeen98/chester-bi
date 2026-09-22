@@ -17,6 +17,7 @@ import time
 
 import jwt
 import requests
+import yaml
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 
@@ -176,20 +177,55 @@ def meta(token: str) -> dict:
     return normalize_meta(response.json())
 
 
-# Matches only top-level `cubes:` list items (2-space indent) — the exact
-# indentation CubeDefinitionWizard.tsx's generateCubeYaml() always emits for
-# a cube name, as opposed to the 6-space indent used by nested dimensions/
-# measures/joins list entries, which also start with "- name:".
-_CUBE_NAME_RE = re.compile(r'^  - name:\s*(.+?)\s*$', re.MULTILINE)
+# Fallback only. The real parse is YAML; this catches a file YAML cannot
+# load (a half-saved edit, a Jinja-templated model) so scoping degrades to
+# "best effort" instead of "this model has no cubes".
+_CUBE_NAME_RE = re.compile(r"^\s*-\s*name:\s*[\"']?([A-Za-z_][\w]*)[\"']?\s*$", re.MULTILINE)
 
 
-def extract_cube_names(yaml_text: str) -> set:
-    """Cube names one definition's .yml file declares. Cube's repositoryFactory
-    (see cube_conf/cube.js) compiles every definition file under an account
-    into one shared namespace, so GET /meta always returns every cube from
-    every definition — this lets a caller filter that account-wide result
-    back down to just the cubes a single definition actually owns."""
-    return {name.strip('"').strip("'") for name in _CUBE_NAME_RE.findall(yaml_text)}
+def _names_from_yaml(text: str) -> set:
+    """Cube names from a properly parsed definition.
+
+    Cube accepts `cubes:` and `views:` at the document root, in either block
+    or flow style, at any indentation, with anchors and comments. Parsing it
+    as YAML is the only way to read every model an author might write; the
+    previous regex only recognised what this app's own wizard emitted."""
+    doc = yaml.safe_load(text)
+    if not isinstance(doc, dict):
+        return set()
+    names = set()
+    for key in ("cubes", "views"):
+        for entry in doc.get(key) or []:
+            if isinstance(entry, dict) and isinstance(entry.get("name"), str):
+                names.add(entry["name"])
+    return names
+
+
+def extract_cube_names(source: str) -> set:
+    """Cube names one definition declares.
+
+    Cube's repositoryFactory (see cube_conf/cube.js) compiles every definition
+    under an account into one shared namespace, so GET /meta always returns
+    every cube from every model. This is what lets a caller narrow that
+    account-wide result to the cubes a single model owns — which is how an
+    artifact is confined to its own semantic model."""
+    if not source or not source.strip():
+        return set()
+
+    # A JavaScript/TypeScript model defines cubes through cube() calls.
+    if "cube(" in source or "view(" in source:
+        return set(re.findall(r"""(?:cube|view)\(\s*[\"'`]([A-Za-z_][\w]*)[\"'`]""", source))
+
+    try:
+        names = _names_from_yaml(source)
+        if names:
+            return names
+    except yaml.YAMLError:
+        pass
+
+    # Unparseable or an unfamiliar shape: recover what we can rather than
+    # reporting a model with no cubes, which would lock its artifacts out.
+    return set(_CUBE_NAME_RE.findall(source))
 
 
 def meta_raw(token: str) -> dict:

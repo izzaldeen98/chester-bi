@@ -31,14 +31,16 @@ from sqlalchemy.orm import Session
 from ai import components
 from ai.adapters import get_adapter
 from ai.grounding import DEFAULT_TEXT_COLOR, PALETTE, cube_grounding
-from ai.validate import MAX_LIMIT, validate_queries
+from ai.validate import DEFAULT_QUERY_LIMIT, MAX_LIMIT, validate_queries
 from models.user import User
 from security import decrypt_password
 from utils.cube import load as cube_load, mint_token
 from utils.redis_handler import cache_query, get_cached_query, redis_client
 
-SAMPLE_ROWS = 5
-MAX_RETRIES = 2
+# Tuning, not policy — every one is configurable, because what suits one
+# deployment's data volume and model count will not suit another's.
+SAMPLE_ROWS = int(os.getenv("ARTIFACT_SAMPLE_ROWS", "5"))
+MAX_RETRIES = int(os.getenv("ARTIFACT_MAX_RETRIES", "2"))
 # Pinned so an artifact renders the same next year. Point at a self-hosted copy
 # for air-gapped installs.
 CHART_LIB_URL = os.getenv(
@@ -64,7 +66,7 @@ You are working against ONE semantic model: **{semantic_model}**.
     {{"id": "lower_snake_case", "label": "what this returns",
       "cube_query": {{"measures": ["Cube.measure"], "dimensions": ["Cube.dimension"],
                      "timeDimensions": [{{"dimension": "Cube.time", "granularity": "month"}}],
-                     "order": {{"Cube.measure": "desc"}}, "limit": 500}}}}
+                     "order": {{"Cube.measure": "desc"}}, "limit": {default_limit}}}}}
   ],
   "filters": [
     {{"id": "region", "label": "Region", "member": "Cube.dimension",
@@ -88,7 +90,8 @@ You are working against ONE semantic model: **{semantic_model}**.
    the reader filters by date themselves.
 4. order may only reference members the query selects. limit is at most {max_limit}.
 5. Only these keys: measures, dimensions, timeDimensions, filters, segments, order,
-   limit, offset, timezone, ungrouped.
+   limit, offset, timezone, ungrouped. A breakdown or detail query should set a limit;
+   {default_limit} is a sensible default.
 
 ## Component rules
 
@@ -340,6 +343,7 @@ def generate(db: Session, user: User, provider_row, model: str, brief: str, them
         semantic_model=(semantic_model.name if semantic_model is not None else "all models"),
         cube_context=cube_context,
         max_limit=MAX_LIMIT,
+        default_limit=DEFAULT_QUERY_LIMIT,
     )
     spec, queries = _spec_turn(db, user, adapter, model, system, f"Brief:\n{brief}", members)
 
@@ -409,6 +413,7 @@ def refine(db: Session, user: User, provider_row, model: str, current_spec: dict
         semantic_model=(semantic_model.name if semantic_model is not None else "all models"),
         cube_context=cube_context,
         max_limit=MAX_LIMIT,
+        default_limit=DEFAULT_QUERY_LIMIT,
     )
 
     spec, new_queries = _spec_turn(
@@ -430,6 +435,10 @@ def render_page(spec: dict, theme: str, title: str = "Artifact") -> str:
     which is what keeps an artifact current when the data moves."""
     body = components.render_body(spec)
     config = components.spec_payload(spec)
+    limits_json = json.dumps({
+        "categories": int(os.getenv("ARTIFACT_MAX_CATEGORIES", "24")),
+        "slices": int(os.getenv("ARTIFACT_MAX_SLICES", "12")),
+    })
     theme_json = json.dumps(
         {"colors": PALETTE.get(theme, PALETTE["chester"]), "text": DEFAULT_TEXT_COLOR}
     ).replace("</", "<\\/")
@@ -441,7 +450,8 @@ def render_page(spec: dict, theme: str, title: str = "Artifact") -> str:
         f"<style>{RUNTIME_CSS}</style>"
         f"<script src='{html_lib.escape(CHART_LIB_URL, quote=True)}'></script>"
         f"<script>window.__CHESTER_SPEC__={config};"
-        f"window.__CHESTER_THEME__={theme_json};</script>"
+        f"window.__CHESTER_THEME__={theme_json};"
+        f"window.__CHESTER_LIMITS__={limits_json};</script>"
         f"</head><body>\n{body}\n"
         f"<script>{RUNTIME_JS}</script>\n</body></html>"
     )
