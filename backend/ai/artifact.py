@@ -69,8 +69,7 @@ You are working against ONE semantic model: **{semantic_model}**.
                      "order": {{"Cube.measure": "desc"}}, "limit": {default_limit}}}}}
   ],
   "filters": [
-    {{"id": "region", "label": "Region", "member": "Cube.dimension",
-      "type": "select|multiselect|date_range|search"}}
+    {{"id": "region", "label": "Region", "member": "Cube.dimension"}}
   ],
   "components": [
     {{"id": "kpi_revenue", "type": "kpi", "query": "totals", "value": "total_revenue",
@@ -109,9 +108,10 @@ You are working against ONE semantic model: **{semantic_model}**.
 
 ## Filter rules
 
+- Give each filter an `id`, a `label` and a `member`. Nothing else.
 - `member` must be a real dimension of this model, fully qualified.
-- `date_range` requires a time dimension. Use `select` for a low-cardinality dimension,
-  `multiselect` when several values are usefully combined, `search` for free text.
+- Do NOT choose a control. A time dimension becomes a date range and every other
+  dimension becomes a multi-select dropdown of its actual values, automatically.
 - Filters apply to EVERY component, re-querying the database — you do not wire them.
 
 ## Judgment

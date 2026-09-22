@@ -266,36 +266,107 @@
       nodes.forEach(function (n) { if (n.value) v[n.getAttribute("data-bound")] = n.value; });
       return (v.from || v.to) ? v : null;
     }
-    var node = nodes[0];
-    if (!node) return null;
-    if (f.type === "multiselect") {
-      return Array.prototype.filter.call(node.options, function (o) { return o.selected && o.value; })
-        .map(function (o) { return o.value; });
-    }
-    return node.value || null;
+    var host = nodes[0];
+    if (!host) return null;
+    var checked = host.querySelectorAll('input[type="checkbox"]:checked');
+    return Array.prototype.map.call(checked, function (n) { return n.value; });
+  }
+
+  /* ── Multi-select dropdown ──────────────────────────────────────────
+     A button that opens a searchable checkbox list. A native
+     <select multiple> is a list box needing ctrl-click, which is not what
+     anyone means by a filter dropdown. */
+  function summarise(host, label) {
+    var checked = host.querySelectorAll('input[type="checkbox"]:checked');
+    var summary = host.querySelector('[data-slot="summary"]');
+    var count = host.querySelector('[data-slot="count"]');
+    if (!checked.length) summary.textContent = "All";
+    else if (checked.length === 1) summary.textContent = checked[0].value;
+    else summary.textContent = checked.length + " selected";
+    summary.classList.toggle("cb-ms-on", checked.length > 0);
+    if (count) count.textContent = checked.length ? checked.length + " selected" : "";
+  }
+
+  function closeAll(except) {
+    document.querySelectorAll(".cb-ms").forEach(function (h) {
+      if (h === except) return;
+      h.querySelector(".cb-ms-panel").hidden = true;
+      h.querySelector(".cb-ms-toggle").setAttribute("aria-expanded", "false");
+    });
+  }
+
+  function wireDropdown(f, host) {
+    var toggle = host.querySelector(".cb-ms-toggle");
+    var panel = host.querySelector(".cb-ms-panel");
+    var search = host.querySelector(".cb-ms-search");
+
+    toggle.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var open = panel.hidden;
+      closeAll(host);
+      panel.hidden = !open;
+      toggle.setAttribute("aria-expanded", String(open));
+      if (open) { search.value = ""; filterOptions(host, ""); search.focus(); }
+    });
+
+    panel.addEventListener("click", function (e) { e.stopPropagation(); });
+    search.addEventListener("input", function () { filterOptions(host, search.value); });
+
+    host.querySelector("[data-ms-clear]").addEventListener("click", function () {
+      host.querySelectorAll('input[type="checkbox"]').forEach(function (n) { n.checked = false; });
+      summarise(host, f.label);
+      apply(f);
+    });
+
+    host.addEventListener("change", function (e) {
+      if (e.target && e.target.type === "checkbox") {
+        summarise(host, f.label);
+        apply(f);
+      }
+    });
+
+    host.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { panel.hidden = true; toggle.setAttribute("aria-expanded", "false"); toggle.focus(); }
+    });
+  }
+
+  function filterOptions(host, term) {
+    var q = term.trim().toLowerCase(), shown = 0;
+    host.querySelectorAll(".cb-ms-option").forEach(function (row) {
+      row.hidden = Boolean(q) && row.textContent.toLowerCase().indexOf(q) === -1;
+      if (!row.hidden) shown++;
+    });
+    var none = host.querySelector('[data-slot="nomatch"]');
+    if (none) none.hidden = shown > 0;
+  }
+
+  function apply(f) {
+    filterState[f.id] = readControl(f);
+    refresh();
   }
 
   function wireFilters() {
     CFG.filters.forEach(function (f) {
       document.querySelectorAll('[data-filter="' + f.id + '"]').forEach(function (node) {
-        var evt = (f.type === "search") ? "input" : "change";
-        var debounce = null;
-        node.addEventListener(evt, function () {
-          clearTimeout(debounce);
-          debounce = setTimeout(function () {
-            filterState[f.id] = readControl(f);
-            refresh();
-          }, f.type === "search" ? 350 : 0);
-        });
+        if (f.type === "date_range") {
+          node.addEventListener("change", function () { apply(f); });
+        } else {
+          wireDropdown(f, node);
+        }
       });
     });
+    document.addEventListener("click", function () { closeAll(null); });
 
     var clear = document.querySelector("[data-clear-all]");
     if (clear) clear.addEventListener("click", function () {
       filterState = {};
       document.querySelectorAll("[data-filter]").forEach(function (n) {
-        if (n.tagName === "SELECT") { Array.prototype.forEach.call(n.options, function (o) { o.selected = false; }); n.value = ""; }
-        else n.value = "";
+        if (n.classList && n.classList.contains("cb-ms")) {
+          n.querySelectorAll('input[type="checkbox"]').forEach(function (c) { c.checked = false; });
+          summarise(n, "");
+        } else if ("value" in n) {
+          n.value = "";
+        }
       });
       refresh();
     });
@@ -305,7 +376,7 @@
      member in the component that reads it. */
   function fillSelects() {
     CFG.filters.forEach(function (f) {
-      if (f.type !== "select" && f.type !== "multiselect") return;
+      if (f.type !== "multiselect") return;
       var field = f.member.split(".").pop();
       var source = CFG.components.filter(function (c) {
         return (c.x === field) || (c.category === field) ||
@@ -319,13 +390,23 @@
           if (v != null && v !== "" && !seen[v]) { seen[v] = 1; values.push(String(v)); }
         });
         values.sort();
-        document.querySelectorAll('[data-filter="' + f.id + '"]').forEach(function (node) {
-          if (node.tagName !== "SELECT") return;
+        document.querySelectorAll('[data-filter="' + f.id + '"]').forEach(function (host) {
+          var box = host.querySelector('[data-slot="options"]');
+          if (!box) return;
+          box.innerHTML = "";
           values.forEach(function (v) {
-            var o = document.createElement("option");
-            o.value = v; o.textContent = v;
-            node.appendChild(o);
+            var row = document.createElement("label");
+            row.className = "cb-ms-option";
+            var input = document.createElement("input");
+            input.type = "checkbox";
+            input.value = v;
+            row.appendChild(input);
+            row.appendChild(document.createTextNode(v));
+            box.appendChild(row);
           });
+          if (!values.length) {
+            box.innerHTML = '<p class="cb-ms-empty">No values</p>';
+          }
         });
       }).catch(function () {});
     });

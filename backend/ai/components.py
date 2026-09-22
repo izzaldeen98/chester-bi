@@ -28,17 +28,36 @@ COMPONENT_TYPES = {
     "text":  {"required": ["body"],                 "columns": []},
 }
 
-FILTER_TYPES = {"select", "multiselect", "date_range", "search"}
+# Two controls, and which one a filter gets is derived from the member, not
+# chosen by the model: a time dimension takes a date range, everything else
+# takes a multi-select dropdown. Nothing textual is ever a free-text box or a
+# single-choice select — picking from the values that exist beats typing one.
+FILTER_TYPES = {"multiselect", "date_range"}
 
-# A filter's operator is decided here, from its type — never by the model.
-# This is what killed the old pages: the LLM wrote `onOrAfter`, which Cube
-# rejects, so every date filter threw and nothing refreshed.
+# A filter's operator follows from its type, for the same reason. The model
+# once wrote `onOrAfter`, which Cube rejects, so every date filter threw and
+# nothing refreshed.
 FILTER_OPERATORS = {
-    "select": "equals",
     "multiselect": "equals",
-    "search": "contains",
     "date_range": ("afterOrOnDate", "beforeOrOnDate"),
 }
+
+
+def filter_type_for(member: str, members: dict) -> str:
+    """The control a member gets. Time dimensions get a range; everything
+    else gets a multi-select of its actual values."""
+    return "date_range" if member in (members.get("time_dimensions") or set()) else "multiselect"
+
+
+def normalize_filters(spec: dict, members: dict) -> None:
+    """Rewrite each filter's type from its member, in place.
+
+    The model may still declare a type; it is overwritten. Leaving the choice
+    with the model produced single-choice selects and free-text boxes on
+    dimensions that should have been pick-lists."""
+    for f in spec.get("filters") or []:
+        if isinstance(f, dict) and isinstance(f.get("member"), str):
+            f["type"] = filter_type_for(f["member"], members)
 
 SPANS = {"full": 12, "half": 6, "third": 4, "quarter": 3}
 SIZES = {k: f"span {v}" for k, v in SPANS.items()}
@@ -148,14 +167,13 @@ def validate_spec(spec: dict, queries: list, members: dict) -> list[str]:
             continue
         if not f.get("id") or not f.get("label"):
             errors.append(f"{where}: needs an id and a label")
-        ftype = f.get("type")
-        if ftype not in FILTER_TYPES:
-            errors.append(f"{where}: type '{ftype}' must be one of {', '.join(sorted(FILTER_TYPES))}")
         member = f.get("member")
         if member not in members.get("all", set()):
             errors.append(f"{where}: member '{member}' does not exist in the semantic model")
-        elif ftype == "date_range" and member not in members.get("time_dimensions", set()):
-            errors.append(f"{where}: '{member}' is not a time dimension, so it cannot be a date_range")
+            continue
+        # The control is derived, so a wrong one is impossible rather than
+        # an error the model has to be sent back to fix.
+        f["type"] = filter_type_for(member, members)
 
     return errors
 
@@ -167,27 +185,52 @@ def _esc(value) -> str:
 
 
 def _filter_html(f: dict) -> str:
-    """A filter control. The operator and the Cube member are baked in here,
-    from validated spec values — the browser never decides either."""
-    fid, label, ftype, member = f["id"], f["label"], f["type"], f["member"]
+    """A filter control. The Cube member and the control are baked in here
+    from validated values — the browser never decides either."""
+    fid, label, member = f["id"], f["label"], f["member"]
+    ftype = _stored_type(f)
     common = f'data-filter="{_esc(fid)}" data-member="{_esc(member)}" data-type="{_esc(ftype)}"'
 
     if ftype == "date_range":
         control = (
             f'<div class="cb-range">'
             f'<input type="date" {common} data-bound="from" aria-label="{_esc(label)} from">'
-            f'<span class="cb-dash">–</span>'
+            f'<span class="cb-dash">\u2013</span>'
             f'<input type="date" {common} data-bound="to" aria-label="{_esc(label)} to">'
             f"</div>"
         )
-    elif ftype == "search":
-        control = f'<input type="search" {common} placeholder="Search…" aria-label="{_esc(label)}">'
     else:
-        multiple = " multiple size=\"4\"" if ftype == "multiselect" else ""
-        # Options are filled at runtime from the member's distinct values.
-        control = f'<select {common}{multiple} aria-label="{_esc(label)}"><option value="">All</option></select>'
+        # A multi-select dropdown: a button opening a searchable checkbox
+        # list. A native <select multiple> is a list box needing ctrl-click,
+        # which is not what anyone means by a filter dropdown. Options are
+        # filled at runtime from the member's distinct values.
+        control = (
+            f'<div class="cb-ms" {common}>'
+            f'<button type="button" class="cb-ms-toggle" aria-haspopup="listbox" '
+            f'aria-expanded="false"><span data-slot="summary">All</span>'
+            f'<span class="cb-ms-caret" aria-hidden></span></button>'
+            f'<div class="cb-ms-panel" role="listbox" aria-multiselectable="true" hidden>'
+            f'<input type="search" class="cb-ms-search" placeholder="Search {_esc(label)}\u2026" '
+            f'aria-label="Search {_esc(label)}">'
+            f'<div class="cb-ms-options" data-slot="options"></div>'
+            f'<p class="cb-ms-empty" data-slot="nomatch" hidden>No matches</p>'
+            f'<div class="cb-ms-foot">'
+            f'<button type="button" data-ms-clear>Clear</button>'
+            f'<span data-slot="count"></span>'
+            f"</div></div></div>"
+        )
 
     return f'<div class="cb-filter"><label>{_esc(label)}</label>{control}</div>'
+
+
+def _stored_type(f: dict) -> str:
+    """The control for a filter already saved in a spec.
+
+    Specs written before the controls were narrowed may carry a retired type
+    ("select", "search"); anything that is not a date range is a multi-select
+    now, so old artifacts keep rendering instead of failing on an unknown
+    control."""
+    return "date_range" if f.get("type") == "date_range" else "multiselect"
 
 
 def _component_html(c: dict, span: int = 6) -> str:
@@ -271,8 +314,8 @@ def spec_payload(spec: dict) -> str:
             for c in spec["components"] if c.get("type") != "text"
         ],
         "filters": [
-            {"id": f["id"], "member": f["member"], "type": f["type"],
-             "operators": FILTER_OPERATORS[f["type"]]}
+            {"id": f["id"], "member": f["member"], "type": _stored_type(f),
+             "operators": FILTER_OPERATORS[_stored_type(f)]}
             for f in (spec.get("filters") or [])
         ],
     }

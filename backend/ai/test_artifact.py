@@ -17,7 +17,12 @@ from ai.artifact import (  # noqa: E402
     query_fingerprint,
     render_page,
 )
-from ai.components import pack_rows, validate_spec  # noqa: E402
+from ai.components import (  # noqa: E402
+    filter_type_for,
+    normalize_filters,
+    pack_rows,
+    validate_spec,
+)
 
 
 SPEC = {
@@ -269,14 +274,37 @@ def check_spec_validation():
     assert any("duplicate" in x for x in bad(components=[SPEC["components"][0], SPEC["components"][0]]))
     assert any("size" in x for x in bad(components=[dict(SPEC["components"][1], size="enormous")]))
 
-    # Filters: the member must exist, and a date_range needs a time dimension.
+    # Filters: the member must exist. The control is no longer the model's to
+    # pick, so a wrong one is impossible rather than an error it has to fix.
     assert any("does not exist" in x for x in
-               bad(filters=[{"id": "f", "label": "F", "member": "nope.x", "type": "select"}]))
-    assert any("not a time dimension" in x for x in
-               bad(filters=[{"id": "f", "label": "F", "member": "customers.region", "type": "date_range"}]))
-    assert bad(filters=[{"id": "f", "label": "F", "member": "loads.date", "type": "date_range"}]) == []
-    assert any("must be one of" in x for x in
-               bad(filters=[{"id": "f", "label": "F", "member": "customers.region", "type": "slider"}]))
+               bad(filters=[{"id": "f", "label": "F", "member": "nope.x"}]))
+    assert any("needs an id and a label" in x for x in
+               bad(filters=[{"id": "f", "member": "customers.region"}]))
+
+    # The control follows from the member: a time dimension gets a range,
+    # everything else a multi-select — whatever the model asked for.
+    assert filter_type_for("loads.date", MEMBERS) == "date_range"
+    assert filter_type_for("customers.region", MEMBERS) == "multiselect"
+
+    s = {"components": SPEC["components"],
+         "filters": [{"id": "a", "label": "A", "member": "customers.region", "type": "date_range"},
+                     {"id": "b", "label": "B", "member": "loads.date", "type": "search"}]}
+    assert validate_spec(s, QUERIES, MEMBERS) == []
+    assert [f["type"] for f in s["filters"]] == ["multiselect", "date_range"], \
+        "validation must overwrite whatever control the model asked for"
+
+    # normalize_filters does the same before validation, for the retry turn.
+    s2 = {"filters": [{"id": "a", "label": "A", "member": "loads.date", "type": "slider"}]}
+    normalize_filters(s2, MEMBERS)
+    assert s2["filters"][0]["type"] == "date_range"
+
+    # A spec saved before the controls were narrowed still renders, and every
+    # non-date filter comes out as a dropdown rather than a native list box.
+    page = render_page({"title": "T", "components": SPEC["components"],
+                        "filters": s["filters"]}, "chester", "T")
+    bar = page[page.index('<div class="cb-filters"'):page.index("data-clear-all")]
+    assert "<select" not in bar, "no native select should survive in the filter bar"
+    assert bar.count("cb-ms-toggle") == 1 and bar.count('type="date"') == 2
 
 
 def check_effective_query():

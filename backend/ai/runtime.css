@@ -25,14 +25,71 @@ body {
 }
 .cb-filter { display: flex; flex-direction: column; gap: 5px; }
 .cb-filter label { font-size: 11px; font-weight: 500; color: var(--text-3); }
-.cb-filter input, .cb-filter select {
+/* Checkboxes are exempt: they want their native box, not a text-field
+   shell, and min-width would stretch each one into a pill. */
+.cb-filter input:not([type="checkbox"]) {
   max-width: 280px;
   appearance: none; -webkit-appearance: none;
   padding: 6px 10px; font: inherit; font-size: 13.5px; color: var(--text);
   background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px;
   min-width: 150px;
 }
-.cb-filter select[multiple] { min-height: 104px; min-width: 200px; padding: 4px; }
+/* ── Multi-select dropdown ────────────────────────────────────────────
+   A button that opens a searchable checkbox panel. */
+.cb-ms { position: relative; }
+.cb-ms-toggle {
+  display: flex; align-items: center; gap: 8px; justify-content: space-between;
+  min-width: 190px; max-width: 280px; padding: 6px 10px;
+  font: inherit; font-size: 13.5px; color: var(--text); text-align: left;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 6px; cursor: pointer;
+}
+.cb-ms-toggle:hover { background: var(--surface-2); }
+.cb-ms-toggle:focus-visible { outline: 2px solid #b45309; outline-offset: 1px; }
+.cb-ms-toggle > span:first-child {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-3);
+}
+.cb-ms-toggle .cb-ms-on { color: var(--text); font-weight: 500; }
+.cb-ms-caret {
+  flex: none; width: 0; height: 0;
+  border-left: 4px solid transparent; border-right: 4px solid transparent;
+  border-top: 5px solid var(--text-3);
+}
+
+.cb-ms-panel {
+  position: absolute; z-index: 20; top: calc(100% + 4px); left: 0;
+  width: 260px; padding: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 2px 4px rgba(23,22,20,0.06), 0 16px 36px -8px rgba(23,22,20,0.16);
+}
+.cb-ms-search {
+  width: 100%; margin-bottom: 6px; padding: 6px 8px;
+  font: inherit; font-size: 13px; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px;
+}
+.cb-ms-options { max-height: 220px; overflow: auto; }
+.cb-ms-option {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 6px; font-size: 13px; color: var(--text);
+  border-radius: 4px; cursor: pointer;
+}
+.cb-ms-option:hover { background: var(--surface-2); }
+/* The option rule sets display, which outranks the UA rule for
+   [hidden], so searching would narrow nothing without this. */
+.cb-ms-option[hidden] { display: none; }
+.cb-ms-option input { flex: none; width: 14px; height: 14px; margin: 0;
+  min-width: 0; appearance: auto; -webkit-appearance: checkbox; accent-color: #b45309; }
+.cb-ms-empty { margin: 6px; font-size: 13px; color: var(--text-3); }
+.cb-ms-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--text-3);
+}
+.cb-ms-foot button {
+  padding: 2px 6px; font: inherit; font-size: 12px; color: var(--text-2);
+  background: none; border: 0; border-radius: 4px; cursor: pointer;
+}
+.cb-ms-foot button:hover { background: var(--surface-2); color: var(--text); }
 .cb-filter input:focus, .cb-filter select:focus { outline: 2px solid #b45309; outline-offset: 1px; border-color: #b45309; }
 .cb-range { display: flex; align-items: center; gap: 6px; }
 .cb-range input { min-width: 130px; }
@@ -87,5 +144,7 @@ body {
   body { padding: 16px; }
   .cb-grid > * { grid-column: span 12 !important; }
   .cb-filters { flex-direction: column; align-items: stretch; }
+  .cb-ms-toggle { max-width: none; width: 100%; }
+  .cb-ms-panel { width: 100%; }
   .cb-clear { margin-left: 0; }
 }
