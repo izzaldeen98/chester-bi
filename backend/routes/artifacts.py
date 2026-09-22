@@ -65,6 +65,27 @@ def _artifact_or_404(db: Session, user: User, artifact_id: UUID) -> Artifact:
     return row
 
 
+async def _artifact_scope(db: Session, user: User, row: Artifact):
+    """(model, cube names) for the ONE semantic model this artifact belongs to.
+
+    Cube compiles every definition in an account into a single namespace, so
+    scoping is not automatic: without it, an artifact built on one model can
+    reference another model's cubes and Cube will happily answer. Every path
+    that validates or plans against /meta must go through here."""
+    if row.semantic_model is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This artifact is not bound to a semantic model. Recreate it.",
+        )
+    model, cube_names = await _model_scope(db, user, row.semantic_model.public_key)
+    if not cube_names:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f'The semantic model "{model.name}" defines no cubes.',
+        )
+    return model, cube_names
+
+
 def _spec_for_version(row: Artifact, version: int | None) -> dict:
     """The spec as it was at that version. Specs are small, so every version
     carries a full copy rather than a diff."""
@@ -243,7 +264,10 @@ async def query_artifact(
     # they reach Cube, so a bad operator is a clear error rather than a chart
     # that silently stops refreshing.
     if payload.filters:
-        _, members = cube_grounding(db, current_user.account.public_key, current_user.account_id)
+        _, cube_names = await _artifact_scope(db, current_user, row)
+        _, members = cube_grounding(
+            db, current_user.account.public_key, current_user.account_id, cube_names
+        )
         problems = validate_runtime_filters(payload.filters, members)
         if problems:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
@@ -271,10 +295,7 @@ async def refine_artifact(
     _require(current_user, *EDIT)
     row = _artifact_or_404(db, current_user, artifact_id)
     provider_row, llm_model = _provider_for(db, current_user, row, payload.provider_id)
-    semantic_model, cube_names = await _model_scope(
-        db, current_user,
-        row.semantic_model.public_key if row.semantic_model is not None else None,
-    )
+    semantic_model, cube_names = await _artifact_scope(db, current_user, row)
 
     try:
         result = artifact_agent.refine(

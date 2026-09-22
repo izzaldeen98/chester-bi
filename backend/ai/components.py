@@ -40,7 +40,38 @@ FILTER_OPERATORS = {
     "date_range": ("afterOrOnDate", "beforeOrOnDate"),
 }
 
-SIZES = {"full": "span 12", "half": "span 6", "third": "span 4", "quarter": "span 3"}
+SPANS = {"full": 12, "half": 6, "third": 4, "quarter": 3}
+SIZES = {k: f"span {v}" for k, v in SPANS.items()}
+
+
+def pack_rows(components: list) -> list:
+    """Assign each component its final column span.
+
+    The model picks a size by intent, but intent leaves ragged rows — one
+    half-width chart alone on a row leaves half the page empty. So the spans
+    the model asked for are packed greedily into 12-column rows and then
+    stretched to fill the row exactly. Layout is arithmetic; the model should
+    not be doing it."""
+    rows, row, used = [], [], 0
+    for c in components:
+        span = SPANS.get(c.get("size", "half"), 6)
+        if used + span > 12:
+            rows.append((row, used))
+            row, used = [], 0
+        row.append((c, span))
+        used += span
+    if row:
+        rows.append((row, used))
+
+    out = []
+    for row, used in rows:
+        slack = 12 - used
+        for i, (c, span) in enumerate(row):
+            # Give the remainder to the widest member, and the last one takes
+            # any rounding, so a row always adds up to exactly twelve.
+            share = slack // len(row) + (slack % len(row) if i == len(row) - 1 else 0)
+            out.append((c, span + share))
+    return out
 
 
 def validate_spec(spec: dict, queries: list, members: dict) -> list[str]:
@@ -159,9 +190,9 @@ def _filter_html(f: dict) -> str:
     return f'<div class="cb-filter"><label>{_esc(label)}</label>{control}</div>'
 
 
-def _component_html(c: dict) -> str:
+def _component_html(c: dict, span: int = 6) -> str:
     ctype = c["type"]
-    size = SIZES.get(c.get("size", "half"), SIZES["half"])
+    size = f"span {span}"
     title = c.get("title") or ""
 
     if ctype == "text":
@@ -173,7 +204,7 @@ def _component_html(c: dict) -> str:
 
     if ctype == "kpi":
         return (
-            f'<section class="cb-card cb-kpi" style="grid-column:{size}" data-cid="{_esc(c["id"])}">'
+            f'<section class="cb-card cb-kpi" data-cid="{_esc(c["id"])}">'
             f'<span class="cb-kpi-label">{_esc(c.get("label") or title)}</span>'
             f'<span class="cb-kpi-value" data-slot="value">—</span>'
             f'<span class="cb-state" data-slot="state"></span>'
@@ -215,9 +246,18 @@ def render_body(spec: dict) -> str:
         parts.append('<button type="button" class="cb-clear" data-clear-all>Clear all</button>')
         parts.append("</div>")
 
-    parts.append('<main class="cb-grid">')
-    parts.extend(_component_html(c) for c in spec["components"])
-    parts.append("</main>")
+    kpis = [c for c in spec["components"] if c.get("type") == "kpi"]
+    rest = [c for c in spec["components"] if c.get("type") != "kpi"]
+
+    if kpis:
+        parts.append('<div class="cb-kpis">')
+        parts.extend(_component_html(c) for c in kpis)
+        parts.append("</div>")
+
+    if rest:
+        parts.append('<main class="cb-grid">')
+        parts.extend(_component_html(c, span) for c, span in pack_rows(rest))
+        parts.append("</main>")
     return "\n".join(parts)
 
 

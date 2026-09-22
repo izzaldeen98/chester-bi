@@ -77,15 +77,39 @@
     animationDuration: 260,
   };
 
+  /* A category axis with a hundred bars is unreadable. Keep the largest
+     slice and say so — the model chose the query, the runtime owns how it
+     is drawn. */
+  var MAX_CATEGORIES = 24;
+
+  function trim(c, rows, kind) {
+    if (rows.length <= MAX_CATEGORIES) return { rows: rows, note: "" };
+    if (kind === "bar") {
+      var key = (Array.isArray(c.y) ? c.y[0] : c.y);
+      var sorted = rows.slice().sort(function (a, b) { return num(b[key]) - num(a[key]); });
+      return { rows: sorted.slice(0, MAX_CATEGORIES),
+               note: "Top " + MAX_CATEGORIES + " of " + rows.length };
+    }
+    // A trend keeps its order; drop the oldest.
+    return { rows: rows.slice(-MAX_CATEGORIES),
+             note: "Last " + MAX_CATEGORIES + " of " + rows.length };
+  }
+
   function axisOption(c, rows, kind) {
     var ys = Array.isArray(c.y) ? c.y : [c.y];
+    var longest = rows.reduce(function (m, r) {
+      return Math.max(m, String(r[c.x] == null ? "" : r[c.x]).length);
+    }, 0);
+    var rotate = rows.length > 8 && longest > 6 ? 35 : 0;
     return Object.assign({}, BASE, {
       color: THEME.colors,
       legend: ys.length > 1 ? { top: 0, icon: "roundRect", itemWidth: 10, itemHeight: 10 } : undefined,
+      grid: { left: 8, right: 16, top: 24, bottom: rotate ? 28 : 8, containLabel: true },
       xAxis: {
         type: "category",
         data: rows.map(function (r) { return r[c.x]; }),
-        axisLabel: { hideOverlap: true },
+        axisLabel: { hideOverlap: true, rotate: rotate, interval: 0 },
+        axisTick: { alignWithLabel: true },
         axisLine: { lineStyle: { color: "#e7e6e2" } },
       },
       yAxis: {
@@ -121,10 +145,14 @@
     var host = slot(c.id, "chart");
     if (!host || !window.echarts) return;
     if (!rows.length) { setState(c.id, "No data for the current filters"); return; }
+    var cut = c.type === "pie"
+      ? { rows: rows.slice(0, 12), note: rows.length > 12 ? "Top 12 of " + rows.length : "" }
+      : trim(c, rows, c.type);
     var chart = charts[c.id] || (charts[c.id] = echarts.init(host));
-    var option = c.type === "pie" ? pieOption(c, rows) : axisOption(c, rows, c.type);
-    chart.setOption(option, true);
+    chart.setOption(c.type === "pie" ? pieOption(c, cut.rows) : axisOption(c, cut.rows, c.type), true);
     chart.resize();
+    setState(c.id, cut.note);
+    return cut.note;
   }
 
   function drawTable(c, rows) {
@@ -152,10 +180,14 @@
   }
 
   function draw(c, rows) {
-    if (c.type === "kpi") drawKpi(c, rows);
-    else if (c.type === "table") drawTable(c, rows);
-    else drawChart(c, rows);
-    setState(c.id, rows.length ? "" : "No data for the current filters");
+    if (!rows.length) {
+      if (c.type === "kpi") drawKpi(c, rows); else if (c.type === "table") drawTable(c, rows);
+      setState(c.id, "No data for the current filters");
+      return;
+    }
+    if (c.type === "kpi") { drawKpi(c, rows); setState(c.id, ""); }
+    else if (c.type === "table") { drawTable(c, rows); setState(c.id, ""); }
+    else drawChart(c, rows);   // owns its own note about trimming
   }
 
   /* One component's data. Every component re-queries when filters change —

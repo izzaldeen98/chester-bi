@@ -17,7 +17,7 @@ from ai.artifact import (  # noqa: E402
     query_fingerprint,
     render_page,
 )
-from ai.components import validate_spec  # noqa: E402
+from ai.components import pack_rows, validate_spec  # noqa: E402
 
 
 SPEC = {
@@ -62,9 +62,65 @@ def main():
     page = render_page(hostile, "chester", "T")
     assert "<img src=x" not in page and "bad()</script>" not in page
 
+    check_row_packing()
+    check_model_isolation()
     check_spec_validation()
     check_effective_query()
     print("artifact: all checks passed")
+
+
+def check_row_packing():
+    """Every row fills exactly twelve columns. The model picks sizes by
+    intent; leaving those spans as-is stranded a half-width chart alone on a
+    row with half the page empty beside it."""
+    def spans(sizes):
+        return [s for _, s in pack_rows([{"size": x} for x in sizes])]
+
+    assert spans(["half"]) == [12], "a lone component fills its row"
+    assert spans(["half", "half"]) == [6, 6]
+    assert spans(["third", "third", "third"]) == [4, 4, 4]
+    assert spans(["quarter"] * 4) == [3, 3, 3, 3]
+    assert sum(spans(["half", "third"])) == 12, "a ragged row is stretched"
+
+    # Rows wrap at twelve and each is filled independently.
+    r = spans(["half", "half", "half"])
+    assert r[0] + r[1] == 12 and r[2] == 12, r
+    assert spans([]) == []
+    # An unknown size falls back to half rather than breaking the row maths.
+    assert sum(spans(["enormous"])) == 12
+
+
+def check_model_isolation():
+    """An artifact sees exactly one semantic model.
+
+    Cube compiles every definition in an account into one namespace, so a
+    member from a neighbouring model is a perfectly valid Cube reference and
+    will execute unless the scope is enforced. This guards the filter path,
+    which is the one that reaches Cube at runtime with user input."""
+    from ai.validate import validate_runtime_filters
+
+    mine = {
+        "all": {"loads.total_revenue", "customers.customer_name"},
+        "dimensions": {"customers.customer_name"},
+        "measures": {"loads.total_revenue"},
+        "time_dimensions": set(), "segments": set(),
+    }
+    own = [{"member": "customers.customer_name", "operator": "equals", "values": ["ABC"]}]
+    assert validate_runtime_filters(own, mine) == []
+
+    # A real member of a DIFFERENT model in the same account must not pass.
+    foreign = [{"member": "customers2.age", "operator": "equals", "values": ["30"]}]
+    errs = validate_runtime_filters(foreign, mine)
+    assert errs and "does not exist in the semantic model" in errs[0], errs
+
+    # Component validation is scoped by the same members dict.
+    queries = [{"id": "q", "label": "Q", "cube_query": {}, "columns": ["customer_name"]}]
+    spec = {"components": [{"id": "c", "type": "bar", "query": "q",
+                            "x": "customer_name", "y": ["customer_name"]}],
+            "filters": [{"id": "f", "label": "F", "member": "orders.payment_method",
+                         "type": "select"}]}
+    errs = validate_spec(spec, queries, mine)
+    assert any("does not exist in the semantic model" in e for e in errs), errs
 
 
 def check_spec_validation():
