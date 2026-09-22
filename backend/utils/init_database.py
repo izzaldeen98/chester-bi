@@ -53,6 +53,7 @@ _ADDED_COLUMNS = [
     ("ai_providers", "default_model", "VARCHAR", None),
     ("artifacts", "current_version", "INTEGER", "1"),
     ("artifacts", "queries", "JSON", "'[]'"),
+    ("artifacts", "spec", "JSON", None),
 ]
 
 

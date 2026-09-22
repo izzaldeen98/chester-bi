@@ -12,49 +12,89 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from ai.artifact import (  # noqa: E402
     PLAN_SYSTEM,
     REFINE_SYSTEM,
-    WRITE_SYSTEM,
-    _parse_markup,
     flatten_rows,
     merge_filters,
     query_fingerprint,
     render_page,
 )
+from ai.components import validate_spec  # noqa: E402
 
 
-DS = "revenue_by_customer"
-MANIFEST = {DS: {"name": "Revenue by customer", "columns": ["customer_name", "total_revenue"]}}
+SPEC = {
+    "title": "Revenue",
+    "summary": "How revenue moved.",
+    "filters": [{"id": "region", "label": "Region", "member": "customers.region", "type": "select"}],
+    "components": [
+        {"id": "k", "type": "kpi", "query": "totals", "value": "total_revenue",
+         "label": "Revenue", "format": "currency", "size": "quarter"},
+        {"id": "b", "type": "bar", "query": "by_cust", "x": "customer_name",
+         "y": ["total_revenue"], "title": "By customer", "size": "half"},
+        {"id": "t", "type": "text", "body": "Revenue grew 12%."},
+    ],
+}
+QUERIES = [
+    {"id": "totals", "label": "Totals", "cube_query": {"measures": ["l.total_revenue"]},
+     "columns": ["total_revenue"]},
+    {"id": "by_cust", "label": "By customer", "cube_query": {"measures": ["l.total_revenue"]},
+     "columns": ["customer_name", "total_revenue"]},
+]
+MEMBERS = {"all": {"customers.region", "loads.date"}, "time_dimensions": {"loads.date"},
+           "measures": set(), "dimensions": {"customers.region"}, "segments": set()}
 
 
 def main():
-    # Cube keys rows "Cube.field" and "Cube.field.granularity"; the page's JS
-    # is written against bare names.
     rows = flatten_rows([{"Orders.count": 5, "Orders.date.month": "2024-01", "plain": 1}])
     assert rows == [{"count": 5, "date": "2024-01", "plain": 1}], rows
 
-    page = render_page("<h1>Hi</h1>", MANIFEST, "chester", "Sales")
+    page = render_page(SPEC, "chester", "Sales")
     assert "<title>Sales</title>" in page
-    assert "<h1>Hi</h1>" in page
-    assert '"Revenue by customer"' in page
+    assert 'data-cid="b"' in page and 'data-filter="region"' in page
+    assert "Revenue grew 12%." in page
 
-    # The whole point of the correction: the document ships a way to ask for
-    # data, never the data itself. A baked page cannot show new rows.
-    assert "CHESTER.query" in page, "the runtime must be shipped with the page"
+    # The page is assembled from shipped components, and holds no data.
+    assert "__CHESTER_SPEC__" in page, "the runtime config must be present"
     assert "chester-page" in page, "the postMessage bridge must be present"
-    assert '"rows"' not in page, "rows must never be baked into the document"
-    assert "total_revenue" not in page.split("__CHESTER_META__")[1][:400] or True
+    assert '"rows"' not in page, "rows must never be embedded"
 
-    # A value containing </script> must not break out of the injecting tag.
-    hostile = {DS: {"name": "</script><img src=x onerror=alert(1)>", "columns": []}}
-    page = render_page("<p>x</p>", hostile, "chester", "T")
-    injected = page.split("window.__CHESTER_META__")[0]
-    assert "</script><img" not in injected
+    # Text bodies and titles are escaped, not injected.
+    hostile = dict(SPEC, title="</script><img src=x onerror=alert(1)>",
+                   components=[{"id": "t", "type": "text", "body": "</style><script>bad()</script>"}])
+    page = render_page(hostile, "chester", "T")
+    assert "<img src=x" not in page and "bad()</script>" not in page
 
-    # An artifact with no queries still renders a working shell.
-    assert "CHESTER.query" in render_page("<p>x</p>", {}, "chester", "T")
-
+    check_spec_validation()
     check_effective_query()
-    check_markup_parsing()
     print("artifact: all checks passed")
+
+
+def check_spec_validation():
+    """Everything the page does at runtime is decided here, so a valid spec
+    cannot produce a chart bound to a column that does not exist."""
+    assert validate_spec(SPEC, QUERIES, MEMBERS) == []
+
+    def bad(**over):
+        s = dict(SPEC); s.update(over); return validate_spec(s, QUERIES, MEMBERS)
+
+    # A column the query does not return — the failure the old pages shipped.
+    e = bad(components=[{"id": "b", "type": "bar", "query": "by_cust", "x": "nope", "y": ["total_revenue"]}])
+    assert any("does not return" in x for x in e), e
+    # An unknown query id.
+    assert any("not one of the planned queries" in x
+               for x in bad(components=[{"id": "b", "type": "bar", "query": "ghost", "x": "a", "y": ["b"]}]))
+    # Unknown component type, missing required field, duplicate id, bad size.
+    assert any("is unknown" in x for x in bad(components=[{"id": "x", "type": "sankey", "query": "totals"}]))
+    assert any("required" in x for x in bad(components=[{"id": "k", "type": "kpi", "query": "totals"}]))
+    assert any("duplicate" in x for x in bad(components=[SPEC["components"][0], SPEC["components"][0]]))
+    assert any("size" in x for x in bad(components=[dict(SPEC["components"][1], size="enormous")]))
+
+    # Filters: the member must exist, and a date_range needs a time dimension.
+    assert any("does not exist" in x for x in
+               bad(filters=[{"id": "f", "label": "F", "member": "nope.x", "type": "select"}]))
+    assert any("not a time dimension" in x for x in
+               bad(filters=[{"id": "f", "label": "F", "member": "customers.region", "type": "date_range"}]))
+    assert bad(filters=[{"id": "f", "label": "F", "member": "loads.date", "type": "date_range"}]) == []
+    assert any("must be one of" in x for x in
+               bad(filters=[{"id": "f", "label": "F", "member": "customers.region", "type": "slider"}]))
 
 
 def check_effective_query():

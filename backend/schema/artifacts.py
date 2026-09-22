@@ -35,6 +35,7 @@ class ArtifactResponse(BaseModel):
     provider: str
     llm_model: str
     queries: list[dict] = []        # the agent's own Cube queries
+    spec: Optional[dict] = None     # title, summary, filters, components
     prompts: list[dict] = []        # one entry per version
     current_version: int = 1
     # Not stored — set on the create response when the agent's brief could not be

@@ -26,6 +26,10 @@ class Artifact(Base):
     # [{"id": "revenue_by_customer", "label": "...", "cube_query": {...}}] — the
     # agent's own Cube queries, validated against /meta before being stored.
     queries = Column(JSON, nullable=False, default=list)
+    # The whole artifact: title, summary, filters and components. The page is
+    # assembled from this on every render, so there is no stored markup and
+    # nothing to regenerate when the app's components improve.
+    spec = Column(JSON, nullable=True)
     file_path = Column(String, nullable=False)          # folder; file is <public_key>.html
     # One entry per version: [{"version": 1, "instruction": "...", "at": iso8601,
     # "model": "..."}] — the brief, then each refinement. Every version's markup

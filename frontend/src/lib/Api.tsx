@@ -605,7 +605,9 @@ export interface ArtifactResponse {
   theme: string;
   provider: string;
   llm_model: string;
-  queries: { id: string; label: string; cube_query: Record<string, unknown> }[];
+  queries: { id: string; label: string; cube_query: Record<string, unknown>; columns?: string[] }[];
+  /** title, summary, filters and components — the page is assembled from this. */
+  spec?: Record<string, unknown> | null;
   /** One entry per version — the brief, then each refinement. */
   prompts: {
     version?: number;

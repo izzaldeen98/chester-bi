@@ -9,6 +9,8 @@ from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from ai import artifact as artifact_agent
+from ai.grounding import cube_grounding
+from ai.validate import validate_runtime_filters
 from models.artifact import Artifact
 from models.ai_provider import AIProvider
 from models.user import User
@@ -61,6 +63,16 @@ def _artifact_or_404(db: Session, user: User, artifact_id: UUID) -> Artifact:
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Artifact not found")
     return row
+
+
+def _spec_for_version(row: Artifact, version: int | None) -> dict:
+    """The spec as it was at that version. Specs are small, so every version
+    carries a full copy rather than a diff."""
+    if version:
+        for prompt in row.prompts or []:
+            if prompt.get("version") == version and prompt.get("spec"):
+                return prompt["spec"]
+    return row.spec or {}
 
 
 def _queries_for_version(row: Artifact, version: int | None) -> list:
@@ -132,9 +144,11 @@ async def create_artifact(
         llm_model=llm_model,
         semantic_model_id=semantic_model.id if semantic_model is not None else None,
         queries=result["queries"],
+        spec=result["spec"],
         file_path=_folder(current_user),
         prompts=[{"version": 1, "instruction": payload.brief, "model": llm_model,
-                  "queries": result["queries"], "usage": result.get("usage"),
+                  "queries": result["queries"], "spec": result["spec"],
+                  "usage": result.get("usage"),
                   "at": datetime.now(timezone.utc).isoformat()}],
         current_version=1,
         created_by=current_user.id,
@@ -144,13 +158,6 @@ async def create_artifact(
     db.commit()
     db.refresh(row)
 
-    try:
-        await _write_markup(row, result["html"], 1)
-    except Exception as exc:
-        db.delete(row)
-        db.commit()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail=f"Failed to save artifact file: {exc}")
 
     # Transient, response-only: the page saved fine, but the user should know
     # what the agent could not answer before they go looking for it.
@@ -197,12 +204,16 @@ async def render_artifact(
     file holds markup only. The caller drops this into a sandboxed iframe."""
     _require(current_user, *READ)
     row = _artifact_or_404(db, current_user, artifact_id)
-    markup = await _read_markup(row, version)
-    # No Cube call here: the page asks for each component's rows itself, so a
-    # model change or new data is picked up without regenerating anything.
-    return HTMLResponse(
-        artifact_agent.render_page(markup, _manifest(row, version), row.theme, row.name)
-    )
+    spec = _spec_for_version(row, version)
+    if not spec:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This artifact predates the component runtime. Recreate it to use "
+                   "live components.",
+        )
+    # Assembled fresh from pre-built components, with no Cube call here: each
+    # component queries for itself, so new data appears without regeneration.
+    return HTMLResponse(artifact_agent.render_page(spec, row.theme, row.name))
 
 
 @router.post("/query/{artifact_id}")
@@ -227,6 +238,16 @@ async def query_artifact(
     if entry is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"This artifact has no query '{payload.query_id}'")
+
+    # The page is untrusted: check its filters against the live model before
+    # they reach Cube, so a bad operator is a clear error rather than a chart
+    # that silently stops refreshing.
+    if payload.filters:
+        _, members = cube_grounding(db, current_user.account.public_key, current_user.account_id)
+        problems = validate_runtime_filters(payload.filters, members)
+        if problems:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail="; ".join(problems[:4]))
 
     try:
         rows, cached = artifact_agent.run_query(
@@ -257,23 +278,23 @@ async def refine_artifact(
 
     try:
         result = artifact_agent.refine(
-            db, current_user, provider_row, llm_model, await _read_markup(row),
+            db, current_user, provider_row, llm_model, row.spec or {},
             row.queries or [], payload.instruction, semantic_model, cube_names,
         )
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
-    markup = result["html"]
 
     version = (row.current_version or len(row.prompts or []) or 1) + 1
-    await _write_markup(row, markup, version)
     # The edit may have rewritten a component's query; drop the stale entries
     # so the next open does not serve rows for a query that no longer exists.
     for q in (row.queries or []) + result["queries"]:
         artifact_agent.invalidate_query(current_user.account.public_key, q.get("cube_query") or {})
     row.queries = result["queries"]
+    row.spec = result["spec"]
     row.prompts = (row.prompts or []) + [
         {"version": version, "instruction": payload.instruction, "model": llm_model,
-         "queries": result["queries"], "usage": result.get("usage"),
+         "queries": result["queries"], "spec": result["spec"],
+         "usage": result.get("usage"),
          "at": datetime.now(timezone.utc).isoformat()}
     ]
     row.current_version = version
@@ -300,14 +321,14 @@ async def restore_artifact_version(
     if version not in known:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No such version")
 
-    snapshot = await storage.get_file(row.file_path, f"{row.public_key}.v{version}.html")
-    if not snapshot:
+    restored_spec = _spec_for_version(row, version)
+    if not restored_spec:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"Version {version} was created before snapshots existed")
-    await storage.upload_file(BytesIO(snapshot.getvalue()), row.file_path, f"{row.public_key}.html")
+                            detail=f"Version {version} has no stored spec")
+    row.spec = restored_spec
     restored = _queries_for_version(row, version)
     if restored:
-        row.queries = restored   # the markup and its queries move together
+        row.queries = restored   # a version's spec and its queries move together
     row.current_version = version
     row.updated_by = current_user.id
     db.commit()

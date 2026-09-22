@@ -1,0 +1,79 @@
+/* Artifact page styles — hand-written, shipped with the app. The page is
+   embedded in Chester BI, so it wears the app's tokens verbatim. */
+:root {
+  --bg: #fbfbfa; --surface: #fff; --surface-2: #f5f5f3;
+  --border: #e7e6e2; --border-strong: #d6d4ce;
+  --text: #171614; --text-2: #5f5d57; --text-3: #716e68;
+  --r: 8px; --r-lg: 12px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 24px;
+  background: var(--bg); color: var(--text-2);
+  font: 14px/1.5 "Geist Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+.cb-head { margin-bottom: 20px; }
+.cb-head h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.021em; color: var(--text); }
+.cb-sub { margin: 6px 0 0; font-size: 13.5px; color: var(--text-3); max-width: 80ch; }
+
+.cb-filters {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+  padding: 14px 16px; margin-bottom: 16px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.cb-filter { display: flex; flex-direction: column; gap: 5px; }
+.cb-filter label { font-size: 11px; font-weight: 500; color: var(--text-3); }
+.cb-filter input, .cb-filter select {
+  appearance: none; -webkit-appearance: none;
+  padding: 6px 10px; font: inherit; font-size: 13.5px; color: var(--text);
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px;
+  min-width: 150px;
+}
+.cb-filter select[multiple] { min-height: 78px; }
+.cb-filter input:focus, .cb-filter select:focus { outline: 2px solid #b45309; outline-offset: 1px; border-color: #b45309; }
+.cb-range { display: flex; align-items: center; gap: 6px; }
+.cb-range input { min-width: 130px; }
+.cb-dash { color: var(--text-3); }
+.cb-clear {
+  margin-left: auto; padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 500;
+  color: var(--text); background: var(--surface); cursor: pointer;
+  border: 1px solid var(--border-strong); border-radius: 6px;
+}
+.cb-clear:hover { background: var(--surface-2); }
+
+.cb-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; align-items: start; }
+.cb-card {
+  display: flex; flex-direction: column; min-width: 0;
+  padding: 16px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  box-shadow: 0 1px 2px rgba(23,22,20,0.05);
+}
+.cb-card h3 { margin: 0 0 12px; font-size: 14px; font-weight: 500; color: var(--text); }
+.cb-chart { width: 100%; height: 280px; }
+.cb-kpi { gap: 6px; justify-content: center; min-height: 96px; }
+.cb-kpi-label { font-size: 12px; color: var(--text-3); }
+.cb-kpi-value { font-size: 28px; font-weight: 600; letter-spacing: -0.03em; color: var(--text); line-height: 1.1; }
+.cb-text p { margin: 0; font-size: 14px; line-height: 1.65; color: var(--text-2); max-width: 80ch; }
+
+.cb-table-wrap { overflow: auto; max-height: 420px; }
+.cb-table-wrap table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cb-table-wrap th {
+  position: sticky; top: 0; z-index: 1;
+  padding: 8px 10px; text-align: left; font-weight: 500; font-size: 11px; color: var(--text-3);
+  background: var(--surface-2); border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.cb-table-wrap td { padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--text-2); }
+.cb-table-wrap td.cb-num { text-align: right; font-variant-numeric: tabular-nums; }
+.cb-table-wrap tr:hover td { background: var(--surface-2); }
+
+.cb-state { margin-top: 8px; font-size: 12px; color: var(--text-3); min-height: 1em; }
+.cb-state-error { color: #c02626; }
+
+@media (max-width: 860px) {
+  body { padding: 16px; }
+  .cb-grid > * { grid-column: span 12 !important; }
+  .cb-filters { flex-direction: column; align-items: stretch; }
+  .cb-clear { margin-left: 0; }
+}

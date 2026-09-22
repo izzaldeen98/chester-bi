@@ -162,3 +162,22 @@ def validate_queries(queries, members: dict) -> tuple[list, list[str]]:
             "cube_query": entry["cube_query"],
         })
     return good, errors
+
+
+def validate_runtime_filters(filters, members: dict) -> list[str]:
+    """Filters arriving from a rendered page, checked before they reach Cube.
+
+    Generation-time validation covers the stored query; this covers what the
+    page sends at interaction time. Without it an invalid operator reaches
+    Cube and the component just fails to refresh, with nothing to point at."""
+    if filters is None:
+        return []
+    if not isinstance(filters, list):
+        return ["filters must be an array"]
+    if len(filters) > 24:
+        return ["too many filters in one request"]
+
+    errors: list[str] = []
+    for i, f in enumerate(filters):
+        errors += _validate_filter(f, members, f"filters[{i}]")
+    return errors

@@ -22,11 +22,13 @@ sanitizing the markup — is what makes running generated code safe here.
 import html as html_lib
 import json
 import os
+import pathlib
 import re
 from hashlib import sha256
 
 from sqlalchemy.orm import Session
 
+from ai import components
 from ai.adapters import get_adapter
 from ai.grounding import DEFAULT_TEXT_COLOR, PALETTE, cube_grounding
 from ai.validate import MAX_LIMIT, validate_queries
@@ -44,186 +46,96 @@ CHART_LIB_URL = os.getenv(
 )
 
 PLAN_SYSTEM = """\
-You are planning an analytical HTML page ("artifact") for Chester BI.
+You design analytical pages ("artifacts") for Chester BI.
 
-You output JSON only. No prose, no markdown fence.
+You output JSON only. No prose, no markdown fence, no HTML — the page itself is
+assembled from pre-built components by the application, not by you.
 
-You are working against ONE semantic model: **{semantic_model}**. You write the queries
-the page needs, directly against this model — there is no pre-built dataset to pick from.
+You are working against ONE semantic model: **{semantic_model}**.
 
 ### The semantic model (live Cube /meta)
 {cube_context}
 
-## Output format
+## Output
 
-{{"title": "short page title",
-  "description": "one sentence",
+{{"title": "...",
+  "summary": "one or two sentences a reader sees under the title",
   "queries": [
-    {{"id": "lower_snake_case_id",
-      "label": "what this query returns",
+    {{"id": "lower_snake_case", "label": "what this returns",
       "cube_query": {{"measures": ["Cube.measure"], "dimensions": ["Cube.dimension"],
-                     "timeDimensions": [{{"dimension": "Cube.time_dim",
-                                         "granularity": "month",
-                                         "dateRange": "last 12 months"}}],
-                     "filters": [{{"member": "Cube.dimension", "operator": "equals",
-                                  "values": ["x"]}}],
-                     "order": {{"Cube.measure": "desc"}},
-                     "limit": 500}}}}
+                     "timeDimensions": [{{"dimension": "Cube.time", "granularity": "month"}}],
+                     "order": {{"Cube.measure": "desc"}}, "limit": 500}}}}
   ],
-  "plan": "what the page shows: which visuals, what the narrative argues, which filters",
+  "filters": [
+    {{"id": "region", "label": "Region", "member": "Cube.dimension",
+      "type": "select|multiselect|date_range|search"}}
+  ],
+  "components": [
+    {{"id": "kpi_revenue", "type": "kpi", "query": "totals", "value": "total_revenue",
+      "label": "Revenue", "format": "currency", "size": "quarter"}},
+    {{"id": "by_customer", "type": "bar", "query": "by_customer", "title": "Revenue by customer",
+      "x": "customer_name", "y": ["total_revenue"], "format": "currency", "size": "half"}}
+  ],
   "unmet": ["anything the brief asked for that this model cannot answer"]}}
 
-## Rules for cube_query
+## cube_query rules
 
-1. Every measure must be a MEASURE of this model and every dimension a DIMENSION,
-   spelled exactly as listed above, fully qualified as "Cube.field".
-2. A query needs at least one measure or dimension.
-3. timeDimensions entries name a time dimension. granularity is one of second, minute,
-   hour, day, week, month, quarter, year. dateRange is a string like "last 12 months"
-   or a ["2024-01-01", "2024-12-31"] pair.
-4. Filter operators: equals, notEquals, contains, notContains, startsWith, notStartsWith,
-   endsWith, notEndsWith, gt, gte, lt, lte, set, notSet, inDateRange, notInDateRange,
-   beforeDate, beforeOrOnDate, afterDate, afterOrOnDate. Every operator except set and
-   notSet needs a non-empty "values" array of STRINGS.
-5. order may only reference members the query selects.
-6. Do NOT add a dateRange unless the brief asks for a specific period. The data is
-   historical and may end well before today — "last 12 months" often matches nothing.
-   With no dateRange the query covers whatever the data actually holds.
-7. limit is an integer, at most {max_limit}. Always set one on a detail/breakdown query —
-   the whole result is embedded in the page.
-8. Only these keys are allowed: measures, dimensions, timeDimensions, filters, segments,
-   order, limit, offset, timezone, ungrouped.
+1. Measures must be MEASURES of this model, dimensions must be DIMENSIONS, spelled
+   exactly and fully qualified as "Cube.field".
+2. timeDimensions name a time dimension; granularity is one of second, minute, hour,
+   day, week, month, quarter, year.
+3. Do NOT add a dateRange. The data is historical and may end well before today, and
+   the reader filters by date themselves.
+4. order may only reference members the query selects. limit is at most {max_limit}.
+5. Only these keys: measures, dimensions, timeDimensions, filters, segments, order,
+   limit, offset, timezone, ungrouped.
+
+## Component rules
+
+- Types: kpi, bar, line, area, pie, table, text.
+- Every component except `text` names a `query`, and every field it references
+  (`value`, `x`, `y`, `category`, `columns`) must be a COLUMN that query returns.
+  A column is the part of the member after the dot: "loads.total_revenue" returns
+  the column "total_revenue".
+- `y` is an array; one entry per series.
+- `format` is one of currency, percent, decimal, number.
+- `size` is quarter, third, half or full — twelve columns to a row. KPIs are usually
+  quarter; a table or a trend is usually full.
+- `text` takes a `body` string: real observations, not placeholders. Use it when the
+  brief asks for a written summary.
+
+## Filter rules
+
+- `member` must be a real dimension of this model, fully qualified.
+- `date_range` requires a time dimension. Use `select` for a low-cardinality dimension,
+  `multiselect` when several values are usefully combined, `search` for free text.
+- Filters apply to EVERY component, re-querying the database — you do not wire them.
 
 ## Judgment
 
-Write the FEWEST queries that answer the brief — one per distinct shape of data
-(headline totals, a trend over time, a breakdown by dimension, a detail table). Do not
-write one query per chart when several charts read the same rows. Give each a stable,
-descriptive id: the page reads its rows from window.CHESTER.data["<that id>"].\
-"""
-
-WRITE_SYSTEM = """\
-You are writing a self-contained analytical HTML page ("artifact") for Chester BI.
-
-You output raw HTML and nothing else — no JSON, no prose, no explanation, no markdown
-fence. Your first character is "<".
-
-## The plan you are implementing
-{plan}
-
-## How your page gets its data
-
-There is no data in your page. Every chart fetches its own rows at runtime from
-a runtime the host already provides — you never write the fetching, only the call.
-
-    const rows = await CHESTER.query('revenue_by_customer');
-    // rows: [ {{column: value, ...}}, ... ]
-
-Each query id below is one component's data. One chart, one query.
-
-    CHESTER.meta          // {{ queryId: {{ name, columns }} }} — what you may ask for
-    CHESTER.theme.colors  // the series palette, in order
-    CHESTER.onData(cb)    // cb(queryId, rows) — fires whenever rows arrive
-
-## Cross-filtering — this is what makes it a dashboard
-
-Filter controls do NOT filter arrays in JavaScript. They set a Cube filter and the
-affected charts re-query the database:
-
-    CHESTER.setFilter('region', {{
-      member: 'customers.region', operator: 'equals', values: [value]
-    }});
-    CHESTER.clearFilter('region');
-    CHESTER.clearAllFilters();
-
-`setFilter` returns a promise and re-runs every component. Redraw inside
-`CHESTER.onData((id, rows) => ...)` so a chart updates whenever its rows land,
-including on first load. A chart may also be clickable to set a filter — that is
-how one chart cross-filters the rest.
-
-`member` must be a real dimension of the semantic model, fully qualified, exactly as
-listed in the plan's queries.
-
-## The queries this page owns, with their columns and a sample of current rows
-
-{samples}
-
-The sample is to show you column names and value shapes ONLY. Never hardcode it, never
-ship it, never compute totals from it — the real rows arrive from CHESTER.query and
-will differ. Always render from what the promise resolves to, and handle an empty array.
-
-## What to build
-
-- Use `echarts` — it is already loaded as a global (v5). Do not load any other library,
-  and do not add <script src> tags: external requests other than the chart library are
-  blocked.
-- Visuals: charts that fit the question (trend, comparison, composition, distribution).
-  Size them with explicit pixel heights; echarts needs a sized container.
-- Narrative: real sentences computed from the data — totals, deltas, the largest mover,
-  what stands out. Not lorem, not placeholders, not "insights will appear here".
-- Filters: working HTML controls (selects, date inputs, search boxes) that re-filter the
-  arrays in JS and re-render the charts and the narrative. They must actually work.
-- Make it good-looking and responsive: a title, a summary line, a KPI row, a chart grid
-  that collapses to one column under 700px.
-
-## House style — the page is embedded in the Chester BI app, so it must match it
-
-- Background #fbfbfa. Cards and panels: #ffffff, 1px solid #e7e6e2, border-radius 12px,
-  box-shadow 0 1px 2px rgba(23,22,20,0.05). Never a coloured card background.
-- Text: #171614 for headings and figures, #5f5d57 for body, #716e68 for labels. Headings
-  use letter-spacing -0.021em and font-weight 600. Never pure black, never pure grey.
-- Font stack, on every element including inputs and buttons:
-  font-family: "Geist Sans", ui-sans-serif, system-ui, -apple-system, sans-serif.
-  Use tabular figures for every number: font-variant-numeric: tabular-nums.
-- Series colours, in this order: {palette}. Do not introduce any other hue.
-- Style every filter control yourself — a bare browser <select> or date input breaks the
-  page. Give them: appearance:none, background #ffffff, 1px solid #d6d4ce, radius 6px,
-  padding 6px 10px, font-size 13.5px, and a custom caret. Labels above them at 11px
-  #716e68. A date range is two text inputs with placeholder YYYY-MM-DD, not
-  <input type="date">.
-- Buttons: primary is background #171614 with #ffffff text, radius 6px, 13px, weight 500.
-  Secondary is white with a #d6d4ce border. No coloured buttons.
-- Spacing: 24px page padding, 16px between cards, 12px inside them.
-
-## Output contract
-
-Emit everything that goes INSIDE <body> — your own <style> and <script> included. The
-host supplies <!doctype>, <head>, the chart library and the data script. Do not emit
-<!doctype>, <html>, <head> or <body> tags.
-
-Write plain, boring JavaScript: no modules, no imports, no frameworks, no fetch, no
-localStorage (the page runs sandboxed with an opaque origin — both throw). Use
-CHESTER.query for data; it is the only way in and it is already loaded.
-
-Render in this order, every time:
-1. Build the layout and the empty chart containers immediately, on script run.
-2. Show a quiet loading state in each chart.
-3. Register CHESTER.onData to draw or redraw a chart when its rows arrive.
-4. Call CHESTER.query(id) for each component to start the first load.
-
-Never block the whole page on one query, and never assume a query has resolved
-before drawing — a slow cube must not leave the page blank.\
+Lead with 3-5 KPIs, then the trend, then the breakdown, then detail. Write the fewest
+queries that serve the components — several components may share one query. A component
+that restates the one above it is noise.\
 """
 
 REFINE_SYSTEM = """\
-You are changing one existing Chester BI artifact — a self-contained HTML page.
+You are changing one existing Chester BI artifact.
 
-You output raw HTML and nothing else — no JSON, no prose, no markdown fence. Your first
-character is "<".
+You output JSON only — the COMPLETE updated spec, in exactly the same shape you were
+given. No prose, no markdown fence, no HTML: the page is assembled from pre-built
+components by the application.
 
-Return the COMPLETE markup, not a diff or a fragment. Keep everything the request does
-not ask you to change: same structure, same data wiring, same working filters.
+Keep everything the request does not ask you to change, with the same ids, so unchanged
+components keep their place and their cached data.
 
-The runtime contract is unchanged: rows come from `await CHESTER.query('<queryId>')`,
-filters go through `CHESTER.setFilter(key, cubeFilter)` and redraws happen in
-`CHESTER.onData((id, rows) => ...)`. `echarts` is a loaded global, your markup goes
-inside <body>, and no external scripts, fetches or storage are available. There is no
-data in the page — never bake rows in.
+All the rules from the design brief still apply: component types and their required
+fields, columns that must exist in the named query, filter members that must exist in
+the semantic model, and the cube_query key list.
 
 The queries this page reads, with their columns and sample rows:
 {samples}
 
-## The page as it stands
+## The spec as it stands
 {current_html}\
 """
 
@@ -411,7 +323,11 @@ def _plan(adapter, model: str, system: str, user_msg: str, members: dict) -> tup
 
 def generate(db: Session, user: User, provider_row, model: str, brief: str, theme: str,
              semantic_model=None, allowed_cubes: set | None = None) -> dict:
-    """Returns {title, description, queries, html, unmet}."""
+    """One LLM turn produces the whole spec — queries, filters and components.
+
+    There is no second turn writing HTML: the page is assembled from pre-built
+    components, so the model's entire output is a small JSON config. That is
+    both far cheaper and the reason components always line up."""
     cube_context, members = cube_grounding(
         db, user.account.public_key, user.account_id, allowed_cubes
     )
@@ -420,200 +336,112 @@ def generate(db: Session, user: User, provider_row, model: str, brief: str, them
         raise Exception(f"{where} exposes no cubes — define one under Models first.")
 
     adapter = _adapter_for(provider_row)
-    queries, plan_out = _plan(
-        adapter, model,
-        PLAN_SYSTEM.format(
-            semantic_model=(semantic_model.name if semantic_model is not None else "all models"),
-            cube_context=cube_context,
-            max_limit=MAX_LIMIT,
-        ),
-        f"Brief:\n{brief}",
-        members,
+    system = PLAN_SYSTEM.format(
+        semantic_model=(semantic_model.name if semantic_model is not None else "all models"),
+        cube_context=cube_context,
+        max_limit=MAX_LIMIT,
     )
+    spec, queries = _spec_turn(db, user, adapter, model, system, f"Brief:\n{brief}", members)
 
-    # Phase 2 — write the page against real column names and sample rows.
     sample = fetch_data(db, user, queries, limit=SAMPLE_ROWS)
-    _record_columns(queries, sample)
-    colors = PALETTE.get(theme, PALETTE["chester"])
-    markup = _parse_markup(adapter.generate(
-        WRITE_SYSTEM.format(
-            plan=json.dumps({k: plan_out.get(k) for k in ("title", "description", "plan")}, indent=1),
-            samples=_samples_block(queries, sample),
-            palette=", ".join(colors),
-            text_color=DEFAULT_TEXT_COLOR,
-        ),
-        f"Brief:\n{brief}",
-        model,
-        json_mode=False,
-    ))
-
     return {
-        "title": plan_out.get("title") or "Untitled artifact",
-        "description": plan_out.get("description") or brief[:127],
+        "title": spec.get("title") or "Untitled artifact",
+        "description": (spec.get("summary") or brief)[:255],
         "queries": queries,
-        "html": markup,
+        "spec": spec,
         "usage": dict(adapter.total),
-        "unmet": plan_out.get("unmet") or [],
-        # A valid query can still match nothing (a date range past the end of the
-        # data). Say so rather than shipping an empty chart with no explanation.
+        "unmet": spec.get("unmet") or [],
         "empty": [q["id"] for q in queries if not sample.get(q["id"])],
     }
 
 
-def refine(db: Session, user: User, provider_row, model: str, current_html: str,
+def _spec_turn(db, user, adapter, model, system, user_msg, members) -> tuple[dict, list]:
+    """Ask for a spec and validate the whole thing — Cube queries against the
+    live model, then components and filters against the columns those queries
+    actually return. Errors go back to the model, bounded."""
+    errors: list[str] = []
+    for attempt in range(MAX_RETRIES + 1):
+        spec = _parse_json(adapter.generate(system, user_msg, model))
+        queries, errors = validate_queries(spec.get("queries"), members)
+
+        if queries:
+            # Columns can only be known by running the queries, and components
+            # are validated against them — so this runs before the spec check.
+            try:
+                _record_columns(queries, fetch_data(db, user, queries, limit=SAMPLE_ROWS))
+            except Exception as exc:
+                errors.append(f"a query failed against Cube: {exc}")
+            errors += components.validate_spec(spec, queries, members)
+
+        if queries and not errors:
+            spec["queries"] = queries
+            return spec, queries
+
+        if attempt == MAX_RETRIES:
+            raise Exception(
+                "The model could not produce a valid spec for this semantic model: "
+                + "; ".join(errors[:6])
+            )
+        user_msg = (
+            f"{user_msg}\n\nYour previous answer was rejected. Return the FULL corrected "
+            "JSON, fixing these and keeping everything that was already valid:\n- "
+            + "\n- ".join(errors[:12])
+        )
+    raise Exception("; ".join(errors[:6]))
+
+
+def refine(db: Session, user: User, provider_row, model: str, current_spec: dict,
            queries: list, instruction: str, semantic_model=None,
            allowed_cubes: set | None = None) -> dict:
-    """Whole-page edit. Replans the queries first, so a request for data the page
-    does not yet have ("add a breakdown by region") can actually be satisfied.
-    Returns {queries, html}."""
+    """Edit the spec, not a page. Returns {spec, queries, usage}."""
     cube_context, members = cube_grounding(
         db, user.account.public_key, user.account_id, allowed_cubes
     )
     adapter = _adapter_for(provider_row)
 
-    new_queries, _ = _plan(
-        adapter, model,
-        PLAN_SYSTEM.format(
-            semantic_model=(semantic_model.name if semantic_model is not None else "all models"),
-            cube_context=cube_context,
-            max_limit=MAX_LIMIT,
-        ),
-        "The page already reads these queries:\n"
-        + json.dumps(queries, indent=1)
-        + f"\n\nChange request:\n{instruction}\n\n"
-        "Return the FULL query set the page needs after this change. Keep every query "
-        "that is still used, with the same id, unchanged.",
-        members,
+    sample = fetch_data(db, user, queries, limit=SAMPLE_ROWS) if queries else {}
+    system = REFINE_SYSTEM.format(
+        samples=_samples_block(queries, sample),
+        current_html=json.dumps(current_spec, indent=1, default=str),
+    )
+    # The design rules live in the brief prompt, so the editor is given them too.
+    system += "\n\n## The rules that governed the original design\n" + PLAN_SYSTEM.format(
+        semantic_model=(semantic_model.name if semantic_model is not None else "all models"),
+        cube_context=cube_context,
+        max_limit=MAX_LIMIT,
     )
 
-    sample = fetch_data(db, user, new_queries, limit=SAMPLE_ROWS)
-    _record_columns(new_queries, sample)
-    markup = _parse_markup(adapter.generate(
-        REFINE_SYSTEM.format(samples=_samples_block(new_queries, sample), current_html=current_html),
-        f"Change request:\n{instruction}",
-        model,
-        json_mode=False,
-    ))
-    return {"queries": new_queries, "html": markup, "usage": dict(adapter.total)}
+    spec, new_queries = _spec_turn(
+        db, user, adapter, model, system, f"Change request:\n{instruction}", members
+    )
+    return {"spec": spec, "queries": new_queries, "usage": dict(adapter.total)}
 
 
-RUNTIME_JS = """
-/* Chester artifact runtime — shipped with the app, never written by the LLM.
-
-   The page runs sandboxed with an opaque origin, so it cannot call the API
-   itself: no cookies, no credentials, no same-origin. Instead it asks the
-   parent app, which is authenticated, and the parent answers. That keeps the
-   sandbox intact while making every chart a live query.
-
-   Contract for the page:
-     await CHESTER.query('revenue_by_customer')   -> rows for that component
-     CHESTER.setFilter('region', {...cubeFilter}) -> re-runs affected charts
-     CHESTER.clearFilter('region')
-     CHESTER.onData(cb)  -> cb(id, rows) whenever a component's rows arrive
-*/
-(function () {
-  var pending = {}, seq = 0, filters = {}, listeners = [], cache = {};
-
-  window.addEventListener('message', function (e) {
-    var m = e.data;
-    if (!m || m.source !== 'chester-host') return;
-    var p = pending[m.rid];
-    if (!p) return;
-    delete pending[m.rid];
-    if (m.error) p.reject(new Error(m.error));
-    else p.resolve(m.rows);
-  });
-
-  function ask(id, extra) {
-    var rid = ++seq;
-    return new Promise(function (resolve, reject) {
-      pending[rid] = { resolve: resolve, reject: reject };
-      parent.postMessage(
-        { source: 'chester-page', rid: rid, queryId: id, filters: extra },
-        '*'
-      );
-      setTimeout(function () {
-        if (pending[rid]) { delete pending[rid]; reject(new Error('Query timed out')); }
-      }, 60000);
-    });
-  }
-
-  function activeFilters() {
-    var out = [];
-    for (var k in filters) if (filters[k]) out.push(filters[k]);
-    return out;
-  }
-
-  var CHESTER = {
-    meta: window.__CHESTER_META__ || {},
-    theme: window.__CHESTER_THEME__ || {},
-
-    /* Rows for one component, honouring every active filter. Repeated calls
-       with the same effective filters are served from the page's own map so
-       a re-render never re-asks. */
-    query: function (id) {
-      var sig = id + '|' + JSON.stringify(activeFilters());
-      if (cache[sig]) return cache[sig];
-      var pr = ask(id, activeFilters()).then(function (rows) {
-        listeners.forEach(function (cb) { try { cb(id, rows); } catch (_) {} });
-        return rows;
-      });
-      cache[sig] = pr;
-      return pr;
-    },
-
-    /* Cross-filter. Setting or clearing one re-runs only the components that
-       actually read data — the page decides what to redraw via onData. */
-    setFilter: function (key, cubeFilter) {
-      filters[key] = cubeFilter;
-      return CHESTER.refresh();
-    },
-    clearFilter: function (key) {
-      delete filters[key];
-      return CHESTER.refresh();
-    },
-    clearAllFilters: function () {
-      filters = {};
-      return CHESTER.refresh();
-    },
-    activeFilters: activeFilters,
-
-    refresh: function () {
-      cache = {};
-      var ids = Object.keys(CHESTER.meta);
-      return Promise.all(ids.map(function (id) { return CHESTER.query(id); }));
-    },
-
-    onData: function (cb) { listeners.push(cb); },
-  };
-
-  window.CHESTER = CHESTER;
-})();
-"""
+_ASSETS = pathlib.Path(__file__).resolve().parent
+RUNTIME_JS = (_ASSETS / "runtime.js").read_text()
+RUNTIME_CSS = (_ASSETS / "runtime.css").read_text()
 
 
-def render_page(markup: str, manifest: dict, theme: str, title: str = "Artifact") -> str:
-    """Wraps the model's markup into a full document.
+def render_page(spec: dict, theme: str, title: str = "Artifact") -> str:
+    """Assemble the page from the spec using pre-built components.
 
-    No rows are baked in. The page receives a manifest of what it may query
-    plus the runtime that fetches it, so every open reflects the current data
-    and a filter change re-queries rather than filtering a frozen array."""
-    payload = json.dumps(
-        {
-            "meta": manifest,
-            "theme": {"colors": PALETTE.get(theme, PALETTE["chester"]), "text": DEFAULT_TEXT_COLOR},
-        },
-        default=str,
+    Deterministic: the same spec always produces the same page, so components
+    always align. No rows are embedded — each component queries for its own,
+    which is what keeps an artifact current when the data moves."""
+    body = components.render_body(spec)
+    config = components.spec_payload(spec)
+    theme_json = json.dumps(
+        {"colors": PALETTE.get(theme, PALETTE["chester"]), "text": DEFAULT_TEXT_COLOR}
     ).replace("</", "<\\/")
+
     return (
-        "<!doctype html>\n<html><head><meta charset='utf-8'>"
+        "<!doctype html>\n<html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
         f"<title>{html_lib.escape(title)}</title>"
-        "<style>body{margin:0;font:14px 'Geist Sans',ui-sans-serif,system-ui,-apple-system,sans-serif;"
-        "background:#fbfbfa;color:#171614}</style>"
+        f"<style>{RUNTIME_CSS}</style>"
         f"<script src='{html_lib.escape(CHART_LIB_URL, quote=True)}'></script>"
-        f"<script>(function(){{var b={payload};"
-        "window.__CHESTER_META__=b.meta;window.__CHESTER_THEME__=b.theme;}})();</script>"
-        f"<script>{RUNTIME_JS}</script>"
-        f"</head><body>\n{markup}\n</body></html>"
+        f"<script>window.__CHESTER_SPEC__={config};"
+        f"window.__CHESTER_THEME__={theme_json};</script>"
+        f"</head><body>\n{body}\n"
+        f"<script>{RUNTIME_JS}</script>\n</body></html>"
     )
