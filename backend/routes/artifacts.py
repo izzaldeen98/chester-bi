@@ -77,13 +77,9 @@ async def _artifact_scope(db: Session, user: User, row: Artifact):
             status_code=status.HTTP_409_CONFLICT,
             detail="This artifact is not bound to a semantic model. Recreate it.",
         )
-    model, cube_names = await _model_scope(db, user, row.semantic_model.public_key)
-    if not cube_names:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f'The semantic model "{model.name}" defines no cubes.',
-        )
-    return model, cube_names
+    # _model_scope raises if the model resolves to no cubes, so this can never
+    # hand back an unscoped view.
+    return await _model_scope(db, user, row.semantic_model.public_key)
 
 
 def _spec_for_version(row: Artifact, version: int | None) -> dict:

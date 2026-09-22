@@ -64,6 +64,8 @@ def main():
 
     check_cube_name_parsing()
     check_row_packing()
+    check_scope_never_falls_open()
+    check_agent_refuses_unscoped()
     check_model_isolation()
     check_spec_validation()
     check_effective_query()
@@ -115,6 +117,59 @@ def check_row_packing():
     assert spans([]) == []
     # An unknown size falls back to half rather than breaking the row maths.
     assert sum(spans(["enormous"])) == 12
+
+
+def check_scope_never_falls_open():
+    """`None` cube-names must mean "no model requested", never "this model
+    resolved to nothing".
+
+    Conflating the two silently disabled isolation: a model whose definitions
+    were not written yet resolved to an empty set, which became None, which
+    cube_grounding read as "no scope" — so the agent was shown every cube in
+    the account instead of that model's none."""
+    raw = {"cubes": [
+        {"name": "loads", "measures": [{"name": "loads.total", "type": "number"}], "dimensions": []},
+        {"name": "orders", "measures": [{"name": "orders.total", "type": "number"}], "dimensions": []},
+    ]}
+    from unittest.mock import patch
+    from ai import grounding
+
+    with patch.object(grounding, "meta_raw", lambda t: raw), \
+         patch.object(grounding, "mint_token", lambda *a: "t"), \
+         patch.object(grounding, "get_cached_query", lambda k: None), \
+         patch.object(grounding, "cache_query", lambda k, v: True), \
+         patch.object(grounding, "_definition_version", lambda k: "v"):
+        # Scoped to one model: only that model's members.
+        _, one = grounding.cube_grounding(None, "acct", 1, {"loads"})
+        assert one["all"] == {"loads.total"}, one["all"]
+
+        # An EMPTY scope must stay empty. If this ever returns both cubes,
+        # an unresolvable model has been silently unscoped again.
+        _, empty = grounding.cube_grounding(None, "acct", 1, set())
+        assert empty["all"] == set(), (
+            "an empty cube scope leaked the whole account: " + repr(empty["all"])
+        )
+
+        # Only an explicit None means "no model requested".
+        _, everything = grounding.cube_grounding(None, "acct", 1, None)
+        assert everything["all"] == {"loads.total", "orders.total"}
+
+
+def check_agent_refuses_unscoped():
+    """Isolation must not be losable by forgetting an argument."""
+    from ai.artifact import _require_scope
+
+    class M:
+        name = "logistics"
+
+    _require_scope(None, None)        # no model requested — fine
+    _require_scope(M(), {"loads"})    # scoped — fine
+    for missing in (None, set()):
+        try:
+            _require_scope(M(), missing)
+            raise AssertionError(f"should have refused {missing!r}")
+        except Exception as exc:
+            assert "without its cube scope" in str(exc), exc
 
 
 def check_model_isolation():

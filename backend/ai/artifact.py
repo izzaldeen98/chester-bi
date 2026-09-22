@@ -324,6 +324,20 @@ def _plan(adapter, model: str, system: str, user_msg: str, members: dict) -> tup
     raise Exception("; ".join(errors[:5]))
 
 
+def _require_scope(semantic_model, allowed_cubes):
+    """A named model must arrive with its cube scope.
+
+    Both callers default allowed_cubes to None for the genuinely unscoped
+    case, so a caller that forgets to pass it would silently ground the agent
+    in every cube in the account. Refusing here means isolation cannot be
+    lost by omission at a call site."""
+    if semantic_model is not None and not allowed_cubes:
+        raise Exception(
+            f'Refusing to build against "{semantic_model.name}" without its cube scope — '
+            "this would expose every model in the account to the agent."
+        )
+
+
 def generate(db: Session, user: User, provider_row, model: str, brief: str, theme: str,
              semantic_model=None, allowed_cubes: set | None = None) -> dict:
     """One LLM turn produces the whole spec — queries, filters and components.
@@ -331,6 +345,7 @@ def generate(db: Session, user: User, provider_row, model: str, brief: str, them
     There is no second turn writing HTML: the page is assembled from pre-built
     components, so the model's entire output is a small JSON config. That is
     both far cheaper and the reason components always line up."""
+    _require_scope(semantic_model, allowed_cubes)
     cube_context, members = cube_grounding(
         db, user.account.public_key, user.account_id, allowed_cubes
     )
@@ -398,6 +413,7 @@ def refine(db: Session, user: User, provider_row, model: str, current_spec: dict
            queries: list, instruction: str, semantic_model=None,
            allowed_cubes: set | None = None) -> dict:
     """Edit the spec, not a page. Returns {spec, queries, usage}."""
+    _require_scope(semantic_model, allowed_cubes)
     cube_context, members = cube_grounding(
         db, user.account.public_key, user.account_id, allowed_cubes
     )

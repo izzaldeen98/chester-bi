@@ -101,7 +101,20 @@ async def _model_scope(db: Session, user: User, semantic_model_id: UUID | None):
     if not model:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Semantic model not found")
 
-    return model, (await _cube_names_for(user, model) or None)
+    cube_names = await _cube_names_for(user, model)
+    if not cube_names:
+        # Never fall back to "unscoped". None means "no model was requested";
+        # a model that resolves to no cubes must fail, or the agent would be
+        # shown every cube in the account — which is what happened for a model
+        # whose definitions had not been written yet.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f'The semantic model "{model.name}" has no cubes yet. Add a definition '
+                f"to it under Models before building an artifact from it."
+            ),
+        )
+    return model, cube_names
 
 
 async def _cube_names_for(user: User, model) -> set:
@@ -127,7 +140,11 @@ async def _cube_names_for(user: User, model) -> set:
             cube_names |= extract_cube_names(content.getvalue().decode("utf-8"))
 
     try:
-        cache_query(key, {"cubes": sorted(cube_names)})
+        # An empty result is never cached: it is usually a model mid-setup or
+        # a transient storage failure, and caching it would keep the model
+        # broken until some unrelated definition changed.
+        if cube_names:
+            cache_query(key, {"cubes": sorted(cube_names)})
     except Exception:
         pass
     return cube_names
