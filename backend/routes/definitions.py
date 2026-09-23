@@ -224,8 +224,14 @@ async def query_definition(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Unauthorized: Insufficient permissions",
         )
+    # Scoped to the account: resolving by public_key alone let any signed-in
+    # user run queries against another account's semantic model.
     target_definition = (
-        db.query(Definition).filter(Definition.public_key == definition_id).first()
+        db.query(Definition)
+        .join(Definition.model)
+        .filter(Definition.public_key == definition_id,
+                Model.account_id == current_user.account_id)
+        .first()
     )
     if not target_definition:
         raise HTTPException(
@@ -241,7 +247,13 @@ async def query_definition(
 
     # `query` is a JSON-encoded Cube query object (see frontend/src/lib/CubeQueryBuilder.ts).
     token = mint_token(db, current_user.account.public_key, current_user.account_id)
-    result = cube_load(token, json.loads(query))
+    try:
+        result = cube_load(token, json.loads(query))
+    except Exception as exc:
+        # Cube's message says what is actually wrong — a measure summing a
+        # text column, an unknown member. Returning a bare 500 left the query
+        # builder showing "Request failed (500)" and nothing to act on.
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     end_time = time.time()
     if result.get("data") != []:
         cache_query(redis_key, result)

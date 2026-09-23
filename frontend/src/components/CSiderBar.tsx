@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { RiHomeLine, RiLogoutBoxLine } from "react-icons/ri";
 import { MdOutlineCloud, MdAutoAwesome } from "react-icons/md";
-import { FaFileAlt, FaUser, FaKey, FaBars } from "react-icons/fa";
+import { FaFileAlt, FaUser, FaKey, FaBars, FaTable } from "react-icons/fa";
 import { GoPackage } from "react-icons/go";
 import { HiSun, HiMoon } from "react-icons/hi";
 import { clearToken, getUser } from "../lib/auth";
@@ -21,6 +21,7 @@ const pipeline: NavItem[] = [
   { label: "Connections", path: "/connections", icon: <MdOutlineCloud size={15} /> },
   { label: "Models", path: "/models", icon: <GoPackage size={14} /> },
   { label: "Artifacts", path: "/artifacts", icon: <MdAutoAwesome size={15} /> },
+  { label: "Queries", path: "/queries", icon: <FaTable size={12} /> },
 ];
 
 const workspace: NavItem[] = [

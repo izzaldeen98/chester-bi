@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { MdAutoAwesome, MdOutlineCloud } from "react-icons/md";
 import { GoPackage } from "react-icons/go";
 import { RiHomeLine } from "react-icons/ri";
-import { FaFileAlt, FaUser, FaKey, FaPlus, FaSearch } from "react-icons/fa";
+import { FaFileAlt, FaUser, FaKey, FaPlus, FaSearch, FaTable } from "react-icons/fa";
 import { getArtifacts, type ArtifactResponse } from "../lib/Api";
 
 interface Command {
@@ -40,9 +40,11 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
       onClose();
     };
     const base: Command[] = [
+      { id: "new-query", label: "New query", hint: "Build one by hand", group: "Actions", icon: <FaPlus size={11} />, run: go("/queries/new") },
       { id: "new", label: "New artifact", hint: "Describe an analysis", group: "Actions", icon: <FaPlus size={11} />, run: go("/artifacts/new") },
       { id: "home", label: "Overview", group: "Go to", icon: <RiHomeLine size={13} />, run: go("/home") },
       { id: "artifacts", label: "Artifacts", group: "Go to", icon: <MdAutoAwesome size={13} />, run: go("/artifacts") },
+      { id: "queries", label: "Queries", group: "Go to", icon: <FaTable size={11} />, run: go("/queries") },
       { id: "connections", label: "Connections", group: "Go to", icon: <MdOutlineCloud size={13} />, run: go("/connections") },
       { id: "models", label: "Models", group: "Go to", icon: <GoPackage size={12} />, run: go("/models") },
       { id: "files", label: "Files", group: "Go to", icon: <FaFileAlt size={11} />, run: go("/files") },

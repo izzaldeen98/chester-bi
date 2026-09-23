@@ -6,6 +6,7 @@ from .models import Model
 from .definitions import Definition
 from .ai_provider import AIProvider
 from .artifact import Artifact
+from .query import SavedQuery
 
 
 __all__ = [
@@ -17,4 +18,5 @@ __all__ = [
     "Definition",
     "AIProvider",
     "Artifact",
+    "SavedQuery",
 ]

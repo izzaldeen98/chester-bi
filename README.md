@@ -70,6 +70,8 @@ servers except the prompt and your schema.
 - **Connections** — PostgreSQL, MySQL, SQL Server, SQLite, ClickHouse, BigQuery, Snowflake, or uploaded CSV/Parquet files
 - **Model Editor** — define Cube semantic models in a visual, form-based builder or edit
   the underlying YAML directly, side by side
+- **Queries** — build a query by hand against a semantic model, run it and save it.
+  Saved queries are yours alone: no part of the AI path can read them
 - **Sandboxed by design** — generated pages run in an isolated iframe with no access to
   your session, storage or API
 - **Access Control** — per-user permissions across connections, models and artifacts

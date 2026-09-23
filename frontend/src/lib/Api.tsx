@@ -415,6 +415,107 @@ export async function runQuery(definitionId: string, query: CubeQuery): Promise<
   return handleResponse<any>(res);
 }
 
+// ── Saved queries ──────────────────────────────────────────────────────────
+// Queries a person built by hand. Deliberately not reachable by the artifact
+// agent: the backend keeps this table out of the AI path entirely (see
+// backend/utils/test_queries.py).
+
+export interface QueryModelRef {
+  id: string;
+  name: string;
+}
+
+export interface QueryDefinitionRef {
+  id: string;
+  name: string;
+  model: QueryModelRef;
+}
+
+export interface QueryPublicResponse {
+  id: string;
+  name: string;
+  description?: string;
+  source: string;
+  definition: QueryDefinitionRef;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+  updated_by: string;
+}
+
+export interface QueryDetailedResponse extends QueryPublicResponse {
+  aggregation_fields: string[];
+  group_by_fields?: string[];
+  filters?: Record<string, any>;
+  havings?: Record<string, any>;
+  order_by_fields?: Record<string, any>;
+  limit?: number;
+  limit_enabled: boolean;
+  cube_query: CubeQuery;
+}
+
+export interface QueryCreate {
+  name: string;
+  description?: string;
+  source: string;
+  aggregation_fields: string[];
+  group_by_fields?: string[];
+  filters?: Record<string, any>;
+  havings?: Record<string, any>;
+  order_by_fields?: Record<string, any>;
+  limit?: number;
+  limit_enabled?: boolean;
+  cube_query: CubeQuery;
+}
+
+export interface QueryUpdate extends Partial<QueryCreate> {
+  definition_id?: string;
+}
+
+export async function getSavedQueries(): Promise<QueryPublicResponse[]> {
+  const res = await fetch(`/api/v1/queries/list`, { headers: { ...authHeaders() } });
+  return handleResponse<QueryPublicResponse[]>(res);
+}
+
+export async function getSavedQuery(queryId: string): Promise<QueryDetailedResponse> {
+  const res = await fetch(`/api/v1/queries/get?query_id=${queryId}`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<QueryDetailedResponse>(res);
+}
+
+export async function createSavedQuery(
+  definitionId: string,
+  data: QueryCreate,
+): Promise<QueryDetailedResponse> {
+  const res = await fetch(`/api/v1/queries/create?definition_id=${definitionId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<QueryDetailedResponse>(res);
+}
+
+export async function updateSavedQuery(
+  queryId: string,
+  data: QueryUpdate,
+): Promise<QueryDetailedResponse> {
+  const res = await fetch(`/api/v1/queries/update?query_id=${queryId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<QueryDetailedResponse>(res);
+}
+
+export async function deleteSavedQuery(queryId: string): Promise<void> {
+  const res = await fetch(`/api/v1/queries/delete?query_id=${queryId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<void>(res);
+}
+
 // ── Files ──────────────────────────────────────────────────────────────────
 
 export interface FilePublicResponse {

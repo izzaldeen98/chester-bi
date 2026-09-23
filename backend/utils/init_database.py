@@ -57,6 +57,37 @@ _ADDED_COLUMNS = [
 ]
 
 
+def retire_legacy_queries_table():
+    """Step aside from the pre-Cube `queries` table.
+
+    An install from before the Cube migration may still carry a `queries`
+    table keyed on `semantic_model_id`, a column — and a concept — that no
+    longer exists. Saved queries reuse the name, and create_all will not
+    reshape a table that is already there, so every read fails on a missing
+    column until this runs.
+
+    Nothing is deleted: an empty legacy table is dropped, and one with rows is
+    renamed aside so its data is still there to look at. Must run before
+    create_all, which then creates the current table.
+    """
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    if "queries" not in set(inspector.get_table_names()):
+        return
+
+    columns = {c["name"] for c in inspector.get_columns("queries")}
+    if "semantic_model_id" not in columns:
+        return  # already the current table
+
+    with engine.begin() as conn:
+        rows = conn.execute(text("SELECT COUNT(*) FROM queries")).scalar() or 0
+        if rows:
+            conn.execute(text("ALTER TABLE queries RENAME TO queries_pre_cube"))
+        else:
+            conn.execute(text("DROP TABLE queries"))
+
+
 def ensure_columns():
     from sqlalchemy import inspect, text
 

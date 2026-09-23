@@ -12,6 +12,8 @@ import FilesPage from './pages/FilesPage'
 import SettingsProvidersPage from './pages/SettingsProvidersPage'
 import ArtifactsPage from './pages/ArtifactsPage'
 import ArtifactWorkspace from './pages/ArtifactWorkspace'
+import QueriesPage from './pages/QueriesPage'
+import QueryWorkspace from './pages/QueryWorkspace'
 import RegisterPage from './pages/RegisterPage'
 
 // Placeholder for pages not yet built
@@ -40,6 +42,9 @@ export default function App() {
           <Route path="/artifacts"   element={<ArtifactsPage />} />
           <Route path="/artifacts/new" element={<ArtifactWorkspace />} />
           <Route path="/artifacts/:artifactId" element={<ArtifactWorkspace />} />
+          <Route path="/queries"     element={<QueriesPage />} />
+          <Route path="/queries/new" element={<QueryWorkspace />} />
+          <Route path="/queries/:savedQueryId" element={<QueryWorkspace />} />
           <Route path="/settings/ai-providers" element={<SettingsProvidersPage />} />
           <Route path="/files"       element={<FilesPage />} />
           <Route path="/connections" element={<ConnectionsPage />} />

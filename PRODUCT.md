@@ -57,6 +57,11 @@ The path through the product is linear and each step is a prerequisite for the n
 **Models** and their Cube definitions, authored in a visual builder or directly in YAML →
 **Artifacts**, prompted in natural language against one chosen semantic model.
 
+From a model a user may also branch to **Queries** — building one by hand instead of
+prompting for it. A saved query is the author's own working material and is deliberately
+outside the AI path: nothing under backend/ai/ can read it, and the artifact agent is
+grounded on Cube's compiled schema alone.
+
 - **AI Providers** must be configured before any artifact can be created: the user adds a
   provider, pastes their own API key, and picks one model. That choice is made once at
   setup, not on every prompt.
