@@ -67,7 +67,7 @@ servers except the prompt and your schema.
   compare and restore, with token usage recorded per version
 - **Bring your own model** — OpenAI, Anthropic Claude, Google Gemini, DeepSeek and Qwen,
   with API keys encrypted at rest and never returned to the browser
-- **Connections** — PostgreSQL, MySQL, BigQuery, Snowflake, or uploaded CSV/Parquet files
+- **Connections** — PostgreSQL, MySQL, SQL Server, ClickHouse, BigQuery, Snowflake, or uploaded CSV/Parquet files
 - **Model Editor** — define Cube semantic models in a visual, form-based builder or edit
   the underlying YAML directly, side by side
 - **Sandboxed by design** — generated pages run in an isolated iframe with no access to

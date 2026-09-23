@@ -12,6 +12,7 @@ import CAlert from "../components/CAlert";
 import CSpinner from "../components/CSpinner";
 import CDetailRow from "../components/CDetailRow";
 import {
+  getConnectionTypes,
   getConnections,
   getConnection,
   createConnection,
@@ -20,17 +21,138 @@ import {
   testConnection,
   type ConnectionPublicResponse,
   type ConnectionDetailedResponse,
+  type ConnectionType,
+  type ConnectionField,
 } from "../lib/Api";
 
 type SidebarMode = "view" | "edit" | "create";
 
-// ── Connection type options ────────────────────────────────────────────────
-const CONNECTION_TYPES = [
-  { label: "PostgreSQL", value: "postgres" },
-  { label: "MySQL", value: "mysql" },
-  { label: "Snowflake", value: "snowflake" },
-  { label: "BigQuery", value: "bigquery" },
-];
+/* ── Credential fields ────────────────────────────────────────────────────
+   Which fields a database needs is the backend adapter's business, not this
+   page's: it serves them from /connections/types and they are rendered here
+   generically. Adding a dialect used to mean another branch in this file and
+   another set of useState hooks; now it means nothing at all. */
+type FormValues = Record<string, string | boolean>;
+
+function defaultsFor(spec: ConnectionType | undefined): FormValues {
+  const values: FormValues = {};
+  for (const f of spec?.fields ?? []) {
+    values[f.name] = f.kind === "boolean" ? Boolean(f.default) : f.default == null ? "" : String(f.default);
+  }
+  return values;
+}
+
+/* Blank optional fields are dropped rather than sent as "", which the
+   backend would store and later hand to a driver. */
+function attributesFrom(spec: ConnectionType | undefined, values: FormValues) {
+  const attrs: Record<string, string | number | boolean> = {};
+  for (const f of spec?.fields ?? []) {
+    const raw = values[f.name];
+    if (f.kind === "boolean") { if (raw) attrs[f.name] = true; continue; }
+    const text = String(raw ?? "").trim();
+    if (!text) continue;
+    attrs[f.name] = f.kind === "number" ? Number(text) : text;
+  }
+  return attrs;
+}
+
+function ConnectionFields({
+  spec, values, onChange, secretsBlank = false,
+}: {
+  spec: ConnectionType | undefined;
+  values: FormValues;
+  onChange: (name: string, value: string | boolean) => void;
+  secretsBlank?: boolean;
+}) {
+  if (!spec) return null;
+  return (
+    <div
+      className="flex flex-col gap-3 rounded-[var(--r-sm)] p-4"
+      style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
+    >
+      <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>
+        {spec.label} credentials
+      </p>
+      {secretsBlank && (
+        <p className="text-xs" style={{ color: "var(--text-2)" }}>
+          Secrets are never sent back to the browser — retype one only to change it.
+        </p>
+      )}
+      {spec.fields.map((f: ConnectionField) => (
+        <FieldControl key={f.name} field={f} value={values[f.name]} onChange={onChange} />
+      ))}
+    </div>
+  );
+}
+
+function FieldControl({
+  field, value, onChange,
+}: {
+  field: ConnectionField;
+  value: string | boolean | undefined;
+  onChange: (name: string, value: string | boolean) => void;
+}) {
+  const help = field.help ? (
+    <p className="mt-1 text-xs" style={{ color: "var(--text-3)" }}>{field.help}</p>
+  ) : null;
+
+  if (field.kind === "boolean") {
+    return (
+      <label className="flex items-center gap-2 text-[13px]" style={{ color: "var(--text)" }}>
+        <input
+          type="checkbox"
+          checked={Boolean(value)}
+          onChange={(e) => onChange(field.name, e.target.checked)}
+          style={{ accentColor: "var(--accent)", width: 14, height: 14 }}
+        />
+        {field.label}
+        {help}
+      </label>
+    );
+  }
+
+  if (field.kind === "textarea") {
+    return (
+      <label className="block">
+        <span className="mb-1.5 block text-[13px] font-medium" style={{ color: "var(--text)" }}>
+          {field.label}
+          {field.required && <span style={{ color: "var(--text-3)" }}> *</span>}
+        </span>
+        <textarea
+          rows={5}
+          value={String(value ?? "")}
+          onChange={(e) => onChange(field.name, e.target.value)}
+          placeholder={field.placeholder}
+          spellCheck={false}
+          className="mono w-full rounded-[var(--r-sm)] px-2.5 py-2 text-[12px]"
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border-strong)",
+            color: "var(--text)",
+            resize: "vertical",
+          }}
+        />
+        {help}
+      </label>
+    );
+  }
+
+  return (
+    <div>
+      <CTextInput
+        label={field.label}
+        type={field.kind === "number" ? "number" : field.kind === "password" ? "password" : "text"}
+        value={String(value ?? "")}
+        onChange={(v) => onChange(field.name, v)}
+        placeholder={field.placeholder}
+        required={field.required}
+        icon={field.kind === "password" ? <RiLockPasswordFill size={15} /> : undefined}
+        autoComplete={field.kind === "password" ? "new-password" : undefined}
+      />
+      {help}
+    </div>
+  );
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function getInitials(name: string) {
@@ -62,31 +184,24 @@ export default function ConnectionsPage() {
   const [saving, setSaving]                   = useState(false);
   const [formError, setFormError]             = useState("");
 
-  // Edit fields (connection attributes)
+  // The supported dialects and their fields, as the backend declares them.
+  const [types, setTypes] = useState<ConnectionType[]>([]);
+
+  // Name/description are common to every dialect; the credentials are not,
+  // so they live in one map keyed by the adapter's own field names.
   const [fName,        setFName]        = useState("");
   const [fDescription, setFDescription] = useState("");
-  const [fHost,        setFHost]        = useState("");
-  const [fPort,        setFPort]        = useState("");
-  const [fDatabase,    setFDatabase]    = useState("");
-  const [fUsername,    setFUsername]    = useState("");
-  const [fPassword,    setFPassword]    = useState("");
-
-  // Create fields
   const [cName,        setCName]        = useState("");
   const [cType,        setCType]        = useState("");
   const [cDescription, setCDescription] = useState("");
-  const [cHost,        setCHost]        = useState("");
-  const [cPort,        setCPort]        = useState("");
-  const [cDatabase,    setCDatabase]    = useState("");
-  const [cUsername,    setCUsername]    = useState("");
-  const [cPassword,    setCPassword]    = useState("");
-  const [cAccount,     setCAccount]     = useState("");
-  const [cProjectId,   setCProjectId]   = useState("");
-  const [cCredentials, setCCredentials] = useState("");
-  const [cPrivateKey,  setCPrivateKey]  = useState("");
-  const [cPrivateKeyPassphrase, setCPrivateKeyPassphrase] = useState("");
-  const [cSchema,      setCSchema]      = useState("");
-  const [cWarehouse,   setCWarehouse]   = useState("");
+  const [form,         setForm]         = useState<FormValues>({});
+
+  const activeType = mode === "create" ? cType : selected?.type ?? "";
+  const spec = types.find((t) => t.type === activeType);
+
+  function setField(name: string, value: string | boolean) {
+    setForm((prev) => ({ ...prev, [name]: value }));
+  }
 
   // Test connection
   const [testing,    setTesting]    = useState(false);
@@ -98,7 +213,12 @@ export default function ConnectionsPage() {
   const [deleteError, setDeleteError] = useState("");
 
   // ── Fetch on mount ───────────────────────────────────────────────────────
-  useEffect(() => { fetchConnections(); }, []);
+  useEffect(() => {
+    fetchConnections();
+    // A dialect the backend cannot serve is one the user must not be offered.
+    getConnectionTypes().then(setTypes).catch((e) =>
+      setPageError(e.message ?? "Failed to load connection types."));
+  }, []);
 
   async function fetchConnections() {
     setLoading(true); setPageError("");
@@ -138,19 +258,23 @@ export default function ConnectionsPage() {
     setSelected(c);
     setFName(c.name);
     setFDescription(c.description ?? "");
-    setFHost(d?.host ?? "");
-    setFPort(d?.port !== undefined ? String(d.port) : "");
-    setFDatabase(d?.database ?? "");
-    setFUsername(d?.username ?? "");
-    setFPassword("");
+    // Secrets are not in the detail response and must not be, so they start
+    // blank and are only sent when retyped.
+    const current = types.find((t) => t.type === c.type);
+    setForm({ ...defaultsFor(current), ...(d?.attributes ?? {}) } as FormValues);
     setFormError(""); setMode("edit");
   }
 
   function openCreate() {
     setSelected(null);
     setCName(""); setCType(""); setCDescription("");
-    setCHost(""); setCPort(""); setCDatabase(""); setCUsername(""); setCPassword("");
+    setForm({});
     setFormError(""); setMode("create");
+  }
+
+  function chooseType(next: string) {
+    setCType(next);
+    setForm(defaultsFor(types.find((t) => t.type === next)));
   }
 
   function closePanel() {
@@ -163,12 +287,7 @@ export default function ConnectionsPage() {
     if (!fName.trim()) { setFormError("Name is required."); return; }
     setSaving(true); setFormError("");
     try {
-      const attrs: Record<string, string | number> = {};
-      if (fHost.trim())     attrs.host     = fHost.trim();
-      if (fPort.trim())     attrs.port     = Number(fPort);
-      if (fDatabase.trim()) attrs.database = fDatabase.trim();
-      if (fUsername.trim()) attrs.username = fUsername.trim();
-      if (fPassword.trim()) attrs.password = fPassword.trim();
+      const attrs = attributesFrom(spec, form);
 
       await updateConnection(selected.id, {
         name: fName,
@@ -184,29 +303,13 @@ export default function ConnectionsPage() {
 
   // ── Save create ──────────────────────────────────────────────────────────
   async function saveCreate() {
+    if (!cType) { setFormError("Pick a database type."); return; }
     setSaving(true); setFormError("");
-    let connection_attributes: Record<string, string | number> = {};
     try {
-      if (cType === "postgres" || cType === "mysql") {
-        connection_attributes = {
-          host: cHost, port: Number(cPort) || 5432,
-          database: cDatabase, username: cUsername, password: cPassword,
-        };
-      }
-      if (cType === "snowflake") {
-        connection_attributes = {
-          account: cAccount, username: cUsername, password: cPassword, schema: cSchema, warehouse: cWarehouse, private_key: cPrivateKey, private_key_passphrase: cPrivateKeyPassphrase,
-        }
-      }
-      if (cType === "bigquery") {
-        connection_attributes = {
-          project_id: cProjectId, credentials: cCredentials,
-        };
-      }
       await createConnection({
         name: cName, type: cType,
         description: cDescription || undefined,
-        connection_attributes: connection_attributes,
+        connection_attributes: attributesFrom(spec, form),
       });
 
       await fetchConnections();
@@ -251,40 +354,18 @@ export default function ConnectionsPage() {
           <div className="rounded-[var(--r-sm)] p-4 flex flex-col gap-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
             <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>General</p>
             <CTextInput label="Name" value={cName} onChange={setCName} placeholder="e.g. Production DB" required />
-            <CSelect label="Type" value={cType} onChange={setCType} options={CONNECTION_TYPES} placeholder="Select type…" required />
+            <CSelect
+              label="Type"
+              value={cType}
+              onChange={chooseType}
+              options={types.map((t) => ({ label: t.label, value: t.type }))}
+              placeholder="Select type…"
+              required
+            />
             <CTextInput label="Description" value={cDescription} onChange={setCDescription} placeholder="Optional" />
           </div>
-          {(cType === "postgres" || cType === "mysql") && (
-            <div className="rounded-[var(--r-sm)] p-4 flex flex-col gap-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>Connection Attributes</p>
-              <CTextInput label="Host"     value={cHost}     onChange={setCHost}     placeholder="e.g. localhost" required />
-              <CTextInput label="Port"     value={cPort}     onChange={setCPort}     placeholder="e.g. 5432" type="number" />
-              <CTextInput label="Database" value={cDatabase} onChange={setCDatabase} placeholder="e.g. my_db" required />
-              <CTextInput label="Username" value={cUsername} onChange={setCUsername} placeholder="e.g. admin" required />
-              <CTextInput label="Password" value={cPassword} onChange={setCPassword} type="password" icon={<RiLockPasswordFill size={15} />} autoComplete="new-password" />
-            </div>
-          )}
-          {cType === "snowflake" && (
-            <div className="rounded-[var(--r-sm)] p-4 flex flex-col gap-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>Connection Attributes</p>
-              <CTextInput label="Account" value={cAccount} onChange={setCAccount} placeholder="e.g. my_account"  />
-              <CTextInput label="Username" value={cUsername} onChange={setCUsername} placeholder="e.g. admin"  />
-              <CTextInput label="Password" value={cPassword} onChange={setCPassword} type="password" icon={<RiLockPasswordFill size={15} />} autoComplete="new-password" />
-              <CTextInput label="Schema" value={cSchema} onChange={setCSchema} placeholder="e.g. my_schema"  />
-              <CTextInput label="Warehouse" value={cWarehouse} onChange={setCWarehouse} placeholder="e.g. my_warehouse" required />
-              <CTextInput label="Private Key" value={cPrivateKey} onChange={setCPrivateKey} type="text" placeholder="e.g. -----BEGIN PRIVATE KEY-----\nMIIEogIBAAKCAQEAwgwgwgSCAgEAAoIBAQCB0LDQu9C40L3QviAgMAwGCCqGSIb3DQEJ...
-              \n-----END PRIVATE KEY-----
-              " />
-              <CTextInput label="Private Key Passphrase" value={cPrivateKeyPassphrase} onChange={setCPrivateKeyPassphrase} type="text" placeholder="e.g. my_passphrase" />
-            </div>
-          )}
-          {cType === "bigquery" && (
-            <div className="rounded-[var(--r-sm)] p-4 flex flex-col gap-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>Connection Attributes</p>
-              <CTextInput label="Project ID" value={cProjectId} onChange={setCProjectId} placeholder="e.g. my_project" required />
-              <CTextInput label="Credentials" value={cCredentials} onChange={setCCredentials} type="text" placeholder='{"type": "service_account", "project_id": "my_project"}' />
-            </div>
-          )}
+
+          <ConnectionFields spec={spec} values={form} onChange={setField} />
         </div>
       );
     }
@@ -302,15 +383,7 @@ export default function ConnectionsPage() {
             <CTextInput label="Description" value={fDescription} onChange={setFDescription} />
           </div>
 
-          <div className="rounded-[var(--r-sm)] p-4 flex flex-col gap-3" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
-            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>Connection Attributes</p>
-            <p className="text-xs" style={{ color: "var(--text-2)" }}>Leave a field blank to keep the existing value.</p>
-            <CTextInput label="Host"     value={fHost}     onChange={setFHost}     placeholder="unchanged" />
-            <CTextInput label="Port"     value={fPort}     onChange={setFPort}     placeholder="unchanged" type="number" />
-            <CTextInput label="Database" value={fDatabase} onChange={setFDatabase} placeholder="unchanged" />
-            <CTextInput label="Username" value={fUsername} onChange={setFUsername} placeholder="unchanged" />
-            <CTextInput label="Password" value={fPassword} onChange={setFPassword} type="password" placeholder="unchanged" icon={<RiLockPasswordFill size={15} />} autoComplete="new-password" />
-          </div>
+          <ConnectionFields spec={spec} values={form} onChange={setField} secretsBlank />
         </div>
       );
     }
@@ -358,10 +431,11 @@ export default function ConnectionsPage() {
                 Connection Attributes
               </p>
             </div>
-            <CDetailRow label="Host"     value={detail.host} />
-            <CDetailRow label="Port"     value={String(detail.port)} />
-            <CDetailRow label="Database" value={detail.database} />
-            <CDetailRow label="Username" value={detail.username} />
+            {(spec?.fields ?? [])
+              .filter((f) => !f.secret && detail.attributes?.[f.name] !== undefined)
+              .map((f) => (
+                <CDetailRow key={f.name} label={f.label} value={String(detail.attributes[f.name])} />
+              ))}
           </>
         ) : null}
 

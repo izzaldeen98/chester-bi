@@ -63,8 +63,16 @@ module.exports = {
   contextToAppId: ({ securityContext }) =>
     securityContext ? `${securityContext.accountId}_${securityContext.definitionVersion || '0'}` : NO_CONTEXT_APP_ID,
 
+  // The orchestrator caches one resolved driver per dataSource for its whole
+  // life, so the account alone is not enough to key it on: a connection added
+  // (or re-credentialled) later would never be looked up again, and its
+  // queries failed with "No connection named ...". connectionsVersion is a
+  // hash of the account's connection set (see backend/utils/cube.py), so
+  // changing one retires the old orchestrator rather than outliving it.
   contextToOrchestratorId: ({ securityContext }) =>
-    securityContext ? securityContext.accountId : NO_CONTEXT_APP_ID,
+    securityContext
+      ? `${securityContext.accountId}_${securityContext.connectionsVersion || '0'}`
+      : NO_CONTEXT_APP_ID,
 
   repositoryFactory: ({ securityContext }) =>
     new FileRepository(repositoryPathFor(securityContext && securityContext.accountId)),
@@ -87,17 +95,13 @@ module.exports = {
       return { type: 'duckdb', database: conn.file };
     }
 
-    // Real database connections — postgres/mysql/snowflake/bigquery, matching
-    // the dialects backend/utils/malloy.py used to build per-account.
-    return {
-      type: conn.type,
-      host: conn.host,
-      port: conn.port,
-      database: conn.database,
-      user: conn.user,
-      password: conn.password,
-      ...(conn.extra || {}),
-    };
+    // Real database connections. The claim is already the exact option set
+    // this dialect's driver takes — backend/utils/db_drivers.py builds it
+    // from that driver's own constructor keys, which genuinely differ
+    // (mssql takes `server`, clickhouse and snowflake take `username`).
+    // Re-mapping the keys here is what silently broke every dialect that
+    // isn't shaped like Postgres, so nothing is re-mapped: pass it through.
+    return { ...conn };
   },
 
   scheduledRefreshContexts: () => [],

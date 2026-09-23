@@ -183,33 +183,51 @@ export interface ConnectionDetailedResponse {
   type: string;
   name: string;
   description?: string;
-  host: string;
-  port: number;
-  database: string;
-  username: string;
+  /* Dialects do not share a field set, so the backend returns whatever
+     non-secret attributes this one has. Secrets are never included. */
+  attributes: Record<string, string | number | boolean>;
   created_at: string;
   updated_at: string;
   created_by: string;
   updated_by: string;
 }
 
+/* One credential a dialect asks for. The backend's adapter is the only
+   place that knows these, so the connection form is built from this list
+   rather than a branch per database. */
+export interface ConnectionField {
+  name: string;
+  label: string;
+  kind: "text" | "number" | "password" | "textarea" | "boolean";
+  required: boolean;
+  secret: boolean;
+  default: string | number | boolean | null;
+  placeholder: string;
+  help: string;
+}
+
+export interface ConnectionType {
+  type: string;
+  label: string;
+  fields: ConnectionField[];
+}
+
 export interface ConnectionCreate {
   name: string;
   type: string;
   description?: string;
-  connection_attributes: Record<string, string | number>;
+  connection_attributes: Record<string, string | number | boolean>;
 }
 
 export interface ConnectionUpdate {
   name?: string;
   description?: string;
-  connection_attributes?: {
-    host?: string;
-    port?: number;
-    database?: string;
-    username?: string;
-    password?: string;
-  };
+  connection_attributes?: Record<string, string | number | boolean>;
+}
+
+export async function getConnectionTypes(): Promise<ConnectionType[]> {
+  const res = await fetch(`/api/v1/connections/types`, { headers: { ...authHeaders() } });
+  return handleResponse<ConnectionType[]>(res);
 }
 
 export async function getConnections(): Promise<ConnectionPublicResponse[]> {

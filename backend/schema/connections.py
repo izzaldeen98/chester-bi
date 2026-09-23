@@ -41,10 +41,10 @@ class ConnectionDetailedResponse(BaseModel):
     type: str
     name: str
     description: str | None = None
-    host: str
-    port: int
-    database: str
-    username: str
+    # Dialects do not share a field set — BigQuery has no host or port, and
+    # Snowflake may route by account instead. So the non-secret attributes
+    # are returned as they are stored, keyed by the adapter's field names.
+    attributes: dict = {}
     created_at: datetime
     updated_at: datetime
     created_by: str = Field(validation_alias=AliasPath("creator", "username"))

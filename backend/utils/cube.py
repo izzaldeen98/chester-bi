@@ -11,6 +11,7 @@ token's claims into a per-account DB connection (driverFactory) and
 definition directory (repositoryFactory).
 """
 import hashlib
+import json
 import os
 import re
 import time
@@ -22,7 +23,7 @@ from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 
 from models.connections import Connection
-from utils.db_drivers import decrypt_secret_values
+from utils.db_drivers import cube_driver_config, decrypt_secret_values
 
 load_dotenv()
 
@@ -76,15 +77,18 @@ def _connections_claim(db: Session, account_id: int) -> dict:
     )
     for conn in connections:
         attrs = decrypt_secret_values(conn.type, conn.connection_attributes)
-        claim[conn.name] = {
-            "type": conn.type,
-            "host": attrs.get("host"),
-            "port": attrs.get("port"),
-            "database": attrs.get("database"),
-            "user": attrs.get("username"),
-            "password": attrs.get("password"),
-        }
+        # The adapter owns the option names, which differ per dialect (MS SQL
+        # takes `server`, ClickHouse and Snowflake take `username`). This used
+        # to assume every dialect looked like Postgres, so anything else was
+        # accepted at setup and then failed on the first query.
+        claim[conn.name] = cube_driver_config(conn.type, attrs)
     return claim
+
+
+def _connections_version(claim: dict) -> str:
+    """A value that changes whenever this account's connections do."""
+    canonical = json.dumps(claim, sort_keys=True, default=str)
+    return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
 
 def mint_token(db: Session, account_public_key, account_id: int) -> str:
@@ -93,10 +97,19 @@ def mint_token(db: Session, account_public_key, account_id: int) -> str:
             "CUBEJS_API_SECRET is not set — add it to your .env (must match the "
             "cube service's CUBEJS_API_SECRET in docker-compose.yml)."
         )
+    connections = _connections_claim(db, account_id)
     claims = {
         "accountId": str(account_public_key),
         "definitionVersion": _definition_version(account_public_key),
-        "connections": _connections_claim(db, account_id),
+        "connections": connections,
+        # Cube caches one query orchestrator per contextToOrchestratorId, and
+        # that orchestrator resolves each dataSource through driverFactory
+        # once and keeps it. Keyed on the account alone, a connection added
+        # or re-credentialled after the account's first query was invisible
+        # until Cube restarted — the query failed with "No connection named
+        # ...". Folding the connection set into the id retires the stale
+        # orchestrator instead.
+        "connectionsVersion": _connections_version(connections),
         "exp": int(time.time()) + TOKEN_TTL_SECONDS,
     }
     return jwt.encode(claims, CUBEJS_API_SECRET, algorithm=CUBEJS_ALGORITHM)

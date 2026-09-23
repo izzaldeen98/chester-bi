@@ -8,7 +8,7 @@
 
 | Feature | Category | Status |
 |---|---|---|
-| MySQL, BigQuery, and Snowflake connections | Connectivity | ✅ Done |
+| MySQL, SQL Server, ClickHouse, BigQuery, and Snowflake connections | Connectivity | ✅ Done |
 | Filtering on measures | Modeling | ✅ Done |
 | Calculated columns | Modeling | ✅ Done |
 | Field tree (source/field browser) | Explorer UI | ✅ Done |
