@@ -28,15 +28,26 @@ export default function ArtifactsPage() {
   const [artifacts, setArtifacts] = useState<ArtifactResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [loaded, setLoaded] = useState(false);
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState<ArtifactResponse | null>(null);
   const [removing, setRemoving] = useState(false);
 
   function refresh() {
     setLoading(true);
+    setError("");
     getArtifacts()
-      .then(setArtifacts)
-      .catch((e) => setError(e.message))
+      .then((rows) => {
+        setArtifacts(rows);
+        setLoaded(true);
+      })
+      // A failed load is not an empty account: showing the "nothing here yet"
+      // state for a request that never succeeded told people their work was
+      // gone when the session had merely expired.
+      .catch((e) => {
+        setLoaded(false);
+        setError(e.message);
+      })
       .finally(() => setLoading(false));
   }
 
@@ -95,7 +106,7 @@ export default function ArtifactsPage() {
               <CSpinner size={18} />
               <span className=" text-[12px]">Loading…</span>
             </div>
-          ) : shown.length === 0 ? (
+          ) : !loaded ? null : shown.length === 0 ? (
             <EmptyBoard
               line={artifacts.length === 0 ? "No artifacts yet" : "No matches"}
               hint={

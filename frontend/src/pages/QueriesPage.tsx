@@ -29,15 +29,26 @@ export default function QueriesPage() {
   const [queries, setQueries] = useState<QueryPublicResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [loaded, setLoaded] = useState(false);
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState<QueryPublicResponse | null>(null);
   const [removing, setRemoving] = useState(false);
 
   function refresh() {
     setLoading(true);
+    setError("");
     getSavedQueries()
-      .then(setQueries)
-      .catch((e) => setError(e.message))
+      .then((rows) => {
+        setQueries(rows);
+        setLoaded(true);
+      })
+      // A failed load is not an empty account: showing the "nothing here yet"
+      // state for a request that never succeeded told people their work was
+      // gone when the session had merely expired.
+      .catch((e) => {
+        setLoaded(false);
+        setError(e.message);
+      })
       .finally(() => setLoading(false));
   }
 
@@ -98,7 +109,7 @@ export default function QueriesPage() {
               <CSpinner size={18} />
               <span className="text-[12px]">Loading…</span>
             </div>
-          ) : shown.length === 0 ? (
+          ) : !loaded ? null : shown.length === 0 ? (
             <EmptyBoard
               line={queries.length === 0 ? "No queries yet" : "No matches"}
               hint={

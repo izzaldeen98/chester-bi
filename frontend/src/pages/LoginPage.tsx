@@ -17,6 +17,11 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const justRegistered = (location.state as any)?.registered === true;
+  /* Arrived here because a request came back 401 — say so, and return the
+     user to the page they were on once they are back in. */
+  const params = new URLSearchParams(location.search);
+  const sessionExpired = params.get("expired") === "1";
+  const next = params.get("next");
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -33,7 +38,7 @@ export default function LoginPage() {
       const data = await login(username.trim(), password);
       setToken(data.access_token);
       if (data.user) setUser(data.user);
-      navigate("/home", { replace: true });
+      navigate(next || "/home", { replace: true });
     } catch (err: any) {
       setError(err.message ?? "Something went wrong. Please try again.");
     } finally {
@@ -78,6 +83,9 @@ export default function LoginPage() {
           {error && <CAlert variant="error" message={error} />}
           {justRegistered && !error && (
             <CAlert variant="success" message="Account created! Sign in to continue." />
+          )}
+          {sessionExpired && !error && (
+            <CAlert variant="warning" message="Your session expired. Sign in again to pick up where you left off." />
           )}
 
           <CTextInput

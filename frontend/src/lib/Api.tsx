@@ -1,7 +1,7 @@
 // All paths are relative — Vite proxies /api/* to the backend in dev,
 // and the production server should be configured to do the same.
 
-import { getToken } from "./auth";
+import { getToken, clearToken, clearUser } from "./auth";
 import { SourceInfo, CubeQuery } from "./cubeTypes";
 
 function authHeaders(): HeadersInit {
@@ -9,7 +9,27 @@ function authHeaders(): HeadersInit {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+/* An expired token used to be invisible: every call threw a generic error,
+   nothing acted on it, and the app carried on looking signed in — an empty
+   artifact list saying "No artifacts yet" and pages with no data in them.
+   A dead session now ends the session and says so. */
+function sessionExpired(res: Response) {
+  // Not for the login/register calls themselves: a wrong password is a 401
+  // too, and reloading the page would throw away the message.
+  if (/\/api\/v1\/auth\//.test(res.url)) return false;
+  return res.status === 401;
+}
+
 async function handleResponse<T>(res: Response): Promise<T> {
+  if (sessionExpired(res)) {
+    clearToken();
+    clearUser();
+    if (!window.location.pathname.startsWith("/login")) {
+      const next = window.location.pathname + window.location.search;
+      window.location.assign(`/login?expired=1&next=${encodeURIComponent(next)}`);
+    }
+    throw new Error("Your session has expired. Please sign in again.");
+  }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     if (Array.isArray(data?.detail)) {
