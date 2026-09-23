@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from models.connections import Connection
 from utils.db_drivers import cube_driver_config, decrypt_secret_values
+from utils.paths import local_dir
 
 load_dotenv()
 
@@ -32,7 +33,7 @@ CUBEJS_API_SECRET = os.getenv("CUBEJS_API_SECRET")
 CUBEJS_ALGORITHM = "HS256"
 TOKEN_TTL_SECONDS = 300
 
-DEFINITION_ROOT = os.path.join(os.getenv("LOCAL_DIR", "./.local/"), "cube_data")
+DEFINITION_ROOT = os.path.join(local_dir(), "cube_data")
 
 
 def definition_dir_for_account(account_public_key) -> str:

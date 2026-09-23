@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker , declarative_base
+from utils.paths import sqlite_url
 
 load_dotenv()
 
@@ -20,7 +21,10 @@ if DB_HOST and DB_PORT and DB_NAME and DB_USER and DB_PASSWORD:
     engine_url = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     connect_args = {}
 else:
-    engine_url = "sqlite:///./sqlite.db"
+    # Absolute, and resolved to the database that already exists — see
+    # utils/paths.py. A cwd-relative path silently opened an empty second
+    # database whenever the app was started from a different directory.
+    engine_url = sqlite_url()
     connect_args = {"check_same_thread": False}
 
 

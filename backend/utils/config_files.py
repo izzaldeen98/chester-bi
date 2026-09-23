@@ -7,10 +7,13 @@ import aiofiles
 from io import BytesIO
 from fastapi import HTTPException
 from dotenv import load_dotenv
+from utils.paths import local_dir
 load_dotenv()
 
 
-LOCAL_DIR = os.getenv("LOCAL_DIR", "./.local/")
+# Resolved against the install's data root, not the working directory, so
+# uploads land in the same place however the app was started (see utils/paths).
+LOCAL_DIR = local_dir()
 
 # Abstract Base Class enforcing an identical code interface for both storage types
 class BaseStorage(ABC):

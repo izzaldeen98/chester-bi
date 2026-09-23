@@ -23,6 +23,7 @@ import os
 from dataclasses import dataclass
 
 from security import decrypt_password
+from utils.paths import local_dir
 
 
 @dataclass(frozen=True)
@@ -534,7 +535,7 @@ class SnowflakeAdapter(SqlAdapter):
 # stored path is Cube's, because that is the one that has to be right at
 # query time; the backend translates it back only to run its own connect-test.
 CUBE_VOLUME_ROOT = "/cube/definitions_root"
-LOCAL_CUBE_DATA = os.path.join(os.getenv("LOCAL_DIR", "./.local/"), "cube_data")
+LOCAL_CUBE_DATA = os.path.join(local_dir(), "cube_data")
 
 
 def local_path_for(path: str) -> str:
