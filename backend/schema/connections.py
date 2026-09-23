@@ -13,12 +13,14 @@ class ConnectionBase(BaseModel):
     type: str = Field(..., min_length=3)
 
 class ConnectionCreate(ConnectionBase):
-    connection_attributes: dict = Field(..., min_length=3)
+    # No key-count constraint: which attributes a dialect needs is the
+    # adapter's to say, and SQLite needs exactly one (a file path).
+    connection_attributes: dict
 
 class ConnectionUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=3)
     description: Optional[str] = Field(None, min_length=3)
-    connection_attributes: Optional[dict] = Field(None, min_length=3)
+    connection_attributes: Optional[dict] = None
 
 class ConnectionPublicResponse(BaseModel):
     id: UUID = Field(validation_alias="public_key")

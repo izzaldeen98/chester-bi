@@ -19,6 +19,7 @@ ways that bite: MS SQL wants `server`, not `host`; ClickHouse and Snowflake
 want `username`, while Postgres and MySQL want `user`.
 """
 import json
+import os
 from dataclasses import dataclass
 
 from security import decrypt_password
@@ -525,10 +526,87 @@ class SnowflakeAdapter(SqlAdapter):
         return connector.connect(**{k: v for k, v in kwargs.items() if v is not None})
 
 
+# ── SQLite ─────────────────────────────────────────────────────────────────
+
+# Cube reads the database file from inside its own container, where the
+# shared volume is mounted at a different path than the backend sees it (see
+# docker-compose.yml and the same constant in CubeDefinitionWizard.tsx). The
+# stored path is Cube's, because that is the one that has to be right at
+# query time; the backend translates it back only to run its own connect-test.
+CUBE_VOLUME_ROOT = "/cube/definitions_root"
+LOCAL_CUBE_DATA = os.path.join(os.getenv("LOCAL_DIR", "./.local/"), "cube_data")
+
+
+def local_path_for(path: str) -> str:
+    """Where the backend can read a file that Cube knows by `path`."""
+    if path.startswith(CUBE_VOLUME_ROOT + "/"):
+        return os.path.join(LOCAL_CUBE_DATA, path[len(CUBE_VOLUME_ROOT) + 1:])
+    # Not under the shared volume: backend and Cube are assumed to see the
+    # same filesystem, which is true when neither is containerised.
+    return path
+
+
+class SQLiteAdapter(Adapter):
+    type, label, cube_type = "sqlite", "SQLite", "sqlite"
+    FIELDS = [
+        Field("database", "Database file", placeholder=f"{CUBE_VOLUME_ROOT}/<account>/files/app.db",
+              help="The path as the Cube engine sees it. Upload the file, or "
+                   "mount it into the Cube container — a path only this "
+                   "backend can reach will fail at query time."),
+    ]
+
+    @classmethod
+    def cube_config(cls, attrs: dict) -> dict:
+        return {"database": attrs["database"]}
+
+    @classmethod
+    def connect(cls, attrs: dict):
+        import sqlite3
+        path = local_path_for(attrs["database"])
+        if not os.path.isfile(path):
+            raise Exception(
+                f"No database file at {attrs['database']}"
+                + ("" if path == attrs["database"] else f" (looked in {path})")
+            )
+        # Read-only, and never create the file: a typo should be an error,
+        # not a new empty database that then reports no tables.
+        return sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=10)
+
+    @classmethod
+    def test(cls, attrs: dict) -> bool:
+        conn = cls.connect(attrs)
+        try:
+            conn.execute("SELECT 1").fetchall()
+        finally:
+            conn.close()
+        return True
+
+    @classmethod
+    def schemas(cls, attrs: dict) -> list:
+        # One file is one namespace, which SQLite itself calls "main".
+        cls.test(attrs)
+        return [{"name": "main", "isHidden": False, "isDefault": True}]
+
+    @classmethod
+    def tables(cls, schema: str, attrs: dict) -> list:
+        conn = cls.connect(attrs)
+        try:
+            names = [r[0] for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type IN ('table', 'view') "
+                "AND name NOT LIKE 'sqlite_%' ORDER BY name")]
+            # SQLite has no information_schema; PRAGMA is the only way in.
+            return [{"resource": f"{schema}.{name}",
+                     "columns": [{"name": row[1]} for row in
+                                 conn.execute(f'PRAGMA table_info("{name}")')]}
+                    for name in names]
+        finally:
+            conn.close()
+
+
 # ── Registry ───────────────────────────────────────────────────────────────
 
 ADAPTERS = {a.type: a for a in (
-    PostgresAdapter, MySQLAdapter, MSSQLAdapter,
+    PostgresAdapter, MySQLAdapter, MSSQLAdapter, SQLiteAdapter,
     ClickHouseAdapter, BigQueryAdapter, SnowflakeAdapter,
 )}
 

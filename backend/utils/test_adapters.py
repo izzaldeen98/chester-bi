@@ -35,20 +35,27 @@ SAMPLE = {
                  "service_account_json": '{"type":"service_account","project_id":"proj"}'},
     "snowflake": {"account": "ab12345.eu-west-1", "warehouse": "WH",
                   "database": "WAREHOUSE", "username": "BI", "password": "s3cret"},
+    "sqlite": {"database": "/cube/definitions_root/acct/files/app.db"},
 }
 
 
 def check_every_dialect_is_covered():
     """The six the product claims to support, each fully declared."""
     assert set(SUPPORTED_TYPES) == {
-        "postgres", "mysql", "mssql", "clickhouse", "bigquery", "snowflake"
+        "postgres", "mysql", "mssql", "sqlite", "clickhouse", "bigquery", "snowflake"
     }, SUPPORTED_TYPES
 
     for name, adapter in ADAPTERS.items():
         assert adapter.type == name
         assert adapter.label and adapter.cube_type, name
         assert adapter.FIELDS, f"{name} declares no fields"
-        assert adapter.secret_keys(), f"{name} declares no secret — nothing would be encrypted"
+        # SQLite is a file, so it has no credential at all. What must hold
+        # for every dialect is that anything credential-shaped IS secret —
+        # an unmarked one would be stored in clear text.
+        for f in adapter.FIELDS:
+            looks_secret = any(w in f.name for w in ("password", "private_key", "secret", "token"))
+            if looks_secret or f.name == "service_account_json":
+                assert f.secret, f"{name}.{f.name} is a credential but is not marked secret"
         # Every dialect must be reachable from Python for the connect-test
         # and the model wizard's field tree — an adapter that inherited the
         # abstract stubs would raise NotImplementedError at runtime.
@@ -107,6 +114,31 @@ def check_cube_option_names():
     assert keyed["privateKey"].startswith("-----BEGIN"), keyed
     assert keyed["privateKeyPass"] == "pw"
     assert keyed["host"] == "sf.internal" and "account" not in keyed
+
+
+def check_sqlite_path_is_cubes_view():
+    """The stored path is the one Cube resolves; the backend only translates
+    it to run its own connect-test."""
+    from utils.db_drivers import CUBE_VOLUME_ROOT, LOCAL_CUBE_DATA, local_path_for
+
+    lite = cube_driver_config("sqlite", SAMPLE["sqlite"])
+    assert lite == {"type": "sqlite", "database": SAMPLE["sqlite"]["database"]}, lite
+
+    inside = f"{CUBE_VOLUME_ROOT}/acct/files/app.db"
+    assert local_path_for(inside) == os.path.join(LOCAL_CUBE_DATA, "acct/files/app.db")
+    # A path outside the shared volume is left alone rather than rewritten
+    # into one that does not exist.
+    assert local_path_for("/mnt/data/app.db") == "/mnt/data/app.db"
+    # A path that merely starts with the same characters is not under it.
+    assert local_path_for(CUBE_VOLUME_ROOT + "_old/app.db") == CUBE_VOLUME_ROOT + "_old/app.db"
+
+    # A missing file must be named, not silently created as an empty database.
+    try:
+        adapter_for("sqlite").test({"database": "/nowhere/missing.db"})
+    except Exception as exc:
+        assert "missing.db" in str(exc), str(exc)
+    else:
+        raise AssertionError("a missing SQLite file was accepted")
 
 
 def check_no_empty_options_reach_cube():
@@ -199,6 +231,7 @@ if __name__ == "__main__":
     for check in (
         check_every_dialect_is_covered,
         check_cube_option_names,
+        check_sqlite_path_is_cubes_view,
         check_no_empty_options_reach_cube,
         check_secrets_are_encrypted_and_recovered,
         check_validation_names_what_is_missing,

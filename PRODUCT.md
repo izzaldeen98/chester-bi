@@ -53,7 +53,7 @@ credentials leave the user's infrastructure.
 
 The path through the product is linear and each step is a prerequisite for the next:
 
-**Connections** (PostgreSQL, MySQL, SQL Server, ClickHouse, BigQuery, Snowflake, or uploaded files) →
+**Connections** (PostgreSQL, MySQL, SQL Server, SQLite, ClickHouse, BigQuery, Snowflake, or uploaded files) →
 **Models** and their Cube definitions, authored in a visual builder or directly in YAML →
 **Artifacts**, prompted in natural language against one chosen semantic model.
 

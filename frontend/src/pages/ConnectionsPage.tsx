@@ -71,7 +71,7 @@ function ConnectionFields({
       style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
     >
       <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-2)" }}>
-        {spec.label} credentials
+        {spec.label} connection
       </p>
       {secretsBlank && (
         <p className="text-xs" style={{ color: "var(--text-2)" }}>
