@@ -148,3 +148,12 @@ body {
   .cb-ms-panel { width: 100%; }
   .cb-clear { margin-left: 0; }
 }
+
+/* Shown only when the page is opened outside the app, where nothing can
+   answer its queries. */
+.cb-offline {
+  margin: 10px 0 0; padding: 8px 10px;
+  font-size: 13px; color: var(--text-2);
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 6px;
+}

@@ -416,8 +416,35 @@
     Object.keys(charts).forEach(function (k) { charts[k].resize(); });
   });
 
+  /* The page has no data of its own and no credentials: it asks the app,
+     which is authenticated, over postMessage. Opened straight from disk
+     there is no app to ask, and every component would sit at "Loading…"
+     for ever looking broken. Say what is actually going on instead. */
+  function hosted() {
+    return window.parent !== window;
+  }
+
+  function explainNoHost() {
+    var note = document.createElement("p");
+    note.className = "cb-offline";
+    note.textContent = "This is the page only — it holds no data. Open it in Chester BI to load the live figures.";
+    var head = document.querySelector(".cb-head");
+    if (head) head.appendChild(note); else document.body.insertBefore(note, document.body.firstChild);
+
+    document.querySelectorAll('[data-slot="state"]').forEach(function (el) {
+      el.textContent = "No data — open in Chester BI";
+    });
+    document.querySelectorAll('[data-slot="value"]').forEach(function (el) {
+      el.textContent = "—";
+    });
+  }
+
   function start() {
     wireFilters();
+    if (!hosted()) {
+      explainNoHost();
+      return;
+    }
     fillSelects();
     CFG.components.forEach(function (c) { load(c, []); });
   }

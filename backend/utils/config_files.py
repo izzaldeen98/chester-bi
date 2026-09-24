@@ -27,6 +27,11 @@ class BaseStorage(ABC):
         """Deletes a file from storage"""
         pass
 
+    async def exists(self, path: str, file_name: str) -> bool:
+        """Whether a file is there, without fetching it. A caller that only
+        needs to know should not pay to download the contents."""
+        return await self.get_file(path, file_name) is not None
+
     @abstractmethod
     async def get_file(self, path: str,file_name : str ) -> BytesIO:
         """Gets a file from storage"""
@@ -80,6 +85,13 @@ class S3Storage(BaseStorage):
         try:
             key = path + "/" + file_name
             self.s3_client.delete_object(Bucket=self.bucket_name, Key=key)
+            return True
+        except ClientError:
+            return False
+
+    async def exists(self, path: str, file_name: str) -> bool:
+        try:
+            self.s3_client.head_object(Bucket=self.bucket_name, Key=path + "/" + file_name)
             return True
         except ClientError:
             return False
@@ -154,6 +166,9 @@ class LocalStorage(BaseStorage):
                 status_code=500,
                 detail=f"Local disk save failed: {str(e)}"
             )
+    async def exists(self, path: str, file_name: str) -> bool:
+        return os.path.isfile(os.path.join(self.base_dir, path + "/" + file_name))
+
     async def get_file(self, path: str,file_name : str ) -> BytesIO:
         file_path = os.path.join(self.base_dir, path + "/" + file_name)
         if os.path.exists(file_path):

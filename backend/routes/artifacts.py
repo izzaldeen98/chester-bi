@@ -134,6 +134,23 @@ async def _write_markup(row: Artifact, markup: str, version: int) -> None:
     await storage.upload_file(BytesIO(payload), row.file_path, f"{row.public_key}.v{version}.html")
 
 
+async def _save_page(row: Artifact, version: int) -> None:
+    """Assemble the page from the stored spec and write it to disk.
+
+    The file is the artifact as a document: the same shell the app renders,
+    holding no data — it fetches its rows through the app, which is what keeps
+    an artifact live. Writing it is never allowed to fail the request that
+    produced it: an LLM generation has already been paid for by the time we
+    get here, and a storage hiccup must not throw it away.
+    """
+    if not row.spec:
+        return
+    try:
+        await _write_markup(row, artifact_agent.render_page(row.spec, row.theme, row.name), version)
+    except Exception:
+        pass
+
+
 @router.post("/create", response_model=ArtifactResponse, status_code=status.HTTP_201_CREATED)
 async def create_artifact(
     payload: ArtifactCreateRequest,
@@ -174,6 +191,7 @@ async def create_artifact(
     db.add(row)
     db.commit()
     db.refresh(row)
+    await _save_page(row, 1)
 
 
     # Transient, response-only: the page saved fine, but the user should know
@@ -230,7 +248,14 @@ async def render_artifact(
         )
     # Assembled fresh from pre-built components, with no Cube call here: each
     # component queries for itself, so new data appears without regeneration.
-    return HTMLResponse(artifact_agent.render_page(spec, row.theme, row.name))
+    markup = artifact_agent.render_page(spec, row.theme, row.name)
+
+    # Artifacts made before the file was written get theirs on first open, so
+    # there is no migration to run and no artifact left without its document.
+    if not await storage.exists(row.file_path, f"{row.public_key}.html"):
+        await _save_page(row, row.current_version or 1)
+
+    return HTMLResponse(markup)
 
 
 @router.post("/query/{artifact_id}")
@@ -320,6 +345,7 @@ async def refine_artifact(
     row.updated_by = current_user.id
     db.commit()
     db.refresh(row)
+    await _save_page(row, version)
     return row
 
 
@@ -350,6 +376,8 @@ async def restore_artifact_version(
     row.updated_by = current_user.id
     db.commit()
     db.refresh(row)
+    # Rewrites the current file; the version's own snapshot is untouched.
+    await _save_page(row, version)
     return row
 
 
