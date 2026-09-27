@@ -4,6 +4,7 @@ Covers the two pieces of artifact logic that can silently corrupt a page: the
 Cube-key flattening the generated JS is written against, and the data injection
 that puts untrusted values inside a <script> tag.
 """
+import json
 import sys
 from pathlib import Path
 
@@ -68,12 +69,14 @@ def main():
     assert "<img src=x" not in page and "bad()</script>" not in page
 
     check_number_formatting()
+    check_granularity_reaches_the_page()
     check_cube_name_parsing()
     check_row_packing()
     check_scope_never_falls_open()
     check_agent_refuses_unscoped()
     check_model_isolation()
     check_spec_validation()
+    check_model_edit_invalidates_cached_rows()
     check_effective_query()
     print("artifact: all checks passed")
 
@@ -103,8 +106,25 @@ def check_number_formatting():
       [format(null), "\u2014"],
       [format(""), "\u2014"],
       [format("text"), "text"],
-      [label("2025-01-01T00:00:00.000"), "Jan 2025"],
-      [label("ABC Corp"), "ABC Corp"]
+      [label("ABC Corp"), "ABC Corp"],
+
+      // A date reads at the granularity its query asked for. The value alone
+      // cannot say: every one of these is the same instant.
+      [label("2025-01-01T00:00:00.000", "year"), "2025"],
+      [label("2025-01-01T00:00:00.000", "month"), "Jan 2025"],
+      [label("2025-01-01T00:00:00.000", "day"), "Jan 1, 2025"],
+      [label("2025-04-01T00:00:00.000", "quarter"), "Q2 2025"],
+
+      // Inferring it from the value got both of these wrong: a daily point
+      // landing on the 1st was labelled as a whole month, and an hourly one
+      // at midnight lost its time entirely.
+      [label("2025-03-01T00:00:00.000", "day"), "Mar 1, 2025"],
+      [label("2025-01-01T00:00:00.000", "hour"), "Jan 1, 12:00 AM"],
+      [label("2025-01-01T14:00:00.000", "hour"), "Jan 1, 02:00 PM"],
+
+      // No granularity: show the whole value rather than guess a unit.
+      [label("2025-01-01T00:00:00.000"), "Jan 1, 2025"],
+      [label("2025-01-01T09:30:00.000"), "Jan 1, 09:30 AM"]
     ];
     var bad = cases.filter(function (c) { return c[0] !== c[1]; });
     console.log(bad.length ? "MISMATCH " + JSON.stringify(bad) : "ok");
@@ -115,10 +135,53 @@ def check_number_formatting():
 
     # No NUMBER path may fall through to a bare toLocaleString: it allows
     # three decimal places, which is how the raw floats got out. Date calls
-    # legitimately carry no fraction digits, so they are excluded by shape.
+    # legitimately carry no fraction digits, so they are excluded by shape —
+    # either inline date options, or the GRAIN table, which is checked below
+    # so it cannot be used to smuggle a number format past this.
     for hit in _re.findall(r"toLocaleString\(([^)]*)\)", js):
-        is_date = any(k in hit for k in ("month:", "day:", "hour:", "year:"))
+        is_date = "GRAIN" in hit or any(k in hit for k in ("month:", "day:", "hour:", "year:"))
         assert is_date or "FractionDigits" in hit, f"unbounded toLocaleString: {hit!r}"
+
+    grain_table = js[js.index("var GRAIN = {"):js.index("function label(")]
+    assert "FractionDigits" not in grain_table and "style:" not in grain_table, \
+        "GRAIN must hold date options only"
+    for unit in ("year", "month", "week", "day", "hour", "minute", "second"):
+        assert f"{unit}:" in grain_table, f"GRAIN has no entry for {unit}"
+
+
+def check_granularity_reaches_the_page():
+    """The runtime can only format a date correctly if it is told which unit
+    the query asked for, so the query's granularity must travel with the
+    component into the page."""
+    from ai.components import grain_for, spec_payload
+
+    spec = {
+        "queries": [
+            {"id": "daily", "cube_query": {"timeDimensions": [
+                {"dimension": "orders.created_at", "granularity": "day"}]}},
+            {"id": "hourly", "cube_query": {"timeDimensions": [
+                {"dimension": "orders.created_at", "granularity": "hour"}]}},
+            {"id": "plain", "cube_query": {"measures": ["orders.count"]}},
+        ],
+        "components": [
+            {"id": "a", "type": "line", "query": "daily", "x": "created_at", "y": ["count"]},
+            {"id": "b", "type": "line", "query": "hourly", "x": "created_at", "y": ["count"]},
+            {"id": "c", "type": "kpi", "query": "plain", "value": "count"},
+        ],
+    }
+
+    assert grain_for(spec) == {"daily": {"created_at": "day"},
+                               "hourly": {"created_at": "hour"}}, grain_for(spec)
+
+    payload = json.loads(spec_payload(spec).replace("<\\/", "</"))
+    by_id = {c["id"]: c for c in payload["components"]}
+    assert by_id["a"]["grain"] == {"created_at": "day"}
+    assert by_id["b"]["grain"] == {"created_at": "hour"}, "same column, different query, different unit"
+    # A query with no time dimension carries nothing rather than an empty map.
+    assert "grain" not in by_id["c"]
+
+    # A query the spec does not describe must not crash the render.
+    assert grain_for({"queries": [{"id": "x"}, "junk", {"id": "y", "cube_query": {}}]}) == {}
 
 
 def check_cube_name_parsing():
@@ -305,6 +368,53 @@ def check_spec_validation():
     bar = page[page.index('<div class="cb-filters"'):page.index("data-clear-all")]
     assert "<select" not in bar, "no native select should survive in the filter bar"
     assert bar.count("cb-ms-toggle") == 1 and bar.count('type="date"') == 2
+
+
+def check_model_edit_invalidates_cached_rows():
+    """Fixing a semantic model must change what artifacts serve.
+
+    The Cube query text is identical before and after a model is corrected —
+    a date cast, a measure's SQL — so a cache keyed on the query alone went on
+    serving the old rows and the fix looked like it had not worked."""
+    import tempfile
+    from ai import artifact as art
+
+    query = {"measures": ["sales.count"], "limit": 10}
+    original = art._definition_version
+    try:
+        art._definition_version = lambda _key: "version-one"
+        before = art.query_fingerprint("acct", query)
+        art._definition_version = lambda _key: "version-two"
+        after = art.query_fingerprint("acct", query)
+    finally:
+        art._definition_version = original
+
+    assert before != after, "a model edit must not reuse the old cache entry"
+    # Still stable for an unchanged model, or nothing would ever be cached.
+    try:
+        art._definition_version = lambda _key: "version-one"
+        assert art.query_fingerprint("acct", query) == before
+        assert art.query_fingerprint("other-acct", query) != before, "accounts must not share"
+        assert art.query_fingerprint("acct", {"measures": ["sales.count"], "limit": 11}) != before
+    finally:
+        art._definition_version = original
+
+    # The real version function changes when a definition file changes.
+    from utils import cube as cube_utils
+    with tempfile.TemporaryDirectory() as tmp:
+        root = cube_utils.DEFINITION_ROOT
+        try:
+            cube_utils.DEFINITION_ROOT = tmp
+            import os
+            os.makedirs(os.path.join(tmp, "acct", "definitions"), exist_ok=True)
+            path = os.path.join(tmp, "acct", "definitions", "m.yml")
+            open(path, "w").write("cubes:\n  - name: a\n")
+            first = cube_utils._definition_version("acct")
+            open(path, "w").write("cubes:\n  - name: a\n  - name: b\n")
+            os.utime(path, (0, 12345))
+            assert cube_utils._definition_version("acct") != first
+        finally:
+            cube_utils.DEFINITION_ROOT = root
 
 
 def check_effective_query():

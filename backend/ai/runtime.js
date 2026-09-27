@@ -85,17 +85,41 @@
 
   var ISO = /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}|$)/;
 
-  /* A category label: dates become readable, everything else is text. The
-     granularity is inferred from the value itself, so a monthly series reads
-     "Jan 2025" and a daily one "1 Jan". */
-  function label(v) {
+  /* How a date reads at each granularity the query could have asked for.
+     The value alone cannot say: 2025-01-01 is the whole of January in a
+     monthly series, New Year's Day in a daily one and midnight in an hourly
+     one. Inferring it from the value labelled a daily point that landed on
+     the 1st as "Jan 2025", so the granularity comes from the query instead
+     (see grain_for in components.py). */
+  var GRAIN = {
+    year:    { year: "numeric" },
+    month:   { month: "short", year: "numeric" },
+    week:    { day: "numeric", month: "short", year: "numeric" },
+    day:     { day: "numeric", month: "short", year: "numeric" },
+    hour:    { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" },
+    minute:  { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" },
+    second:  { hour: "2-digit", minute: "2-digit", second: "2-digit" },
+  };
+
+  function label(v, gran) {
     if (typeof v !== "string" || !ISO.test(v)) return String(v == null ? "" : v);
     var d = new Date(v);
     if (isNaN(d.getTime())) return v;
+
+    if (gran === "quarter") return "Q" + (Math.floor(d.getMonth() / 3) + 1) + " " + d.getFullYear();
+    if (GRAIN[gran]) return d.toLocaleString(undefined, GRAIN[gran]);
+
+    // No granularity: a plain date dimension, or a value the query did not
+    // describe. Show the whole thing rather than guessing at a unit.
     var midnight = /T00:00:00/.test(v) || v.length === 10;
-    if (!midnight) return d.toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-    if (d.getDate() === 1) return d.toLocaleDateString(undefined, { month: "short", year: "numeric" });
-    return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+    return midnight
+      ? d.toLocaleDateString(undefined, GRAIN.day)
+      : d.toLocaleString(undefined, GRAIN.minute);
+  }
+
+  /* The granularity for one of a component's columns, if its query set one. */
+  function grainOf(c, column) {
+    return (c.grain || {})[column];
   }
 
   function format(v, kind) {
@@ -148,7 +172,7 @@
       grid: { left: 8, right: 16, top: 24, bottom: rotate ? 28 : 8, containLabel: true },
       xAxis: {
         type: "category",
-        data: rows.map(function (r) { return label(r[c.x]); }),
+        data: rows.map(function (r) { return label(r[c.x], grainOf(c, c.x)); }),
         axisLabel: { hideOverlap: true, rotate: rotate, interval: 0 },
         axisTick: { alignWithLabel: true },
         axisLine: { lineStyle: { color: "#e7e6e2" } },
@@ -181,7 +205,7 @@
       series: [{
         type: "pie", radius: ["52%", "76%"], itemStyle: { borderRadius: 4, borderColor: "#fff", borderWidth: 2 },
         label: { show: false }, data: rows.map(function (r) {
-          return { name: label(r[c.category]), value: num(r[c.value]) };
+          return { name: label(r[c.category], grainOf(c, c.category)), value: num(r[c.value]) };
         }),
       }],
     });
@@ -213,7 +237,7 @@
         var v = r[k];
         var isNum = v !== null && v !== "" && isFinite(Number(v));
         return '<td class="' + (isNum ? "cb-num" : "") + '">' +
-          (isNum ? format(v, c.format) : (v == null || v === "" ? "—" : label(v))) + "</td>";
+          (isNum ? format(v, c.format) : (v == null || v === "" ? "—" : label(v, grainOf(c, k)))) + "</td>";
       }).join("") + "</tr>";
     }).join("");
     host.innerHTML = "<table><thead><tr>" + head + "</tr></thead><tbody>" + body + "</tbody></table>";

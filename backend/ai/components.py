@@ -304,13 +304,38 @@ def render_body(spec: dict) -> str:
     return "\n".join(parts)
 
 
+def grain_for(spec: dict) -> dict:
+    """query id -> {column: granularity}, read from each query's timeDimensions.
+
+    A date means different things at different granularities, and the value
+    alone does not say which: 2025-01-01 is the whole of January in a monthly
+    series, New Year's Day in a daily one, and midnight in an hourly one. The
+    runtime used to guess from the value and so labelled a daily point landing
+    on the 1st as "Jan 2025". The query already knows, so it is told."""
+    out: dict = {}
+    for q in spec.get("queries") or []:
+        if not isinstance(q, dict):
+            continue
+        columns = {}
+        for td in (q.get("cube_query") or {}).get("timeDimensions") or []:
+            member, gran = td.get("dimension"), td.get("granularity")
+            if isinstance(member, str) and gran:
+                # Rows arrive with bare column names (see _flatten_key).
+                columns[member.split(".")[-1]] = gran
+        if columns:
+            out[q.get("id")] = columns
+    return out
+
+
 def spec_payload(spec: dict) -> str:
     """The component/filter config the runtime reads. Only what the runtime
     needs to draw and query — no prose, no layout."""
+    grain = grain_for(spec)
     slim = {
         "components": [
-            {k: v for k, v in c.items() if k in
-             ("id", "type", "query", "x", "y", "value", "category", "columns", "format", "title")}
+            {**{k: v for k, v in c.items() if k in
+                ("id", "type", "query", "x", "y", "value", "category", "columns", "format", "title")},
+             **({"grain": grain[c["query"]]} if c.get("query") in grain else {})}
             for c in spec["components"] if c.get("type") != "text"
         ],
         "filters": [

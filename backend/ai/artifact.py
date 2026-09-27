@@ -34,7 +34,7 @@ from ai.grounding import DEFAULT_TEXT_COLOR, PALETTE, cube_grounding
 from ai.validate import DEFAULT_QUERY_LIMIT, MAX_LIMIT, validate_queries
 from models.user import User
 from security import decrypt_password
-from utils.cube import load as cube_load, mint_token
+from utils.cube import _definition_version, load as cube_load, mint_token
 from utils.redis_handler import cache_query, get_cached_query, redis_client
 
 # Tuning, not policy — every one is configurable, because what suits one
@@ -131,6 +131,18 @@ components by the application.
 Keep everything the request does not ask you to change, with the same ids, so unchanged
 components keep their place and their cached data.
 
+## Where a new component goes
+The order of `components` IS the order on the page: they are laid out in the order you
+list them, so position is your decision and the application will not tidy it up. Put a
+new component where it belongs — a breakdown next to the chart it breaks down, a new
+trend beside the other trends, detail below the summary it supports. Adding to the end
+is right only when the request asks for that or when it genuinely belongs last; it is
+not the default. If the request names a position ("at the top", "under revenue",
+"replace the pie"), follow it exactly.
+
+KPIs are the one exception: wherever you list them they are collected into the strip
+across the top, in the order you give.
+
 All the rules from the design brief still apply: component types and their required
 fields, columns that must exist in the named query, filter members that must exist in
 the semantic model, and the cube_query key list.
@@ -206,9 +218,16 @@ def merge_filters(cube_query: dict, extra: list | None) -> dict:
 def query_fingerprint(account_key, query: dict) -> str:
     """A stable hash of an effective query. Two components with the same
     effective query share a cache entry; changing a filter changes the hash,
-    which is precisely the set that has to be re-fetched."""
+    which is precisely the set that has to be re-fetched.
+
+    The semantic model's version is part of the key. The same Cube query means
+    something different after its model changes — fixing a date cast or a
+    measure's SQL leaves the query text identical — so without this every
+    artifact went on serving the old rows and the correction looked like it
+    had not worked."""
     canonical = json.dumps(query, sort_keys=True, separators=(",", ":"), default=str)
-    return f"artifact_q:{account_key}:{sha256(canonical.encode()).hexdigest()[:24]}"
+    version = _definition_version(account_key)
+    return f"artifact_q:{account_key}:{version}:{sha256(canonical.encode()).hexdigest()[:24]}"
 
 
 def run_query(db: Session, user: User, cube_query: dict, extra_filters: list | None = None,
