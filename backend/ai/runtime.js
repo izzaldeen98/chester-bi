@@ -144,16 +144,13 @@
   var MAX_SLICES = (window.__CHESTER_LIMITS__ || {}).slices || 12;
 
   function trim(c, rows, kind) {
-    if (rows.length <= MAX_CATEGORIES) return { rows: rows, note: "" };
-    if (kind === "bar") {
-      var key = (Array.isArray(c.y) ? c.y[0] : c.y);
-      var sorted = rows.slice().sort(function (a, b) { return num(b[key]) - num(a[key]); });
-      return { rows: sorted.slice(0, MAX_CATEGORIES),
-               note: "Top " + MAX_CATEGORIES + " of " + rows.length };
-    }
-    // A trend keeps its order; drop the oldest.
-    return { rows: rows.slice(-MAX_CATEGORIES),
-             note: "Last " + MAX_CATEGORIES + " of " + rows.length };
+    // A line keeps every point: crowded labels are handled by the axis, and a
+    // trend that silently drops its history is a lie. Only bars get trimmed.
+    if (kind !== "bar" || rows.length <= MAX_CATEGORIES) return { rows: rows, note: "" };
+    var key = (Array.isArray(c.y) ? c.y[0] : c.y);
+    var sorted = rows.slice().sort(function (a, b) { return num(b[key]) - num(a[key]); });
+    return { rows: sorted.slice(0, MAX_CATEGORIES),
+             note: "Top " + MAX_CATEGORIES + " of " + rows.length };
   }
 
   function axisOption(c, rows, kind) {
@@ -173,7 +170,7 @@
       xAxis: {
         type: "category",
         data: rows.map(function (r) { return label(r[c.x], grainOf(c, c.x)); }),
-        axisLabel: { hideOverlap: true, rotate: rotate, interval: 0 },
+        axisLabel: { hideOverlap: true, rotate: rotate, interval: rows.length > MAX_CATEGORIES ? "auto" : 0 },
         axisTick: { alignWithLabel: true },
         axisLine: { lineStyle: { color: "#e7e6e2" } },
       },
