@@ -15,6 +15,12 @@
 
 [Report a Bug](https://github.com/izzaldeen98/chester-bi/issues) · [Request a Feature](https://github.com/izzaldeen98/chester-bi/issues)
 
+<br/>
+
+<a href="brag.mp4"><img src="brag.jpg" alt="Chester BI launch video — click to play" width="900" /></a>
+
+_▶ Click to watch the launch video_
+
 </div>
 
 ---
