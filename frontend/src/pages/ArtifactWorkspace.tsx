@@ -6,6 +6,7 @@ import CButton from "../components/CButton";
 import CSelect from "../components/CSelect";
 import CAlert from "../components/CAlert";
 import CSpinner from "../components/CSpinner";
+import { getToken } from "../lib/auth";
 import { Flap, Lamp, Panel, Status } from "../components/Board";
 import {
   createArtifact,
@@ -13,9 +14,7 @@ import {
   getAIThemes,
   getArtifact,
   getModels,
-  queryArtifact,
   refineArtifact,
-  renderArtifact,
   restoreArtifactVersion,
   type AIModelOption,
   type AITheme,
@@ -101,7 +100,6 @@ export default function ArtifactWorkspace() {
   const isNew = !artifactId;
 
   const [artifact, setArtifact] = useState<ArtifactResponse | null>(null);
-  const [srcDoc, setSrcDoc] = useState("");
   const [viewing, setViewing] = useState<number | undefined>(undefined);
 
   const [providers, setProviders] = useState<AIModelOption[]>([]);
@@ -117,34 +115,8 @@ export default function ArtifactWorkspace() {
   const [error, setError] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
   const [notesOpen, setNotesOpen] = useState(true);
-  const [queriesRun, setQueriesRun] = useState(0);
+  const [frameKey, setFrameKey] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const frameRef = useRef<HTMLIFrameElement>(null);
-
-  /* The page runs on an opaque origin and cannot reach the API. It asks
-     here; this component is authenticated, so it answers. That is what lets
-     every chart be a live query without ever giving the sandbox a token. */
-  useEffect(() => {
-    async function onMessage(e: MessageEvent) {
-      const msg = e.data;
-      if (!msg || msg.source !== "chester-page" || !artifactId) return;
-      const frame = frameRef.current;
-      if (!frame || e.source !== frame.contentWindow) return;
-
-      const reply = (body: Record<string, unknown>) =>
-        frame.contentWindow?.postMessage({ source: "chester-host", rid: msg.rid, ...body }, "*");
-
-      try {
-        const result = await queryArtifact(artifactId, msg.queryId, msg.filters ?? undefined, viewing);
-        setQueriesRun((n) => n + 1);
-        reply({ rows: result.rows });
-      } catch (err: any) {
-        reply({ error: err?.message ?? "Query failed" });
-      }
-    }
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [artifactId, viewing]);
 
   useEffect(() => {
     Promise.all([getAIModels(), getAIThemes(), getModels()])
@@ -162,11 +134,10 @@ export default function ArtifactWorkspace() {
       if (!artifactId) return;
       setError("");
       try {
-        const [meta, html] = await Promise.all([getArtifact(artifactId), renderArtifact(artifactId, version)]);
+        const meta = await getArtifact(artifactId);
         setArtifact(meta);
-        setSrcDoc(html);
         setViewing(version ?? meta.current_version);
-        setQueriesRun(0);
+        setFrameKey((k) => k + 1);
         setTheme((t) => t || meta.theme);
       } catch (e: any) {
         setError(e.message);
@@ -283,7 +254,7 @@ export default function ArtifactWorkspace() {
               {providers.length === 0 && (
                 <CAlert
                   variant="warning"
-                  message="No AI provider configured. Add one under AI Providers before setting a departure."
+                  message="No AI provider configured. Add one under AI Providers to create artifacts."
                   className="mb-3"
                 />
               )}
@@ -410,7 +381,7 @@ export default function ArtifactWorkspace() {
 
         <div className="ml-auto flex items-center gap-2">
           <Status signal={busy ? "live" : "ok"} live={busy}>
-            {busy ? "Building" : queriesRun > 0 ? `Live · ${queriesRun} queries` : "Live data"}
+            {busy ? "Building" : "Live data"}
           </Status>
           <CButton variant="outline" disabled={busy || loading} onClick={() => load(viewing)}>
             <FaSyncAlt size={10} /> Refresh
@@ -444,17 +415,18 @@ export default function ArtifactWorkspace() {
                 </span>
               </div>
             )}
-            {/* The lit document on the table: the board is dark so the page reads.
-                allow-scripts WITHOUT allow-same-origin — generated JS runs on an
-                opaque origin and cannot reach this app's session. */}
-            <iframe
-              ref={frameRef}
-              title={artifact?.name ?? "Artifact"}
-              srcDoc={srcDoc}
-              sandbox="allow-scripts"
-              className="h-full w-full border-0"
-              style={{ background: "#fff" }}
-            />
+            {/* The Streamlit dashboard (dashboard/app.py), served same-origin
+                through the /streamlit proxy. It renders the spec; nothing in it
+                is generated, and every chart queries the API itself. */}
+            {artifactId && viewing !== undefined && (
+              <iframe
+                key={frameKey}
+                title={artifact?.name ?? "Artifact"}
+                src={`/streamlit/?embed=true&host=chester&artifact=${artifactId}&version=${viewing}&token=${encodeURIComponent(getToken() ?? "")}`}
+                className="h-full w-full border-0"
+                style={{ background: "#fff" }}
+              />
+            )}
           </>
         )}
 

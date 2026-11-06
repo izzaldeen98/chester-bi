@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { MdOutlineCloud, MdAutoAwesome } from "react-icons/md";
-import { FaArrowRight, FaGithub, FaStar, FaLock } from "react-icons/fa";
+import { FaGithub, FaStar, FaLock } from "react-icons/fa";
 import { GoPackage } from "react-icons/go";
 import { HiSun, HiMoon } from "react-icons/hi";
 import { useTheme } from "../lib/theme";
@@ -58,8 +58,8 @@ function Navbar({ stars }: { stars: string | null }) {
     >
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-6 py-3.5">
         <CLogo size={26} />
-        <span className="text-base font-bold tracking-tight" style={{ color: "var(--text-2)" }}>
-          Chester BI
+        <span className="text-base font-semibold tracking-[-0.02em]" style={{ color: "var(--text)" }}>
+          Chester <span className="font-normal" style={{ color: "var(--text-3)" }}>BI</span>
         </span>
 
         <div className="flex-1" />
@@ -89,10 +89,10 @@ function Navbar({ stars }: { stars: string | null }) {
         </button>
 
         <CButton variant="outline" onClick={() => navigate("/login")} className="hidden sm:inline-flex">
-          Sign In
+          Sign in
         </CButton>
         <CButton variant="primary" onClick={() => navigate("/register")}>
-          Get Started <FaArrowRight size={11} />
+          Get started
         </CButton>
       </div>
     </nav>
@@ -133,12 +133,10 @@ function Hero({ stars }: { stars: string | null }) {
         </div>
 
         <h1
-          className="mb-6 text-balance text-5xl font-extrabold leading-[1.05] tracking-[-0.032em] md:text-[4.25rem]"
-          style={{ color: "var(--text-2)" }}
+          className="mb-6 text-balance text-5xl font-semibold leading-[1.02] tracking-[-0.04em] md:text-[4.5rem]"
+          style={{ color: "var(--text)" }}
         >
-          <span style={{ color: "var(--text-3)" }}>Stop building dashboards.</span>
-          <br />
-          Describe the analysis.
+          Stop building dashboards. Describe the analysis.
         </h1>
 
         <p
@@ -156,7 +154,7 @@ function Hero({ stars }: { stars: string | null }) {
 
         <div className="flex flex-wrap items-center justify-center gap-4">
           <CButton variant="primary" onClick={() => navigate("/register")} className="px-7 py-3">
-            Create Your Instance <FaArrowRight size={13} />
+            Create your instance
           </CButton>
           <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
             <CButton variant="outline" className="px-7 py-3">
@@ -514,7 +512,7 @@ function CTABanner() {
               "radial-gradient(circle 260px at 18% 10%, rgba(245,158,11,0.18) 0%, transparent 70%)",
           }}
         />
-        <CLogo size={36} className="relative mx-auto mb-5" />
+        <CLogo size={36} color="var(--brand-mark-on-solid)" className="relative mx-auto mb-5" />
         <h2 className="relative mb-3 text-balance text-4xl font-semibold tracking-[-0.025em]" style={{ color: "var(--solid-ink)" }}>
           Your data. Your model. Your key.
         </h2>
@@ -529,7 +527,7 @@ function CTABanner() {
             onClick={() => navigate("/register")}
             className="px-6 py-2.5"
           >
-            Create Your Account <FaArrowRight size={13} />
+            Create your account
           </CButton>
           <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer">
             <CButton
@@ -552,7 +550,7 @@ function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 md:flex-row">
         <div className="flex items-center gap-2">
           <CLogo size={20} />
-          <span className="font-semibold" style={{ color: "var(--text-2)" }}>Chester BI</span>
+          <span className="font-semibold tracking-[-0.02em]" style={{ color: "var(--text)" }}>Chester <span className="font-normal" style={{ color: "var(--text-3)" }}>BI</span></span>
           <span
             className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold"
             style={{ background: "var(--accent-soft)", color: "var(--accent)" }}

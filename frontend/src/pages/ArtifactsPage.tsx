@@ -6,7 +6,7 @@ import CTextInput from "../components/CTextInput";
 import CAlert from "../components/CAlert";
 import CSpinner from "../components/CSpinner";
 import CConfirmDialog from "../components/CConfirmDialog";
-import { BoardFill, BoardHead, BoardRow, EmptyBoard, Flap, Panel, Status } from "../components/Board";
+import { BoardFill, BoardHead, BoardRow, EmptyBoard, Flap, PageHead, Panel, Status } from "../components/Board";
 import { getArtifacts, deleteArtifact, type ArtifactResponse } from "../lib/Api";
 
 /* Columns never move: time, destination, model, version, status, service. */
@@ -59,46 +59,34 @@ export default function ArtifactsPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <header
-        className="flex shrink-0 flex-wrap items-center gap-4 px-6 py-4"
-        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
-      >
-        <div className="min-w-0">
-          <h1 className="text-[18px] font-semibold leading-none tracking-[-0.02em]">Artifacts</h1>
-          <p className="mt-1.5 text-[13px] leading-none" style={{ color: "var(--text-3)" }}>
-            {artifacts.length} artifact{artifacts.length === 1 ? "" : "s"} · re-queried live on every open
-          </p>
-        </div>
-        <div className="ml-auto flex items-center gap-3">
-          {artifacts.length > 0 && (
-            <div className="hidden w-56 sm:block">
-              <CTextInput
-                type="search"
-                value={search}
-                onChange={setSearch}
-                placeholder="Search artifacts…"
-                icon={<FaSearch size={11} />}
-              />
-            </div>
-          )}
-          <CButton variant="primary" onClick={() => navigate("/artifacts/new")}>
-            <FaPlus size={10} /> New artifact
-          </CButton>
-        </div>
-      </header>
+      <PageHead title="Artifacts" context={`${artifacts.length} artifact${artifacts.length === 1 ? "" : "s"}. Each one re-queries live data when it opens.`}>
+        {artifacts.length > 0 && (
+          <div className="w-full sm:w-64">
+            <CTextInput
+              type="search"
+              value={search}
+              onChange={setSearch}
+              placeholder="Search artifacts…"
+              icon={<FaSearch size={12} />}
+            />
+          </div>
+        )}
+        <CButton variant="primary" onClick={() => navigate("/artifacts/new")}>
+          <FaPlus size={10} /> New artifact
+        </CButton>
+      </PageHead>
 
       <div className="relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
-        <div aria-hidden className="grid-paper pointer-events-none absolute inset-0" />
         {error && <CAlert variant="error" message={error} className="mb-3" />}
 
-        <Panel className="relative" label="All artifacts" flush bodyClassName="flex flex-col">
+        <Panel className="relative" flush bodyClassName="flex flex-col">
           <BoardHead cols={COLS} colsNarrow={COLS_NARROW}>
             <span className="label">Updated</span>
             <span className="label">Artifact</span>
             <span className="label col-secondary">Built with</span>
             <span className="label col-secondary text-right">Ver</span>
             <span className="label text-right">Status</span>
-            <span className="label col-secondary text-right">·</span>
+            <span className="col-secondary" aria-label="Actions" />
           </BoardHead>
 
           {loading ? (

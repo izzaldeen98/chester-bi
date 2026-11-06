@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { FaSearch, FaEdit, FaTrash, FaPlus, FaVial } from "react-icons/fa";
 import { RiLockPasswordFill } from "react-icons/ri";
 import CSelect from "../components/CSelect";
-import CHCard from "../components/CHCard";
-import { BoardFill, BoardHead, EmptyBoard, Panel } from "../components/Board";
-import CInfoSideBar from "../components/CInfoSideBar";
+import CHCard, { CARD_COLS } from "../components/CHCard";
+import { BoardFill, BoardHead, EmptyBoard, PageHead, Panel } from "../components/Board";
+import CDialog from "../components/CDialog";
 import CConfirmDialog from "../components/CConfirmDialog";
 import CButton from "../components/CButton";
 import CTextInput from "../components/CTextInput";
@@ -155,11 +155,6 @@ function FieldControl({
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function getInitials(name: string) {
-  const words = name.trim().split(/\s+/);
-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
-}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -391,28 +386,7 @@ export default function ConnectionsPage() {
     // view
     return (
       <div>
-        <div className="mb-6 flex flex-col items-center gap-2">
-          <div
-            className="flex h-16 w-16 items-center justify-center rounded-[var(--r-sm)] text-xl font-bold"
-            style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--accent-line)" }}
-          >
-            {getInitials(selected.name)}
-          </div>
-          <p className="text-base font-bold text-center" style={{ color: "var(--text)" }}>{selected.name}</p>
-          <div className="flex items-center gap-2">
-            <span className="rounded-[var(--r-sm)] px-3 py-0.5 text-xs font-medium"
-              style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--accent-line)" }}>
-              {selected.type}
-            </span>
-            <span className={`rounded-[var(--r-sm)] px-3 py-0.5 text-xs font-medium ${
-              selected.is_active
-                ? "text-[var(--ok)] bg-[var(--ok-soft)]"
-                : "text-[var(--danger)] bg-[var(--danger-soft)]"
-            }`}>
-              {selected.is_active ? "Active" : "Inactive"}
-            </span>
-          </div>
-        </div>
+        <CDetailRow label="Status" value={selected.is_active ? "Active" : "Inactive"} />
 
         {testResult && (
           <div className="mb-4">
@@ -440,9 +414,9 @@ export default function ConnectionsPage() {
         ) : null}
 
         <CDetailRow label="Created"      value={formatDate(selected.created_at)} />
-        <CDetailRow label="Last Updated" value={formatDate(selected.updated_at)} />
-        <CDetailRow label="Created By"   value={selected.created_by} />
-        <CDetailRow label="Updated By"   value={selected.updated_by} />
+        <CDetailRow label="Last updated" value={formatDate(selected.updated_at)} />
+        <CDetailRow label="Created by"   value={selected.created_by} />
+        <CDetailRow label="Updated by"   value={selected.updated_by} />
       </div>
     );
   }
@@ -453,7 +427,7 @@ export default function ConnectionsPage() {
         <div className="flex gap-2">
           <CButton variant="primary" fullWidth loading={saving} onClick={saveCreate}
             >
-            Create Connection
+            Create connection
           </CButton>
           <CButton variant="ghost" onClick={closePanel} disabled={saving}>Cancel</CButton>
         </div>
@@ -462,7 +436,7 @@ export default function ConnectionsPage() {
     if (mode === "edit") {
       return (
         <div className="flex gap-2">
-          <CButton variant="primary" fullWidth loading={saving} onClick={saveEdit}>Save Changes</CButton>
+          <CButton variant="primary" fullWidth loading={saving} onClick={saveEdit}>Save changes</CButton>
           <CButton variant="ghost" onClick={() => selected && openView(selected)} disabled={saving}>Cancel</CButton>
         </div>
       );
@@ -475,10 +449,10 @@ export default function ConnectionsPage() {
           <FaVial size={13} /> Test Connection
         </CButton>
         <CButton variant="outline" fullWidth onClick={() => openEdit(selected, detail)}>
-          <FaEdit size={14} /> Edit Connection
+          <FaEdit size={14} /> Edit connection
         </CButton>
         <CButton variant="danger" fullWidth onClick={() => { setDeleteError(""); setConfirmOpen(true); }}>
-          <FaTrash size={13} /> Delete Connection
+          <FaTrash size={13} /> Delete connection
         </CButton>
       </div>
     );
@@ -487,64 +461,52 @@ export default function ConnectionsPage() {
   // ── Sidebar meta ─────────────────────────────────────────────────────────
   const sidebarTitle =
     mode === "create" ? "New connection" :
-    mode === "edit"   ? "Edit Connection" :
+    mode === "edit"   ? "Edit connection" :
     selected ? selected.name : "";
 
   const sidebarSubtitle =
-    mode === "create" ? "Fill in the details below" :
+    mode === "create" ? "" :
     mode === "edit"   ? "Update connection details" :
     selected ? selected.type : "";
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <header
-        className="flex shrink-0 flex-wrap items-center gap-4 px-6 py-4"
-        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
-      >
-        <div className="min-w-0">
-          <h1 className="text-[18px] font-semibold leading-none tracking-[-0.02em]">Connections</h1>
-          <p className="mt-1.5 text-[13px] leading-none" style={{ color: "var(--text-3)" }}>Manage data source connections.</p>
+      <PageHead title="Connections" context="Databases Chester queries live. Credentials are encrypted at rest.">
+        <div className="w-full sm:w-64">
+          <CTextInput value={search} onChange={setSearch} placeholder="Search connections…" icon={<FaSearch size={12} />} />
         </div>
-        <div className="ml-auto flex items-center gap-3">
         <CButton variant="primary" onClick={openCreate}>
           <FaPlus size={12} /> New connection
         </CButton>
-        </div>
-      </header>
+      </PageHead>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
 
       {pageError && <CAlert variant="error" message={pageError} className="mb-6" />}
 
 
-      {/* Search */}
-      <div className="mb-5 max-w-sm">
-        <CTextInput value={search} onChange={setSearch} placeholder="Search by name, type or description…" icon={<FaSearch size={13} />} />
-      </div>
 
       {/* Connection grid */}
-      <Panel label="Connections" flush bodyClassName="flex flex-col">
+      <Panel flush bodyClassName="flex flex-col">
         {loading ? (
         <div className="flex items-center justify-center gap-3 py-20" style={{ color: "var(--text-3)" }}><CSpinner size={18} /><span className=" text-[12px]">Loading…</span></div>
         ) : filtered.length === 0 ? (
-        <EmptyBoard line={search ? "No match on this board" : "No sources connected"} hint={search ? "Try a different search." : "Connect a database or upload a file — everything downstream is modelled from it."}
+        <EmptyBoard line={search ? `No connections match “${search}”` : "No connections yet"} hint={search ? "Check the spelling or clear the search." : "Connect a database to model it. Uploaded files work without one."}
               action={search ? undefined : <CButton variant="primary" onClick={openCreate}><FaPlus size={10} /> Add connection</CButton>} />
         ) : (
           <>
-          <BoardHead cols="42px minmax(0,1fr) 140px 108px">
-            <span className="label"></span>
+          <BoardHead cols={CARD_COLS} colsNarrow="minmax(0,1fr) 100px">
             <span className="label">Connection</span>
-            <span className="label">Type</span>
+            <span className="label col-secondary">Type</span>
             <span className="label text-right">State</span>
           </BoardHead>
           {filtered.map((c) => (
             <CHCard
               key={c.id}
               title={c.name}
-              subtitle={c.description ?? c.type}
+              subtitle={c.description ?? undefined}
               meta={c.type}
-              initials={getInitials(c.name)}
               isSelected={selected?.id === c.id && mode !== "create"}
               badge={{ label: c.is_active ? "Active" : "Inactive", variant: c.is_active ? "green" : "red" }}
               onClick={() => openView(c)}
@@ -556,14 +518,14 @@ export default function ConnectionsPage() {
       </Panel>
 
       {/* Sidebar */}
-      <CInfoSideBar isOpen={isSidebarOpen} onClose={closePanel} title={sidebarTitle} subtitle={sidebarSubtitle} footer={renderSidebarFooter()}>
+      <CDialog isOpen={isSidebarOpen} onClose={closePanel} title={sidebarTitle} subtitle={sidebarSubtitle} footer={renderSidebarFooter()}>
         {renderSidebarContent()}
-      </CInfoSideBar>
+      </CDialog>
 
       {/* Delete confirmation */}
       <CConfirmDialog
         isOpen={confirmOpen}
-        title="Delete Connection"
+        title="Delete connection"
         message={selected ? `Are you sure you want to delete "${selected.name}"? This action cannot be undone.` : ""}
         confirmLabel="Yes, Delete"
         cancelLabel="Cancel"

@@ -24,6 +24,11 @@ export default defineConfig({
   },
   server: {
     proxy: {
+      // The Streamlit dashboard (dashboard/app.py, --server.baseUrlPath streamlit).
+      '/streamlit': {
+        target: 'http://localhost:8501',
+        ws: true
+      },
       '/api': {
         target: 'http://localhost:8989',
         changeOrigin: true,

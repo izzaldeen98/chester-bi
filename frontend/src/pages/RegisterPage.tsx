@@ -145,7 +145,7 @@ export default function RegisterPage() {
         >
           <CLogo size={18} />
           <div className="min-w-0">
-            <p className="font-medium text-[13px] leading-none">Chester BI</p>
+            <p className="font-semibold text-[13px] leading-none tracking-[-0.02em]">Chester <span className="font-normal" style={{ color: "var(--text-3)" }}>BI</span></p>
             <p className="label mt-1 leading-none" style={{ color: "var(--accent)" }}>
               Semantic BI
             </p>

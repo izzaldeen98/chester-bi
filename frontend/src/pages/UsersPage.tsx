@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { FaUser, FaSearch, FaEdit, FaTrash } from "react-icons/fa";
 import { RiLockPasswordFill } from "react-icons/ri";
 import { IoMdMail } from "react-icons/io";
-import CHCard from "../components/CHCard";
-import { BoardFill, BoardHead, EmptyBoard, Panel } from "../components/Board";
-import CInfoSideBar from "../components/CInfoSideBar";
+import CHCard, { CARD_COLS_AVATAR } from "../components/CHCard";
+import { BoardFill, BoardHead, EmptyBoard, PageHead, Panel } from "../components/Board";
+import CDialog from "../components/CDialog";
 import CConfirmDialog from "../components/CConfirmDialog";
 import CButton from "../components/CButton";
 import CTextInput from "../components/CTextInput";
@@ -331,28 +331,15 @@ export default function UsersPage() {
     // view
     return (
       <div>
-        <div className="mb-6 flex flex-col items-center gap-2">
-          <div
-            className="flex h-16 w-16 items-center justify-center rounded-[var(--r-sm)] text-xl font-bold"
-            style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--accent-line)" }}
-          >
-            {getInitials(selected)}
-          </div>
-          <p className="text-base font-bold" style={{ color: "var(--text)" }}>
-            {selected.first_name} {selected.last_name}
-          </p>
-          <span className={`rounded-[var(--r-sm)] px-3 py-0.5 text-xs font-medium ${selected.is_active ? "text-[var(--ok)] bg-[var(--ok-soft)]" : "text-[var(--danger)] bg-[var(--danger-soft)]"}`}>
-            {selected.is_active ? "Active" : "Inactive"}
-          </span>
-        </div>
+        <CDetailRow label="Status" value={selected.is_active ? "Active" : "Inactive"} />
         <CDetailRow label="Username"    value={selected.username} />
         <CDetailRow label="Email"       value={selected.email} />
         <CDetailRow label="Role"        value={selected.role} />
         <CDetailRow label="Permissions" value={formatPermissions(selected.permissions) || "—"} />
         <CDetailRow label="Created"     value={formatDate(selected.created_at)} />
-        <CDetailRow label="Last Updated"  value={formatDate(selected.updated_at)} />
-        {selected.created_by && <CDetailRow label="Created By" value={String(selected.created_by)} />}
-        {selected.updated_by && <CDetailRow label="Updated By" value={String(selected.updated_by)} />}
+        <CDetailRow label="Last updated"  value={formatDate(selected.updated_at)} />
+        {selected.created_by && <CDetailRow label="Created by" value={String(selected.created_by)} />}
+        {selected.updated_by && <CDetailRow label="Updated by" value={String(selected.updated_by)} />}
 
       </div>
     );
@@ -363,7 +350,7 @@ export default function UsersPage() {
       return (
         <div className="flex gap-2">
           <CButton variant="primary" fullWidth loading={saving} onClick={saveCreate} disabled={!cUsername.trim() || !cFirst.trim() || !cLast.trim()}>
-            Create User
+            Create user
           </CButton>
           <CButton variant="ghost" onClick={closePanel} disabled={saving}>Cancel</CButton>
         </div>
@@ -372,7 +359,7 @@ export default function UsersPage() {
     if (mode === "edit") {
       return (
         <div className="flex gap-2">
-          <CButton variant="primary" fullWidth loading={saving} onClick={saveEdit}>Save Changes</CButton>
+          <CButton variant="primary" fullWidth loading={saving} onClick={saveEdit}>Save changes</CButton>
           <CButton variant="ghost" onClick={() => selected && openView(selected)} disabled={saving}>Cancel</CButton>
         </div>
       );
@@ -389,7 +376,7 @@ export default function UsersPage() {
           fullWidth
           onClick={() => { setDeleteError(""); setConfirmOpen(true); }}
         >
-          <FaTrash size={13} /> Delete User
+          <FaTrash size={13} /> Delete user
         </CButton>
       </div>
     );
@@ -402,56 +389,46 @@ export default function UsersPage() {
     selected ? `${selected.first_name} ${selected.last_name}` : "";
 
   const sidebarSubtitle =
-    mode === "create" ? "Fill in the details below" :
+    mode === "create" ? "" :
     selected ? `@${selected.username}` : "";
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <header
-        className="flex shrink-0 flex-wrap items-center gap-4 px-6 py-4"
-        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
-      >
-        <div className="min-w-0">
-          <h1 className="text-[18px] font-semibold leading-none tracking-[-0.02em]">Users</h1>
-          <p className="mt-1.5 text-[13px] leading-none" style={{ color: "var(--text-3)" }}>Manage workspace members and their permissions.</p>
+      <PageHead title="Users" context="People in this workspace and what they are allowed to do.">
+        <div className="w-full sm:w-64">
+          <CTextInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search users…"
+            icon={<FaSearch size={12} />}
+          />
         </div>
-        <div className="ml-auto flex items-center gap-3">
         <CButton variant="primary" onClick={openCreate}>
-          <FaUser size={13} /> Add User
+          <FaUser size={13} /> Add user
         </CButton>
-        </div>
-      </header>
+      </PageHead>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
 
       {pageError && <CAlert variant="error" message={pageError} className="mb-6" />}
 
 
-      {/* Search */}
-      <div className="mb-5 max-w-sm">
-        <CTextInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search by name, username or email…"
-          icon={<FaSearch size={13} />}
-        />
-      </div>
 
       {/* User grid */}
-      <Panel label="Users" flush bodyClassName="flex flex-col">
+      <Panel flush bodyClassName="flex flex-col">
         {loading ? (
         <div className="flex items-center justify-center py-20">
           <CSpinner size={28} />
         </div>
         ) : filtered.length === 0 ? (
-        <EmptyBoard line={search ? "No match on this board" : "No operators"} hint={search ? "Try a different search." : "Invite the people who will run this board."} />
+        <EmptyBoard line={search ? `No users match “${search}”` : "No other members yet"} hint={search ? "Check the spelling or clear the search." : "Add people so they can open artifacts and build models."} />
         ) : (
           <>
-          <BoardHead cols="42px minmax(0,1fr) 140px 108px">
+          <BoardHead cols={CARD_COLS_AVATAR} colsNarrow="28px minmax(0,1fr) 100px">
             <span className="label"></span>
             <span className="label">Name</span>
-            <span className="label">Role</span>
+            <span className="label col-secondary">Role</span>
             <span className="label text-right">State</span>
           </BoardHead>
           {filtered.map((u) => (
@@ -472,7 +449,7 @@ export default function UsersPage() {
       </Panel>
 
       {/* Sidebar */}
-      <CInfoSideBar
+      <CDialog
         isOpen={isSidebarOpen}
         onClose={closePanel}
         title={sidebarTitle}
@@ -480,12 +457,12 @@ export default function UsersPage() {
         footer={renderSidebarFooter()}
       >
         {renderSidebarContent()}
-      </CInfoSideBar>
+      </CDialog>
 
       {/* Delete confirmation */}
       <CConfirmDialog
         isOpen={confirmOpen}
-        title="Delete User"
+        title="Delete user"
         message={
           selected
             ? `Are you sure you want to delete ${selected.first_name} ${selected.last_name} (@${selected.username})? This action cannot be undone.`

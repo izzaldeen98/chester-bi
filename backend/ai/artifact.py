@@ -100,7 +100,9 @@ You are working against ONE semantic model: **{semantic_model}**.
   A column is the part of the member after the dot: "loads.total_revenue" returns
   the column "total_revenue".
 - `y` is an array; one entry per series.
-- `format` is one of currency, percent, decimal, number.
+- `format` is one of currency, percent, decimal, number. `percent` multiplies by 100,
+  so it is only for a 0-1 ratio; a measure already in percentage points (39.8 meaning
+  39.8%) uses `decimal`, with the % in its label.
 - `size` is quarter, third, half or full — twelve columns to a row. KPIs are usually
   quarter; a table or a trend is usually full.
 - `text` takes a `body` string: real observations, not placeholders. Use it when the

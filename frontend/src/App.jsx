@@ -21,7 +21,7 @@ function ComingSoon({ name }) {
   return (
     <div className="flex h-full items-center justify-center p-8">
       <p className="text-sm" style={{ color: 'var(--text)' }}>
-        <span className="font-semibold" style={{ color: 'var(--text-h)' }}>{name}</span> — coming soon
+        <span className="font-semibold" style={{ color: 'var(--text)' }}>{name}</span> — coming soon
       </p>
     </div>
   )

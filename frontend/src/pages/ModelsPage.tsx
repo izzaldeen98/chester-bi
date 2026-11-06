@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaSearch, FaPlus, FaCode, FaTrash } from "react-icons/fa";
-import CHCard from "../components/CHCard";
-import { BoardFill, BoardHead, EmptyBoard, Panel } from "../components/Board";
-import CInfoSideBar from "../components/CInfoSideBar";
+import CHCard, { CARD_COLS } from "../components/CHCard";
+import { BoardFill, BoardHead, EmptyBoard, PageHead, Panel } from "../components/Board";
+import CDialog from "../components/CDialog";
 import CConfirmDialog from "../components/CConfirmDialog";
 import CButton from "../components/CButton";
 import CTextInput from "../components/CTextInput";
@@ -15,11 +15,6 @@ import { getModels, createModel, deleteModel, type ModelResponse } from "../lib/
 type SidebarMode = "view" | "create";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function getModelInitials(name: string) {
-  const words = name.trim().split(/\s+/);
-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
-}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -172,31 +167,12 @@ export default function ModelsPage() {
     // view
     return (
       <div>
-        <div className="mb-6 flex flex-col items-center gap-2">
-          <div
-            className="flex h-16 w-16 items-center justify-center rounded-[var(--r-sm)] text-xl font-bold"
-            style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--accent-line)" }}
-          >
-            {getModelInitials(selected.name)}
-          </div>
-          <p className="text-base font-bold text-center" style={{ color: "var(--text)" }}>
-            {selected.name}
-          </p>
-          <span
-            className={`rounded-[var(--r-sm)] px-3 py-0.5 text-xs font-medium ${
-              selected.is_active
-                ? "text-[var(--ok)] bg-[var(--ok-soft)]"
-                : "text-[var(--danger)] bg-[var(--danger-soft)]"
-            }`}
-          >
-            {selected.is_active ? "Active" : "Inactive"}
-          </span>
-        </div>
+        <CDetailRow label="Status" value={selected.is_active ? "Active" : "Inactive"} />
         <CDetailRow label="Location"     value={selected.location} />
         <CDetailRow label="Created"      value={formatDate(selected.created_at)} />
-        <CDetailRow label="Last Updated" value={formatDate(selected.updated_at)} />
-        <CDetailRow label="Created By"   value={selected.created_by} />
-        <CDetailRow label="Updated By"   value={selected.updated_by} />
+        <CDetailRow label="Last updated" value={formatDate(selected.updated_at)} />
+        <CDetailRow label="Created by"   value={selected.created_by} />
+        <CDetailRow label="Updated by"   value={selected.updated_by} />
       </div>
     );
   }
@@ -206,7 +182,7 @@ export default function ModelsPage() {
       return (
         <div className="flex gap-2">
           <CButton variant="primary" fullWidth loading={saving} onClick={saveCreate} disabled={!cName.trim()}>
-            Create Model
+            Create model
           </CButton>
           <CButton variant="ghost" onClick={closePanel} disabled={saving}>Cancel</CButton>
         </div>
@@ -218,10 +194,10 @@ export default function ModelsPage() {
         <div className="flex flex-col gap-2">
           {deleteError && <CAlert variant="error" message={deleteError} />}
           <CButton variant="outline" fullWidth onClick={() => navigate(`/models/${selected.id}/editor`)}>
-            <FaCode size={13} /> Open Editor
+            <FaCode size={13} /> Open editor
           </CButton>
           <CButton variant="danger" fullWidth onClick={() => { setDeleteError(""); setConfirmOpen(true); }}>
-            <FaTrash size={13} /> Delete Model
+            <FaTrash size={13} /> Delete model
           </CButton>
         </div>
       );
@@ -231,69 +207,57 @@ export default function ModelsPage() {
 
   // ── Sidebar meta ─────────────────────────────────────────────────────────
   const sidebarTitle =
-    mode === "create" ? "New Model" :
+    mode === "create" ? "New model" :
     selected ? selected.name : "";
 
   const sidebarSubtitle =
-    mode === "create" ? "Fill in the details below" :
+    mode === "create" ? "" :
     selected ? `Created by ${selected.created_by}` : "";
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <header
-        className="flex shrink-0 flex-wrap items-center gap-4 px-6 py-4"
-        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
-      >
-        <div className="min-w-0">
-          <h1 className="text-[18px] font-semibold leading-none tracking-[-0.02em]">Models</h1>
-          <p className="mt-1.5 text-[13px] leading-none" style={{ color: "var(--text-3)" }}>Manage analytics models and their definitions.</p>
+      <PageHead title="Models" context="Semantic models decide what can be asked. The AI answers nothing outside them.">
+        <div className="w-full sm:w-64">
+          <CTextInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search models…"
+            icon={<FaSearch size={12} />}
+          />
         </div>
-        <div className="ml-auto flex items-center gap-3">
         <CButton variant="primary" onClick={openCreate}>
-          <FaPlus size={12} /> New Model
+          <FaPlus size={12} /> New model
         </CButton>
-        </div>
-      </header>
+      </PageHead>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
 
       {pageError && <CAlert variant="error" message={pageError} className="mb-6" />}
 
 
-      {/* Search */}
-      <div className="mb-5 max-w-sm">
-        <CTextInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search by name or location…"
-          icon={<FaSearch size={13} />}
-        />
-      </div>
 
       {/* Model grid */}
-      <Panel label="Models" flush bodyClassName="flex flex-col">
+      <Panel flush bodyClassName="flex flex-col">
         {loading ? (
         <div className="flex items-center justify-center py-20">
           <CSpinner size={28} />
         </div>
         ) : filtered.length === 0 ? (
-        <EmptyBoard line={search ? "No match on this board" : "No models defined"} hint={search ? "Try a different search." : "A semantic model is the contract: it decides what an artifact can be asked."} />
+        <EmptyBoard line={search ? `No models match “${search}”` : "No models yet"} hint={search ? "Check the spelling or clear the search." : "A semantic model decides what an artifact can answer. Create one to start asking."} />
         ) : (
           <>
-          <BoardHead cols="42px minmax(0,1fr) 140px 108px">
-            <span className="label"></span>
+          <BoardHead cols={CARD_COLS} colsNarrow="minmax(0,1fr) 100px">
             <span className="label">Model</span>
-            <span className="label">Location</span>
+            <span className="label col-secondary">Created by</span>
             <span className="label text-right">State</span>
           </BoardHead>
           {filtered.map((p) => (
             <CHCard
               key={p.id}
               title={p.name}
-              subtitle={p.location}
-              meta={`By ${p.created_by}`}
-              initials={getModelInitials(p.name)}
+              subtitle={`Updated ${formatDate(p.updated_at)}`}
+              meta={p.created_by}
               isSelected={selected?.id === p.id && mode !== "create"}
               badge={{ label: p.is_active ? "Active" : "Inactive", variant: p.is_active ? "green" : "red" }}
               onClick={() => openView(p)}
@@ -305,7 +269,7 @@ export default function ModelsPage() {
       </Panel>
 
       {/* Sidebar */}
-      <CInfoSideBar
+      <CDialog
         isOpen={isSidebarOpen}
         onClose={closePanel}
         title={sidebarTitle}
@@ -313,7 +277,7 @@ export default function ModelsPage() {
         footer={renderSidebarFooter()}
       >
         {renderSidebarContent()}
-      </CInfoSideBar>
+      </CDialog>
 
       {/* Delete confirmation */}
       <CConfirmDialog

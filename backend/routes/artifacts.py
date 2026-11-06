@@ -31,6 +31,8 @@ CREATE = ["*", "artifacts:*", "artifacts:create"]
 READ = ["*", "artifacts:*", "artifacts:list"]
 EDIT = ["*", "artifacts:*", "artifacts:edit"]
 DELETE = ["*", "artifacts:*", "artifacts:delete"]
+# ponytail: a dropdown past this many values needs server-side search instead.
+MAX_OPTIONS = 1000
 
 
 def _provider_for(db: Session, user: User, row: Artifact, asked: UUID | None):
@@ -302,6 +304,35 @@ async def query_artifact(
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
 
     return {"id": entry["id"], "rows": rows, "cached": cached, "count": len(rows)}
+
+
+@router.get("/options/{artifact_id}")
+async def filter_options(
+    artifact_id: UUID,
+    filter_id: str,
+    version: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """The distinct values of one of the artifact's filter members, for its
+    dropdown. Only members the spec declares as filters can be asked for, so
+    this cannot be used to read arbitrary dimensions."""
+    _require(current_user, *READ)
+    row = _artifact_or_404(db, current_user, artifact_id)
+    spec = _spec_for_version(row, version)
+    f = next((f for f in spec.get("filters") or [] if f.get("id") == filter_id), None)
+    if f is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"This artifact has no filter '{filter_id}'")
+    try:
+        rows, _ = artifact_agent.run_query(
+            db, current_user, {"dimensions": [f["member"]], "order": {f["member"]: "asc"}},
+            limit=MAX_OPTIONS,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+    column = f["member"].split(".")[-1]
+    return {"id": filter_id, "values": [str(r[column]) for r in rows if r.get(column) not in (None, "")]}
 
 
 @router.post("/refine/{artifact_id}", response_model=ArtifactResponse)

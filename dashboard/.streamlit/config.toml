@@ -1,0 +1,47 @@
+# Makes the embedded dashboards look like the Chester app around them:
+# same typeface, accent, radius and outlined inputs.
+# ponytail: light only. Streamlit 1.50 has one [theme] and ignores
+# ?embed_options=dark_theme once it is customised; follow the app's dark
+# mode when Streamlit ships per-mode theme sections.
+
+[server]
+# Serves ./static (the Geist fonts) at app/static/.
+enableStaticServing = true
+
+[theme]
+primaryColor = "#d97706"
+font = "Geist"
+headingFont = "Geist"
+codeFont = "Geist Mono"
+baseFontSize = 14
+headingFontWeights = 600
+baseRadius = "8px"
+showWidgetBorder = true
+
+# Categorical order validated for light (#ffffff) and dark (#131314)
+# surfaces: lightness band, chroma, CVD and contrast all pass in both.
+# Blue leads so a single-series chart doesn't read as a warning colour;
+# brand amber is second.
+chartCategoricalColors = ["#2a78d6", "#d97706", "#199e70", "#7b6be0", "#d55181", "#2f8f2f", "#e34948"]
+# One hue (amber), light to dark.
+chartSequentialColors = ["#fef3c7", "#fde68a", "#fcd34d", "#fbbf24", "#f59e0b", "#d97706", "#b45309", "#92400e", "#78350f", "#5a2a0c"]
+
+[[theme.fontFaces]]
+family = "Geist"
+url = "app/static/geist-sans-latin-400-normal.woff2"
+weight = 400
+
+[[theme.fontFaces]]
+family = "Geist"
+url = "app/static/geist-sans-latin-500-normal.woff2"
+weight = 500
+
+[[theme.fontFaces]]
+family = "Geist"
+url = "app/static/geist-sans-latin-600-normal.woff2"
+weight = 600
+
+[[theme.fontFaces]]
+family = "Geist Mono"
+url = "app/static/geist-mono-latin-400-normal.woff2"
+weight = 400

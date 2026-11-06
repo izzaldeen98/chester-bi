@@ -4,7 +4,7 @@ interface CHCardProps {
   title: string;
   subtitle?: string;
   meta?: string;
-  initials: string;
+  initials?: string;
   avatarBg?: string;
   badge?: {
     label: string;
@@ -14,6 +14,12 @@ interface CHCardProps {
   onClick?: () => void;
   className?: string;
 }
+
+/* Columns shared with the BoardHead above the rows, so they can't drift.
+   The leading avatar column exists only for people. */
+export const CARD_COLS = "minmax(0,1fr) 150px 120px";
+export const CARD_COLS_AVATAR = "32px minmax(0,1fr) 150px 120px";
+const NARROW = "minmax(0,1fr) 100px";
 
 /* Was a card in a grid; now a row on the board. Same props, so every page
    that lists things gets the board grammar without changing its logic.
@@ -59,19 +65,21 @@ export default function CHCard({
         onClick ? "cursor-pointer hover:bg-[var(--surface-2)]" : ""
       } ${className}`}
       style={{
-        ["--cols" as string]: "44px minmax(0,1fr) 150px 120px",
-        ["--cols-narrow" as string]: "36px minmax(0,1fr) 100px",
+        ["--cols" as string]: initials ? CARD_COLS_AVATAR : CARD_COLS,
+        ["--cols-narrow" as string]: initials ? `28px ${NARROW}` : NARROW,
         borderBottom: "1px solid var(--border)",
         background: isSelected ? "var(--surface-2)" : undefined,
         boxShadow: isSelected ? "inset 2px 0 0 var(--accent)" : undefined,
       }}
     >
-      <span
-        className="flex h-7 w-7 items-center justify-center text-[11px] font-medium"
-        style={{ background: "var(--surface-2)", color: "var(--text-2)", borderRadius: "var(--r-sm)" }}
-      >
-        {initials}
-      </span>
+      {initials && (
+        <span
+          className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-medium"
+          style={{ background: "var(--surface-2)", color: "var(--text-2)" }}
+        >
+          {initials}
+        </span>
+      )}
 
       <span className="min-w-0">
         <span className="block truncate text-[13.5px] font-medium leading-tight" style={{ color: "var(--text)" }}>{title}</span>

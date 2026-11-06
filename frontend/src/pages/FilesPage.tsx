@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { FaSearch, FaTrash, FaPlus } from "react-icons/fa";
-import CInfoSideBar from "../components/CInfoSideBar";
+import CDialog from "../components/CDialog";
 import CConfirmDialog from "../components/CConfirmDialog";
 import CButton from "../components/CButton";
 import CTextInput from "../components/CTextInput";
 import CAlert from "../components/CAlert";
 import CSpinner from "../components/CSpinner";
-import { BoardFill, EmptyBoard, Panel } from "../components/Board";
+import { BoardFill, EmptyBoard, PageHead, Panel } from "../components/Board";
 import CDetailRow from "../components/CDetailRow";
 import {
   getFiles,
@@ -18,14 +18,9 @@ import {
 
 type SidebarMode = "view" | "create";
 
-const columns = ["#", "Name", "File Name", "Extension", "Size", "Created At", "Created By"];
+const columns = ["#", "Name", "File Name", "Extension", "Size", "Created At", "Created by"];
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function getFileInitials(name: string) {
-  const words = name.trim().split(/\s+/);
-  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
-}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, {
@@ -283,33 +278,14 @@ export default function FilesPage() {
 
     return (
       <div>
-        <div className="mb-6 flex flex-col items-center gap-2">
-          <div
-            className="flex h-16 w-16 items-center justify-center rounded-[var(--r-sm)] text-xl font-bold"
-            style={{ background: "var(--accent-soft)", color: "var(--accent)", border: "1px solid var(--accent-line)" }}
-          >
-            {getFileInitials(selected.name)}
-          </div>
-          <p className="text-base font-bold text-center" style={{ color: "var(--text)" }}>
-            {selected.name}
-          </p>
-          {selected.extension && (
-            <span
-              className="rounded-[var(--r-sm)] px-2.5 py-0.5 text-xs font-medium uppercase"
-              style={{ background: "var(--surface-2)", color: "var(--text-2)", border: "1px solid var(--border)" }}
-            >
-              {selected.extension}
-            </span>
-          )}
-        </div>
         <CDetailRow label="Description" value={selected.description} />
         <CDetailRow label="File Name"   value={selected.file_name} />
         <CDetailRow label="Size"        value={formatFileSize(selected.file_size)} />
         <CDetailRow label="Path"        value={selected.path} />
         <CDetailRow label="Created"     value={formatDate(selected.created_at)} />
-        <CDetailRow label="Last Updated" value={formatDate(selected.updated_at)} />
-        <CDetailRow label="Created By"  value={selected.created_by} />
-        <CDetailRow label="Updated By"  value={selected.updated_by} />
+        <CDetailRow label="Last updated" value={formatDate(selected.updated_at)} />
+        <CDetailRow label="Created by"  value={selected.created_by} />
+        <CDetailRow label="Updated by"  value={selected.updated_by} />
       </div>
     );
   }
@@ -340,14 +316,14 @@ export default function FilesPage() {
           fullWidth
           onClick={() => { setDeleteError(""); setConfirmOpen(true); }}
         >
-          <FaTrash size={13} /> Delete File
+          <FaTrash size={13} /> Delete file
         </CButton>
       </div>
     );
   }
 
   const sidebarTitle =
-    mode === "create" ? "Upload Files" :
+    mode === "create" ? "Upload files" :
     selected ? selected.name : "";
 
   const sidebarSubtitle =
@@ -356,34 +332,25 @@ export default function FilesPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <header
-        className="flex shrink-0 flex-wrap items-center gap-4 px-6 py-4"
-        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
-      >
-        <div className="min-w-0">
-          <h1 className="text-[18px] font-semibold leading-none tracking-[-0.02em]">Files</h1>
-          <p className="mt-1.5 text-[13px] leading-none" style={{ color: "var(--text-3)" }}>Upload and manage your workspace files.</p>
+      <PageHead title="Files" context="CSV and Parquet files you can model without a database.">
+        <div className="w-full sm:w-64">
+          <CTextInput
+            value={search}
+            onChange={setSearch}
+            placeholder="Search files…"
+            icon={<FaSearch size={12} />}
+          />
         </div>
-        <div className="ml-auto flex items-center gap-3">
         <CButton variant="primary" onClick={openCreate}>
-          <FaPlus size={12} /> Upload Files
+          <FaPlus size={12} /> Upload files
         </CButton>
-        </div>
-      </header>
+      </PageHead>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
 
       {pageError && <CAlert variant="error" message={pageError} className="mb-6" />}
 
 
-      <div className="mb-5 max-w-sm">
-        <CTextInput
-          value={search}
-          onChange={setSearch}
-          placeholder="Search by name, file name, or extension…"
-          icon={<FaSearch size={13} />}
-        />
-      </div>
 
       {loading ? (
         <div className="flex items-center justify-center gap-3 py-20" style={{ color: "var(--text-3)" }}>
@@ -391,9 +358,9 @@ export default function FilesPage() {
           <span className=" text-[12px]">Loading…</span>
         </div>
       ) : filtered.length === 0 ? (
-        <EmptyBoard line={search ? "No match on this board" : "No files uploaded"} hint={search ? "Try a different search." : "Upload a CSV or Parquet to model it as a cube."} />
+        <EmptyBoard line={search ? `No files match “${search}”` : "No files yet"} hint={search ? "Check the spelling or clear the search." : "Upload a CSV or Parquet file to model it without a database."} />
       ) : (
-        <Panel label="Files" flush bodyClassName="flex flex-col">
+        <Panel flush bodyClassName="flex flex-col">
           <div className="overflow-x-auto">
           <table className="w-full border-collapse text-xs">
             <thead>
@@ -435,7 +402,7 @@ export default function FilesPage() {
         </Panel>
       )}
 
-      <CInfoSideBar
+      <CDialog
         isOpen={isSidebarOpen}
         onClose={closePanel}
         title={sidebarTitle}
@@ -444,11 +411,11 @@ export default function FilesPage() {
         closeOnBackdropClick={mode !== "create"}
       >
         {renderSidebarContent()}
-      </CInfoSideBar>
+      </CDialog>
 
       <CConfirmDialog
         isOpen={confirmOpen}
-        title="Delete File"
+        title="Delete file"
         message={
           selected
             ? `Are you sure you want to delete "${selected.name}"? This action cannot be undone.`

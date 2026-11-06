@@ -1,0 +1,31 @@
+{
+  "brand": "Chester BI",
+  "tagline": "Model it once. Ask in one sentence.",
+  "brief": "Self-hosted, open-source BI for analysts who build the semantic model themselves, then describe the analysis and let the AI write the page. It should feel precise, technical and calm — not another AI sparkle.",
+  "adjectives": ["precise", "self-owned", "direct", "warm"],
+  "criteria": "Success: ownable letterform, reads as data without drawing a dashboard, clear at 16 px, works in one colour, keeps the amber equity.",
+  "mockups": ["readme", "favicon-tab", "app-icon", "terminal", "website", "sticker"],
+  "nav": ["Docs", "GitHub", "Quick start"],
+  "brand_color": "#D97706",
+  "tile_color": "#1C1917",
+  "greyscale": false,
+  "designer": "Chester BI",
+  "round": 2,
+  "concepts": [
+    {
+      "name": "Radial C",
+      "symbol": "chester-symbol.svg",
+      "lockup": "chester-horizontal.svg",
+      "symbol_on_tile": "chester-symbol-dark.svg",
+      "lockup_on_dark": "chester-horizontal-dark.svg",
+      "idea": "The C is a radial bar chart: your initial, drawn as data.",
+      "rationale": [
+        "Letterform tied to the name, so it can't be borrowed",
+        "Three bands = model, query, page — never spelled out",
+        "One filled shape: holds at 16 px with its own small cut"
+      ]
+    }
+  ],
+  "recommendation": "Radial C, amber on light and gold on dark, with Geist Sans outlined for the wordmark.",
+  "next_steps": ["Trademark and reverse-image search before public launch", "Replace outdated README screenshots alongside the new mark"]
+}

@@ -39,6 +39,9 @@ services:
   cube:
     image: cubejs/cube:latest
     container_name: chester_cube
+    extra_hosts:
+      # Lets cube.js reach databases saved as "localhost" (see withReachableHost).
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
     environment:
       CUBEJS_API_SECRET: ${CUBEJS_API_SECRET:-changeme}

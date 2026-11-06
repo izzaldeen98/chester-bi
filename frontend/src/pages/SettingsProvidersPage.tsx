@@ -6,7 +6,7 @@ import CSelect from "../components/CSelect";
 import CDialog from "../components/CDialog";
 import CAlert from "../components/CAlert";
 import CSpinner from "../components/CSpinner";
-import { BoardFill, BoardHead, EmptyBoard, Panel, Status } from "../components/Board";
+import { BoardFill, BoardHead, EmptyBoard, PageHead, Panel, Status } from "../components/Board";
 import CConfirmDialog from "../components/CConfirmDialog";
 import {
   getAIProviders,
@@ -139,28 +139,17 @@ export default function SettingsProvidersPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <header
-        className="flex shrink-0 flex-wrap items-center gap-4 px-6 py-4"
-        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
-      >
-        <div className="min-w-0">
-          <h1 className="text-[18px] font-semibold leading-none tracking-[-0.02em]">AI Providers</h1>
-          <p className="mt-1.5 text-[13px] leading-none" style={{ color: "var(--text-3)" }}>
-            Bring your own key · encrypted at rest · model chosen once
-          </p>
-        </div>
-        <div className="ml-auto">
-          <CButton variant="primary" onClick={() => setDialogOpen(true)}>
-            <FaPlus size={10} /> Add provider
-          </CButton>
-        </div>
-      </header>
+      <PageHead title="AI Providers" context="Your own API key, encrypted at rest. The model is chosen once, here.">
+        <CButton variant="primary" onClick={() => setDialogOpen(true)}>
+          <FaPlus size={10} /> Add provider
+        </CButton>
+      </PageHead>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
         {error && <CAlert variant="error" message={error} />}
         {ok && <CAlert variant="success" message={ok} />}
 
-        <Panel label="Providers" flush bodyClassName="flex flex-col">
+        <Panel flush bodyClassName="flex flex-col">
           {loading ? (
             <div className="flex items-center justify-center gap-3 py-20" style={{ color: "var(--text-3)" }}>
               <CSpinner size={18} />

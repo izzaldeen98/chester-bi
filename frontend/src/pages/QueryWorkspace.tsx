@@ -598,11 +598,11 @@ export default function QueryWorkspace() {
 
       {/* Top bar */}
       <header
-        className="flex shrink-0 items-center gap-3 px-4 py-2.5"
-        style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-subtle)" }}
+        className="flex shrink-0 flex-wrap items-center gap-3 px-4 py-2.5"
+        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
       >
         <PiFileSqlFill size={18} style={{ color: "var(--accent)" }} />
-        <span className="text-sm font-bold" style={{ color: "var(--text-h)" }}>
+        <span className="text-sm font-bold" style={{ color: "var(--text)" }}>
           {isEditMode ? "Edit query" : "New query"}
         </span>
         {queryNameEditing ? (
@@ -616,8 +616,8 @@ export default function QueryWorkspace() {
               if (e.key === 'Enter') setQueryNameEditing(false);
               if (e.key === 'Escape') {setQueryNameEditing(false)};
             }}
-            className="w-48 rounded-lg border px-2 py-1 text-left text-xs font-semibold outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]"
-            style={{ background: "var(--bg)", color: "var(--text-h)", borderColor: "var(--border)" }}
+            className="w-48 rounded-lg border px-2 py-1 text-left text-xs font-semibold outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-line)]"
+            style={{ background: "var(--bg)", color: "var(--text)", borderColor: "var(--border)" }}
           />
         ) : (
           <span
@@ -639,8 +639,8 @@ export default function QueryWorkspace() {
               <select
                 value={selectedModelId}
                 onChange={(e) => setSelectedModelId(e.target.value)}
-                className="rounded-lg border px-2 py-1 text-xs outline-none transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]"
-                style={{ background: "var(--bg)", color: selectedModelId ? "var(--text-h)" : "var(--text)", borderColor: "var(--border)" }}
+                className="rounded-lg border px-2 py-1 text-xs outline-none transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-line)]"
+                style={{ background: "var(--bg)", color: selectedModelId ? "var(--text)" : "var(--text)", borderColor: "var(--border)" }}
               >
                 <option value="" disabled>Model…</option>
                 {modelOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -649,8 +649,8 @@ export default function QueryWorkspace() {
                 value={selectedDefinitionId}
                 onChange={(e) => setSelectedDefinitionId(e.target.value)}
                 disabled={!selectedModelId}
-                className="rounded-lg border px-2 py-1 text-xs outline-none transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)] disabled:cursor-not-allowed disabled:opacity-50"
-                style={{ background: "var(--bg)", color: selectedDefinitionId ? "var(--text-h)" : "var(--text)", borderColor: "var(--border)" }}
+                className="rounded-lg border px-2 py-1 text-xs outline-none transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-line)] disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ background: "var(--bg)", color: selectedDefinitionId ? "var(--text)" : "var(--text)", borderColor: "var(--border)" }}
               >
                 <option value="" disabled>Definition…</option>
                 {definitionOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -660,7 +660,7 @@ export default function QueryWorkspace() {
                 onClick={loadSchema}
                 disabled={!selectedDefinitionId || loadingSchema}
                 title="Refresh Definition"
-                className="flex shrink-0 items-center justify-center rounded-lg p-1.5 transition-colors hover:bg-[var(--accent-muted)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex shrink-0 items-center justify-center rounded-lg p-1.5 transition-colors hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40"
                 style={{ color: "var(--text)" }}
               >
                 {loadingSchema ? <CSpinner size={12} /> : <MdRefresh size={14} />}
@@ -685,7 +685,7 @@ export default function QueryWorkspace() {
         <button onClick={handleRun}
           disabled={!hasSelection || running}
           className="flex items-center gap-2 rounded-xl px-4 py-1.5 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-          style={{ background: "var(--accent)", color: "var(--accent-fg)" }}
+          style={{ background: "var(--accent)", color: "var(--solid-ink)" }}
         >
           {running ? <CSpinner size={12} /> : <FaPlay size={11} />} Run
         </button>
@@ -705,7 +705,7 @@ export default function QueryWorkspace() {
 
         {/* ── Left sidebar ────────────────────────────────────────────── */}
         <aside className="flex w-72 shrink-0 flex-col overflow-y-auto"
-          style={{ borderRight: "1px solid var(--border)", background: "var(--bg-subtle)" }}
+          style={{ borderRight: "1px solid var(--border)", background: "var(--surface)" }}
         >
           {/* Schema browser */}
           <div className="flex-1 overflow-y-auto py-1">
@@ -727,7 +727,7 @@ export default function QueryWorkspace() {
                   {/* Source row */}
                   <div
                     className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors"
-                    style={srcActive ? { background: "var(--accent-muted)", color: "var(--accent)" } : { color: "var(--text-h)" }}
+                    style={srcActive ? { background: "var(--accent-soft)", color: "var(--accent)" } : { color: "var(--text)" }}
                   >
                     <button type="button" onClick={() => setActiveSchema(schema)}
                       className="flex min-w-0 flex-1 items-center gap-2 text-left"
@@ -777,7 +777,7 @@ export default function QueryWorkspace() {
           {/* Results */}
           <div className="flex flex-1 flex-col overflow-hidden">
             <div className="flex shrink-0 items-center gap-3 px-3 py-1.5"
-              style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-subtle)" }}
+              style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
             >
               <FaTable size={11} style={{ color: "var(--accent)" }} />
               <span className="text-xs font-medium" style={{ color: "var(--text)" }}>Results</span>
@@ -791,8 +791,8 @@ export default function QueryWorkspace() {
               <div className="ml-auto flex items-center gap-1.5">
                 <span className="text-xs font-medium" style={{ color: "var(--text)" }}>Limit</span>
                 <input type="number" value={limit} onChange={(e) => setLimit(Math.max(1, Number(e.target.value)))} min={1}
-                  className="w-20 rounded-lg border px-2 py-1 text-right text-xs outline-none transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-ring)]"
-                  style={{ background: "var(--bg)", color: "var(--text-h)", borderColor: "var(--border)" }}
+                  className="w-20 rounded-lg border px-2 py-1 text-right text-xs outline-none transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-line)]"
+                  style={{ background: "var(--bg)", color: "var(--text)", borderColor: "var(--border)" }}
                 />
                 <span className="text-xs" style={{ color: "var(--text)" }}>save limit</span>
                 <button
@@ -820,7 +820,7 @@ export default function QueryWorkspace() {
               {!queryError && !queryResult && !running && (
                 <div className="flex flex-1 flex-col items-center justify-center gap-2 py-20 text-center">
                   <FaPlay size={28} style={{ color: "var(--border)" }} />
-                  <p className="text-sm font-medium" style={{ color: "var(--text-h)" }}>Select fields and run your query</p>
+                  <p className="text-sm font-medium" style={{ color: "var(--text)" }}>Select fields and run your query</p>
                   <p className="text-xs" style={{ color: "var(--text)" }}>Choose a source from the sidebar, pick fields, then click Run.</p>
                 </div>
               )}
@@ -832,7 +832,7 @@ export default function QueryWorkspace() {
                   {resultView === "table" && <CTable columns={resultColumns} rows={resultRows} maxHeight="100%" />}
                   {resultView === "json" && (
                     <pre className="p-4 text-xs font-mono leading-relaxed overflow-auto"
-                      style={{ color: "var(--text-h)", background: "var(--bg)" }}
+                      style={{ color: "var(--text)", background: "var(--bg)" }}
                     >
                       {JSON.stringify(queryResult, null, 2)}
                     </pre>
@@ -840,7 +840,7 @@ export default function QueryWorkspace() {
                   {resultView === "cube" && (
                     <div className="flex flex-col gap-2">
                     <pre className="p-4 text-xs font-mono leading-relaxed overflow-auto"
-                      style={{ color: "var(--text-h)", background: "var(--bg)" }}
+                      style={{ color: "var(--text)", background: "var(--bg)" }}
                     >
                       {JSON.stringify(query, null, 2)}
                     </pre>

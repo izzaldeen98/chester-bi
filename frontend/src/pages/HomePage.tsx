@@ -1,18 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { MdAutoAwesome, MdOutlineCloud } from "react-icons/md";
-import { GoPackage } from "react-icons/go";
-import { FaPlus, FaArrowRight } from "react-icons/fa";
+import { FaPlus } from "react-icons/fa";
 import { getUser } from "../lib/auth";
 import {
   getArtifacts,
   getConnections,
   getModels,
-  getUsers,
   type ArtifactResponse,
   type ConnectionPublicResponse,
 } from "../lib/Api";
-import { BoardFill, BoardHead, BoardRow, EmptyBoard, Flap, Lamp, Panel, Readout, Status } from "../components/Board";
+import { BoardFill, BoardHead, BoardRow, EmptyBoard, Flap, PageHead, Panel, Status } from "../components/Board";
 import CButton from "../components/CButton";
 import CAlert from "../components/CAlert";
 import CSpinner from "../components/CSpinner";
@@ -20,47 +17,73 @@ import CSpinner from "../components/CSpinner";
 const COLS = "88px minmax(0,1fr) 150px 74px 108px";
 const COLS_NARROW = "62px minmax(0,1fr) 92px";
 
+// Time alone for today, the date otherwise: "21:14" means nothing a month later.
 function departureTime(iso: string) {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
+  const d = new Date(iso);
+  return d.toDateString() === new Date().toDateString()
+    ? d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false })
+    : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-/* The pipeline is the product's one path. Showing it as an ordered run of
-   stages with live counts is what makes "where am I, what next" answerable
-   without a tutorial. */
-function PipelineStage({
-  n,
-  label,
-  count,
-  done,
-  icon,
-  onClick,
-}: {
-  n: string;
-  label: string;
-  count: number | null;
-  done: boolean;
-  icon: React.ReactNode;
-  onClick: () => void;
-}) {
+/* The pipeline is the product's one path, and the overview's one bold
+   element: three stages in order, each with its live count. The first stage
+   still at zero is the one that is lit, so "what next" never needs a tour. */
+type Stage = { step: number; title: string; noun: string; hint: string; count: number | null; to: string; cta: string };
+
+function Pipeline({ stages, onGo }: { stages: Stage[]; onGo: (to: string) => void }) {
+  const loaded = stages.every((s) => s.count !== null);
+  const nextIdx = loaded ? stages.findIndex((s) => !s.count) : -1;
+  const current = nextIdx === -1 ? stages.length - 1 : nextIdx;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-[filter] hover:brightness-[1.4]"
-      style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}
+    <ol
+      className="settle grid overflow-hidden md:grid-cols-3"
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--r-lg)",
+        boxShadow: "var(--shadow-1)",
+      }}
     >
-      <span className="mono text-[11px]" style={{ color: "var(--text-3)" }}>
-        {n}
-      </span>
-      <span style={{ color: done ? "var(--accent)" : "var(--text-3)" }}>{icon}</span>
-      <span className=" flex-1 text-[12px]" style={{ color: "var(--text)" }}>
-        {label}
-      </span>
-      <span className="mono text-[15px]" style={{ color: done ? "var(--ok)" : "var(--text-3)" }}>
-        {count === null ? "—" : count}
-      </span>
-      <Lamp signal={done ? "ok" : "idle"} />
-    </button>
+      {stages.map((s, i) => {
+        const lit = loaded && i === current;
+        const done = Boolean(s.count);
+        return (
+          <li
+            key={s.step}
+            className="relative flex flex-col gap-3 p-5"
+            style={{
+              borderLeft: i ? "1px solid var(--border)" : undefined,
+              boxShadow: lit ? "inset 0 2px 0 var(--accent-bold)" : undefined,
+            }}
+          >
+            <div className="flex items-center gap-2 text-[13px]">
+              <span
+                className="tnum grid h-5 w-5 place-items-center rounded-full text-[11px] font-medium"
+                style={{
+                  background: done ? "var(--ok-soft)" : lit ? "var(--accent-soft)" : "var(--surface-2)",
+                  color: done ? "var(--ok)" : lit ? "var(--accent)" : "var(--text-3)",
+                }}
+              >
+                {s.step}
+              </span>
+              <span className="font-medium" style={{ color: "var(--text)" }}>{s.title}</span>
+            </div>
+            <p className="flex items-baseline gap-2">
+              <span className="tnum text-[32px] font-semibold leading-none tracking-[-0.03em]" style={{ color: "var(--text)" }}>
+                {s.count ?? "–"}
+              </span>
+              <span className="text-[13px]" style={{ color: "var(--text-3)" }}>{s.noun}</span>
+            </p>
+            <p className="max-w-[34ch] text-[13px] leading-relaxed" style={{ color: "var(--text-3)" }}>{s.hint}</p>
+            <div className="mt-auto pt-1">
+              <CButton variant={lit ? "primary" : "outline"} onClick={() => onGo(s.to)}>
+                {s.cta}
+              </CButton>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -71,14 +94,13 @@ export default function HomePage() {
   const [artifacts, setArtifacts] = useState<ArtifactResponse[] | null>(null);
   const [connections, setConnections] = useState<ConnectionPublicResponse[] | null>(null);
   const [modelCount, setModelCount] = useState<number | null>(null);
-  const [userCount, setUserCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const results = await Promise.allSettled([getArtifacts(), getConnections(), getModels(), getUsers()]);
+      const results = await Promise.allSettled([getArtifacts(), getConnections(), getModels()]);
       if (cancelled) return;
       const errs: string[] = [];
       if (results[0].status === "fulfilled") setArtifacts(results[0].value);
@@ -87,8 +109,6 @@ export default function HomePage() {
       else setConnections([]);
       if (results[2].status === "fulfilled") setModelCount(results[2].value.length);
       else setModelCount(0);
-      if (results[3].status === "fulfilled") setUserCount(results[3].value.length);
-      else setUserCount(0);
       setErrors(errs);
       setLoading(false);
     })();
@@ -100,36 +120,30 @@ export default function HomePage() {
   const recent = artifacts
     ? [...artifacts].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()).slice(0, 7)
     : [];
-  const firstName = user?.first_name ?? user?.username ?? "operator";
+  const firstName = user?.first_name || user?.username || "Welcome";
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {/* Concourse header: who is on shift, and the one action that matters */}
-      <header
-        className="flex shrink-0 flex-wrap items-center gap-4 px-6 py-4"
-        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
-      >
-        <div className="min-w-0">
-          <h1 className="text-[18px] font-semibold leading-none tracking-[-0.02em]">Overview</h1>
-          <p className="mt-1.5 text-[13px] leading-none" style={{ color: "var(--text-3)" }}>
-            {firstName} · {user?.account_name ?? "—"} · {user?.role ?? "—"}
-          </p>
-        </div>
-        <div className="ml-auto">
-          <CButton variant="primary" onClick={() => navigate("/artifacts/new")}>
-            <FaPlus size={10} /> New artifact
-          </CButton>
-        </div>
-      </header>
+      <PageHead title="Overview" context={`${firstName}, ${user?.account_name ?? "your workspace"}`} />
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
         {errors.length > 0 && (
           <CAlert variant="error" message={`Could not reach: ${errors.join(", ")}.`} className="mb-3" />
         )}
 
-        <div className="relative grid items-start gap-4 lg:grid-cols-[1fr_300px]">
-          {/* ── The board ────────────────────────────────────────────── */}
-          <Panel
+        <Pipeline
+          onGo={navigate}
+          stages={[
+            { step: 1, title: "Connect", noun: connections?.length === 1 ? "connection" : "connections", count: connections?.length ?? null,
+              hint: "A database Chester queries live. Credentials are encrypted and never leave this server.", to: "/connections", cta: "Add a connection" },
+            { step: 2, title: "Model", noun: modelCount === 1 ? "semantic model" : "semantic models", count: modelCount,
+              hint: "Measures and dimensions the AI is allowed to use. It answers nothing outside them.", to: "/models", cta: "Open models" },
+            { step: 3, title: "Ask", noun: artifacts?.length === 1 ? "artifact" : "artifacts", count: artifacts?.length ?? null,
+              hint: "Describe the analysis in a sentence. Chester writes the page from your model.", to: "/artifacts/new", cta: "New artifact" },
+          ]}
+        />
+
+        <Panel
             label="Recent artifacts"
             flush
             bodyClassName="flex flex-col"
@@ -137,10 +151,10 @@ export default function HomePage() {
               <button
                 type="button"
                 onClick={() => navigate("/artifacts")}
-                className=" text-[11px] transition-colors hover:text-[var(--accent)]"
+                className="text-[13px] transition-colors hover:text-[var(--text)]"
                 style={{ color: "var(--text-2)" }}
               >
-                View all <FaArrowRight size={9} className="inline" />
+                View all
               </button>
             }
           >
@@ -191,65 +205,6 @@ export default function HomePage() {
             {!loading && recent.length > 0 && <BoardFill />}
           </Panel>
 
-          {/* ── Right rail ───────────────────────────────────────────── */}
-          <div className="flex flex-col gap-4">
-            <Panel label="Setup" flush bodyClassName="flex flex-col">
-              <PipelineStage
-                n="01"
-                label="Connections"
-                count={connections?.length ?? null}
-                done={Boolean(connections?.length)}
-                icon={<MdOutlineCloud size={15} />}
-                onClick={() => navigate("/connections")}
-              />
-              <PipelineStage
-                n="02"
-                label="Models"
-                count={modelCount}
-                done={Boolean(modelCount)}
-                icon={<GoPackage size={14} />}
-                onClick={() => navigate("/models")}
-              />
-              <PipelineStage
-                n="03"
-                label="Artifacts"
-                count={artifacts?.length ?? null}
-                done={Boolean(artifacts?.length)}
-                icon={<MdAutoAwesome size={15} />}
-                onClick={() => navigate("/artifacts")}
-              />
-            </Panel>
-
-            <Panel label="Workspace">
-              <div className="grid grid-cols-2 gap-2">
-                <Readout value={artifacts?.length ?? 0} label="Artifacts" />
-                <Readout value={userCount ?? 0} label="Team members" />
-              </div>
-            </Panel>
-
-            <Panel label="Quick actions">
-              <div className="flex flex-col gap-2.5">
-                {[
-                  { label: "New artifact", to: "/artifacts/new" },
-                  { label: "Add connection", to: "/connections" },
-                  { label: "Edit models", to: "/models" },
-                  { label: "AI Providers", to: "/settings/ai-providers" },
-                ].map((a) => (
-                  <button
-                    key={a.to}
-                    type="button"
-                    onClick={() => navigate(a.to)}
-                    className=" flex items-center justify-between border px-3 py-2 text-[11px] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                    style={{ borderColor: "var(--border)", color: "var(--text-2)" }}
-                  >
-                    {a.label}
-                    <FaArrowRight size={8} />
-                  </button>
-                ))}
-              </div>
-            </Panel>
-          </div>
-        </div>
       </div>
     </div>
   );

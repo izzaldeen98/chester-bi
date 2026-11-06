@@ -99,7 +99,7 @@ export default function CFieldTree({
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search fields…"
             className="w-full bg-transparent text-xs outline-none"
-            style={{ color: "var(--text-h)" }}
+            style={{ color: "var(--text)" }}
           />
         </div>
       </div>
@@ -113,7 +113,7 @@ export default function CFieldTree({
               type="button"
               onClick={() => toggleGroup(group.key)}
               className="flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors"
-              style={{ color: "var(--text-h)" }}
+              style={{ color: "var(--text)" }}
             >
               {isCollapsed ? <FaChevronRight size={9} style={{ color: "var(--text)" }} /> : <FaChevronDown size={9} style={{ color: "var(--text)" }} />}
               {group.icon}
@@ -142,7 +142,7 @@ export default function CFieldTree({
                     onClick={() => onToggleField(field)}
                     onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = "var(--border)"; }}
                     onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = ""; }}
-                    style={isSelected ? { background: isMeasureLike ? "#ede9fe" : "var(--accent-muted)" } : undefined}
+                    style={isSelected ? { background: isMeasureLike ? "#ede9fe" : "var(--accent-soft)" } : undefined}
                   >
                     <input
                       type="checkbox"
@@ -156,7 +156,7 @@ export default function CFieldTree({
                     <div className="flex min-w-0 flex-1 items-center gap-1.5">
                       <span
                         className="truncate text-xs"
-                        style={{ color: isSelected ? (isMeasureLike ? "#7c3aed" : "var(--accent)") : "var(--text-h)" }}
+                        style={{ color: isSelected ? (isMeasureLike ? "#7c3aed" : "var(--accent)") : "var(--text)" }}
                       >
                         {field.name}
                       </span>
@@ -220,7 +220,7 @@ export default function CFieldTree({
                           className="px-1.5 py-0.5 text-[9px] font-semibold transition-colors cursor-pointer rounded"
                           onClick={(e) => onSetGranularity(e, field.name, g)}
                           style={gran === g
-                            ? { background: "var(--accent)", color: "var(--accent-fg)" }
+                            ? { background: "var(--accent)", color: "var(--solid-ink)" }
                             : { background: "var(--border)", color: "var(--text)" }}
                         >
                           {g}

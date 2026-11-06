@@ -371,7 +371,7 @@ export default function CQueryBuilder({ fields, query, onQueryChange }: CQueryBu
                     {collapseFilters ? <BsArrowsExpand size={14} className="cursor-pointer var(--text)" onClick={cycleCollapseFilters} /> : <BsArrowsCollapse size={14} className="cursor-pointer var(--accent)" onClick={cycleCollapseFilters} />}
                 </span>
                 <FaFilter size={11} style={{ color: "var(--accent)" }} />
-                <span className="text-xs font-medium" style={{ color: "var(--text-h)" }}>Filters</span>
+                <span className="text-xs font-medium" style={{ color: "var(--text)" }}>Filters</span>
                 {filterRuleCount > 0 ? (
                     <button
                         type="button"

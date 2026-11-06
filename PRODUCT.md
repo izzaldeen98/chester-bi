@@ -109,9 +109,10 @@ grounded on Cube's compiled schema alone.
 
 ## Brand Commitments
 
-- **Name:** Chester BI. Existing logo at `assets/logo.svg` and `assets/logo.png`.
-- **Identity color:** an amber-to-gold gradient, currently `#d97706 → #eab308 → #facc15`,
-  used on the landing page and as the app accent.
+- **Name:** Chester BI. Logo: a C drawn as a radial bar chart. Kit, lockups, icons and
+  usage rules in `assets/brand/` (see its README); `assets/logo.svg` is the symbol.
+- **Identity color:** amber `#d97706` on light, gold `#f59e0b` on dark, ink `#1c1917`.
+  In the app the mark uses `var(--brand-mark)`.
 - **License:** MIT, © Izzaldeen Radaideh. Public repository at
   `github.com/izzaldeen98/chester-bi`.
 - **Voice in existing copy:** plain, technical, second person, no marketing inflation

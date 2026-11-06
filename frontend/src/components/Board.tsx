@@ -60,6 +60,36 @@ export function Flap({ children }: { children: string; cascade?: boolean }) {
   return <>{children}</>;
 }
 
+/* ── Page head ─────────────────────────────────────────────────────────
+   Every page opens the same way: what this is, one line of context, and
+   its tools on the right (search first, the primary action last). */
+export function PageHead({
+  title,
+  context,
+  children,
+}: {
+  title: string;
+  context?: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <header
+      className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-3 px-6 py-4"
+      style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
+    >
+      <div className="min-w-0">
+        <h1 className="text-[18px] font-semibold leading-tight tracking-[-0.02em]">{title}</h1>
+        {context && (
+          <p className="mt-0.5 truncate text-[13px]" style={{ color: "var(--text-3)" }}>
+            {context}
+          </p>
+        )}
+      </div>
+      {children && <div className="ml-auto flex flex-wrap items-center gap-2">{children}</div>}
+    </header>
+  );
+}
+
 /* ── Panel ─────────────────────────────────────────────────────────────
    A white surface on the page ground. The header is optional and quiet —
    a title, maybe one action. No tinted bar, no uppercase eyebrow. */

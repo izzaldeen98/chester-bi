@@ -38,6 +38,8 @@
   /* ── Accent: the logo's amber, tuned per job ────────────────────── */
   --accent:        #b45309;
   --accent-bold:   #f59e0b;
+  --brand-mark:    #d97706;   /* logo colour, see assets/brand */
+  --brand-mark-on-solid: #f59e0b;
   --accent-soft:   #fef6e7;
   --accent-line:   #f3d9a4;
 
@@ -82,6 +84,8 @@
 
   --accent:        #f5b544;
   --accent-bold:   #f59e0b;
+  --brand-mark:    #f59e0b;
+  --brand-mark-on-solid: #d97706;
   --accent-soft:   rgba(245, 158, 11, 0.12);
   --accent-line:   rgba(245, 158, 11, 0.30);
 

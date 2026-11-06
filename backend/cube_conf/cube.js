@@ -40,16 +40,14 @@ const NO_CONTEXT_APP_ID = 'no-context';
 function connectionFor(securityContext, dataSource) {
   const connections = (securityContext && securityContext.connections) || {};
 
-  // Cube's query dispatch calls driverFactory once with no dataSource at
-  // all (or the literal string "default") purely to resolve a SQL dialect
-  // for the outer/wrapping query, before routing each cube's actual data
-  // pull to its own explicit `data_source:`. There's no real "default"
-  // connection in our per-account model, so any of the account's saved
-  // connections works equally well for that; fall back to a stateless
-  // DuckDB engine if the account has none saved at all.
+  // "default" is what Cube uses for a cube with no `data_source:` — in
+  // practice a hand-written file cube (`read_csv(...)`), since a database
+  // cube can't be queried without naming its connection. It always means
+  // the stateless DuckDB engine. It used to mean "the account's first saved
+  // connection", so adding a connection silently re-routed every such cube
+  // to it, and one unreachable database broke unrelated dashboards.
   if (!dataSource || dataSource === 'default') {
-    const first = Object.values(connections)[0];
-    return first || { type: 'duckdb' };
+    return { type: 'duckdb' };
   }
 
   const conn = connections[dataSource];
@@ -57,6 +55,20 @@ function connectionFor(securityContext, dataSource) {
     throw new Error(`No connection named "${dataSource}" in this request's security context`);
   }
   return conn;
+}
+
+// Cube runs in a container, where "localhost" is the container itself and
+// never a database. A connection saved as localhost means the machine
+// running Docker, so point it there (compose maps host.docker.internal to
+// the host gateway, which Linux needs; Docker Desktop provides it anyway).
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
+
+function withReachableHost(conn) {
+  const out = { ...conn };
+  for (const key of ['host', 'server']) {
+    if (LOCAL_HOSTS.has(String(out[key]).toLowerCase())) out[key] = 'host.docker.internal';
+  }
+  return out;
 }
 
 module.exports = {
@@ -101,7 +113,7 @@ module.exports = {
     // (mssql takes `server`, clickhouse and snowflake take `username`).
     // Re-mapping the keys here is what silently broke every dialect that
     // isn't shaped like Postgres, so nothing is re-mapped: pass it through.
-    return { ...conn };
+    return withReachableHost(conn);
   },
 
   scheduledRefreshContexts: () => [],

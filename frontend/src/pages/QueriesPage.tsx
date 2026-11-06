@@ -6,7 +6,7 @@ import CTextInput from "../components/CTextInput";
 import CAlert from "../components/CAlert";
 import CSpinner from "../components/CSpinner";
 import CConfirmDialog from "../components/CConfirmDialog";
-import { BoardFill, BoardHead, BoardRow, EmptyBoard, Panel, Status } from "../components/Board";
+import { BoardFill, BoardHead, BoardRow, EmptyBoard, PageHead, Panel, Status } from "../components/Board";
 import { getSavedQueries, deleteSavedQuery, type QueryPublicResponse } from "../lib/Api";
 
 /* Columns: when, name, which model, which cube, state, delete. */
@@ -62,39 +62,27 @@ export default function QueriesPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <header
-        className="flex shrink-0 flex-wrap items-center gap-4 px-6 py-4"
-        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface)" }}
-      >
-        <div className="min-w-0">
-          <h1 className="text-[18px] font-semibold leading-none tracking-[-0.02em]">Queries</h1>
-          <p className="mt-1.5 text-[13px] leading-none" style={{ color: "var(--text-3)" }}>
-            {queries.length} quer{queries.length === 1 ? "y" : "ies"} · yours alone, never read by the AI
-          </p>
-        </div>
-        <div className="ml-auto flex items-center gap-3">
-          {queries.length > 0 && (
-            <div className="hidden w-56 sm:block">
-              <CTextInput
-                type="search"
-                value={search}
-                onChange={setSearch}
-                placeholder="Search queries…"
-                icon={<FaSearch size={11} />}
-              />
-            </div>
-          )}
-          <CButton variant="primary" onClick={() => navigate("/queries/new")}>
-            <FaPlus size={10} /> New query
-          </CButton>
-        </div>
-      </header>
+      <PageHead title="Queries" context={`${queries.length} quer${queries.length === 1 ? "y" : "ies"}, yours alone. The AI never reads them.`}>
+        {queries.length > 0 && (
+          <div className="w-full sm:w-64">
+            <CTextInput
+              type="search"
+              value={search}
+              onChange={setSearch}
+              placeholder="Search queries…"
+              icon={<FaSearch size={12} />}
+            />
+          </div>
+        )}
+        <CButton variant="primary" onClick={() => navigate("/queries/new")}>
+          <FaPlus size={10} /> New query
+        </CButton>
+      </PageHead>
 
       <div className="relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
-        <div aria-hidden className="grid-paper pointer-events-none absolute inset-0" />
         {error && <CAlert variant="error" message={error} className="mb-3" />}
 
-        <Panel className="relative" label="All queries" flush bodyClassName="flex flex-col">
+        <Panel className="relative" flush bodyClassName="flex flex-col">
           <BoardHead cols={COLS} colsNarrow={COLS_NARROW}>
             <span className="label">Updated</span>
             <span className="label">Query</span>

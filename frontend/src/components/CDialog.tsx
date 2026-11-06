@@ -13,10 +13,15 @@ interface CDialogProps {
   saving?: boolean;
   saveDisabled?: boolean;
   children?: ReactNode;
+  /** Replaces the Cancel/Save footer when a dialog needs its own actions. */
+  footer?: ReactNode;
+  /** Set false while a form holds unsaved input (e.g. after a file picker):
+   * a stray or "ghost" click on the backdrop would otherwise discard it. */
+  closeOnBackdropClick?: boolean;
 }
 
-/* A dialog is a service panel swung open in front of the board: steel
-   head, square, with the hall darkened behind it. */
+/* Every panel that opens over a page is this dialog: details, create and
+   edit forms alike. It takes no layout space while closed. */
 export default function CDialog({
   isOpen,
   title,
@@ -27,6 +32,8 @@ export default function CDialog({
   saving = false,
   saveDisabled = false,
   children,
+  footer,
+  closeOnBackdropClick = true,
 }: CDialogProps) {
   useEffect(() => {
     if (!isOpen) return;
@@ -41,7 +48,7 @@ export default function CDialog({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(23,22,20,0.45)", backdropFilter: "blur(2px)" }}
-      onClick={onClose}
+      onClick={closeOnBackdropClick ? onClose : undefined}
       role="presentation"
     >
       <div
@@ -84,7 +91,14 @@ export default function CDialog({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
 
-        {onSave && (
+        {footer ? (
+          <footer
+            className="shrink-0 px-5 py-3.5"
+            style={{ borderTop: "1px solid var(--border)", background: "var(--surface-2)" }}
+          >
+            {footer}
+          </footer>
+        ) : onSave && (
           <footer
             className="flex shrink-0 items-center justify-end gap-2 px-5 py-3.5"
             style={{ borderTop: "1px solid var(--border)", background: "var(--surface-2)" }}
